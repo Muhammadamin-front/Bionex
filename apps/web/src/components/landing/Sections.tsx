@@ -306,30 +306,6 @@ export function About() {
 }
 
 /** Composition set like the printed label on the pack: one panel, ruled rows. */
-export function Ingredients() {
-  const { ingredients } = product;
-  return (
-    <section aria-labelledby="tarkib-title" className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 sm:pb-24">
-      <div className="overflow-hidden rounded-3xl border-2 border-forest bg-card">
-        <div className="on-dark flex flex-wrap items-baseline justify-between gap-2 bg-forest px-6 py-5 text-white sm:px-8">
-          <h2 id="tarkib-title" className="text-[1.6rem] font-extrabold tracking-[-0.01em] sm:text-3xl">
-            {ingredients.title}
-          </h2>
-          <p className="font-display text-base font-bold uppercase tracking-[0.06em] text-accent">100% ўсимлик</p>
-        </div>
-        <dl className="grid grid-cols-1 gap-px bg-line md:grid-cols-3">
-          {ingredients.items.map((it) => (
-            <div key={it.name} className="bg-card px-6 py-5 sm:px-8">
-              <dt className="font-display text-lg font-bold text-forest">{it.name}</dt>
-              <dd className="mt-1 text-[1.05rem] leading-snug text-ink-2">{it.text}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
-  );
-}
-
 export function Usage() {
   const { audience, dosage } = product;
   return (

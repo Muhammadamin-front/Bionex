@@ -9,7 +9,6 @@ import {
   Faq,
   Family,
   Footer,
-  Ingredients,
   Order,
   Process,
   Reviews,
@@ -71,7 +70,6 @@ export function Landing() {
         <Symptoms />
         <Process />
         <About />
-        <Ingredients />
         <Usage />
         <Reviews />
         <Order utm={utm} orderRef={orderRef} order={order} onOrdered={setOrder} />
