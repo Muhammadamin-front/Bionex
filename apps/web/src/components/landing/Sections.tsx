@@ -214,13 +214,6 @@ export function Symptoms() {
           </div>
         </div>
       </div>
-
-      <p role="note" className="mt-10 flex items-start gap-4 rounded-2xl border-2 border-alarm bg-alarm-bg p-5 text-lg font-semibold">
-        <AlertIcon className="mt-0.5 h-7 w-7 flex-none text-alarm" />
-        <span>
-          {symptoms.emergency} <strong className="text-alarm">{symptoms.emergencyCall}</strong>
-        </span>
-      </p>
     </section>
   );
 }
