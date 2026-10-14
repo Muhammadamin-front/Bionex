@@ -208,7 +208,7 @@ export function Symptoms() {
                 Агар сизда ушбу аломатлардан камида биттаси бўлса — уни эътиборсиз қолдирманг!
               </p>
             )}
-            <AntiMetalLink href="#forma" tone="accent" className="mt-5 w-full">
+            <AntiMetalLink href="#tez-buyurtma" tone="accent" className="mt-5 w-full">
               Бепул маслаҳат олиш
             </AntiMetalLink>
           </div>
@@ -526,7 +526,7 @@ export function Footer() {
   );
 }
 
-export function StickyCta({ visible, heroFormOnScreen }: { visible: boolean; heroFormOnScreen: boolean }) {
+export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; quickFormOnScreen: boolean }) {
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_28px_-18px_rgba(13,58,39,0.55)] transition-transform duration-300 ease-out md:hidden"
@@ -548,8 +548,8 @@ export function StickyCta({ visible, heroFormOnScreen }: { visible: boolean; her
         <a
           href="#forma"
           onClick={(e) => {
-            // Next to the first-screen form: use that one instead of jumping to the bottom of the page.
-            const heroName = heroFormOnScreen ? document.querySelector<HTMLInputElement>('#asosiy form input[name=name]') : null;
+            // Next to the first form: use that one instead of jumping to the bottom of the page.
+            const heroName = quickFormOnScreen ? document.querySelector<HTMLInputElement>('#tez-buyurtma form input[name=name]') : null;
             if (!heroName) return;
             e.preventDefault();
             heroName.scrollIntoView({ block: 'center', behavior: 'smooth' });

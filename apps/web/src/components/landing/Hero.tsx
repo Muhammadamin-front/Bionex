@@ -65,7 +65,7 @@ export function Header() {
           </a>
         )}
         <a
-          href="#forma"
+          href="#tez-buyurtma"
           className="inline-flex h-12 items-center rounded-full bg-accent px-4 font-display font-bold text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)] transition-colors hover:bg-accent-2 sm:px-6"
         >
           Буюртма
@@ -149,20 +149,10 @@ function MobileBadges() {
   );
 }
 
-export function Hero({
-  heroRef,
-  utm,
-  order,
-  onOrdered,
-}: {
-  heroRef: React.Ref<HTMLElement>;
-  utm: Utm;
-  order: OrderResult | null;
-  onOrdered: (r: OrderResult) => void;
-}) {
+export function Hero() {
   const { hero } = product;
   return (
-    <section id="asosiy" ref={heroRef} className="on-dark relative isolate overflow-hidden bg-forest pb-14 text-white sm:pb-20">
+    <section id="asosiy" className="on-dark relative isolate overflow-hidden bg-forest pb-14 text-white sm:pb-20">
       <AuroraBackdrop />
       <Header />
       <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:items-start px-4 pt-6 sm:px-6 sm:pt-12 lg:grid-cols-[1.12fr_0.88fr] lg:gap-14 lg:pt-16">
@@ -205,11 +195,28 @@ export function Hero({
               {product.oldPrice !== null && <s className="text-xl text-on-forest tabular-nums">{formatPrice(product.oldPrice)}</s>}
             </p>
           )}
-
-          <div className="mt-8 max-w-[40rem] [--focus-ring:var(--color-forest)]">
-            <OrderForm utm={utm} variant="compact" completed={order} onSuccess={onOrdered} />
-          </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** The first order form, right after the symptom check: "you have these signs — order now". */
+export function QuickOrder({
+  sectionRef,
+  utm,
+  order,
+  onOrdered,
+}: {
+  sectionRef: React.Ref<HTMLElement>;
+  utm: Utm;
+  order: OrderResult | null;
+  onOrdered: (r: OrderResult) => void;
+}) {
+  return (
+    <section id="tez-buyurtma" ref={sectionRef} aria-label="Буюртма формаси" className="on-dark bg-forest px-4 py-12 text-white sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-[40rem] [--focus-ring:var(--color-forest)]">
+        <OrderForm utm={utm} variant="compact" completed={order} onSuccess={onOrdered} />
       </div>
     </section>
   );
