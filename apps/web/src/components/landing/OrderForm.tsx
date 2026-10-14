@@ -67,6 +67,9 @@ export function OrderForm({
   const honeypotRef = useRef<HTMLInputElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
   const widgetBox = useRef<HTMLDivElement>(null);
+  /** The visible check box needs 300 px; narrower forms get Cloudflare's square compact widget. */
+  const [compactWidget, setCompactWidget] = useState(false);
+  const compactRef = useRef(false);
   const submittedHere = useRef(false);
 
   const [fullName, setFullName] = useState('');
@@ -102,9 +105,10 @@ export function OrderForm({
       sitekey: SITE_KEY,
       action: TURNSTILE_ACTION,
       cData: submissionId, // the server checks the token was issued for this exact form
-      appearance: 'interaction-only',
+      // Always shown, so every visitor sees the site is protected; real people pass without clicking.
+      appearance: 'always',
       // 'flexible' is at least 300 px wide and would push narrow phones into zoom-out.
-      size: window.innerWidth < 420 ? 'compact' : 'flexible',
+      size: compactRef.current ? 'compact' : 'flexible',
       language: turnstileLanguage(),
       'refresh-expired': 'auto',
       callback: (token) => {
@@ -217,6 +221,13 @@ export function OrderForm({
     pendingCaret.current = caretAfterDigits(formatted, digitsBefore);
     setCaretTick((t) => t + 1); // re-render even when the text did not change
   }
+
+  // Decided before the first paint, so the reserved space is right from the start.
+  useLayoutEffect(() => {
+    const narrow = (widgetBox.current?.clientWidth ?? 400) < 300;
+    compactRef.current = narrow;
+    setCompactWidget(narrow);
+  }, []);
 
   // Runs synchronously right after React writes the new value, before the next keystroke
   // can arrive, so fast typing or a held key never lands at the wrong position.
@@ -467,8 +478,11 @@ export function OrderForm({
           <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" />
         </div>
 
-        {/* Turnstile mounts here; with "interaction-only" it stays invisible unless a check is needed. */}
-        <div ref={widgetBox} className="empty:hidden sm:col-span-2" />
+        {/* Turnstile mounts here. Its height is reserved up front so the form does not jump when it appears. */}
+        <div
+          ref={widgetBox}
+          className={cn('flex justify-center sm:col-span-2', compactWidget ? 'min-h-[147px]' : 'min-h-[72px]')}
+        />
 
         {formError && (
           <div role="alert" className="rounded-2xl bg-danger-bg px-4 py-3 text-base font-semibold text-danger sm:col-span-2">
