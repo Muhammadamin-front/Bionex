@@ -518,42 +518,6 @@ export function Family() {
   );
 }
 
-export function Privacy() {
-  return (
-    <section id="maxfiylik" aria-labelledby="maxfiylik-title" className="border-t border-line">
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <h2 id="maxfiylik-title" className="text-xl font-bold">
-          Махфийлик сиёсати
-        </h2>
-        <div className="mt-4 space-y-3 text-[1.02rem] leading-relaxed text-ink-2">
-          <p>
-            <strong>Қандай маълумотлар йиғилади:</strong> буюртма формаси орқали юборган исмингиз ва телефон рақамингиз,
-            шунингдек сайтга қайси реклама орқали ўтганингиз. Хавфсизлик учун IP манзилингиз фақат қайтариб бўлмайдиган
-            шифрланган (хеш) кўринишда сақланади.
-          </p>
-          <p>
-            <strong>Нима учун ишлатилади:</strong> фақат буюртмангизни расмийлаштириш, сиз билан боғланиш, маҳсулотни етказиб
-            бериш ва сохта аризалардан ҳимояланиш учун. Маълумотлар учинчи шахсларга сотилмайди.
-          </p>
-          <p>
-            <strong>Ким кўради:</strong> исмингиз ва рақамингиз фақат {site.legalName} операторларининг ёпиқ Telegram гуруҳига
-            юборилади. Маълумотлар {site.retentionText} сақланади, сўнг ўчирилади.
-          </p>
-          <p>
-            <strong>Cookie ва Meta Pixel:</strong> сайт реклама самарадорлигини ўлчаш учун Meta Pixel'дан фойдаланади. Форма
-            Cloudflare Turnstile билан ботлардан ҳимояланган. Браузер созламаларида cookie файлларини ўчириб қўйишингиз мумкин.
-          </p>
-          <p>
-            <strong>Маълумотни ўчириш:</strong> маълумотларингизни ўчиришни истасангиз, оператор қўнғироқ қилганда бу ҳақда
-            айтинг. Маълумотлар Ўзбекистон Республикасининг «Шахсга доир маълумотлар тўғрисида»ги Қонунига мувофиқ қайта
-            ишланади.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function Footer() {
   return (
     <footer className="on-dark bg-forest text-on-forest">
@@ -577,7 +541,6 @@ export function Footer() {
               ['#mahsulot', 'Маҳсулот'],
               ['#alomatlar', 'Аломатлар'],
               ['#forma', 'Буюртма бериш'],
-              ['#maxfiylik', 'Махфийлик'],
             ].map(([href, label]) => (
               <a key={href} href={href} className="inline-flex min-h-11 items-center rounded underline-offset-4 hover:text-white hover:underline">
                 {label}

@@ -19,13 +19,16 @@ export interface ProductImage {
 
 export const site = {
   brand: 'Зейнара',
-  /** Contact phone for click-to-call (header, form, sticky bar, footer). null = hidden. */
-  phone: '+998 55 508 56 56' as string | null,
-  phoneHref: 'tel:+998555085656' as string | null,
-  /** Shown in the footer and privacy notice. VERIFY */
+  /**
+   * Contact phone for click-to-call (header, form, sticky bar, footer, error messages).
+   * null = hidden everywhere. Switched off on 2026-10-14 because the number does not work yet;
+   * to restore: phone '+998 55 508 56 56', phoneHref 'tel:+998555085656' (and the <noscript>
+   * line in index.html).
+   */
+  phone: null as string | null,
+  phoneHref: null as string | null,
+  /** Shown in the footer. VERIFY */
   legalName: 'Зейнара',
-  /** How long order data is kept — keep in sync with LEAD_RETENTION_DAYS on the server. VERIFY */
-  retentionText: 'буюртма якунлангандан сўнг 12 ой',
   disclaimer: 'Биологик фаол қўшимча. Дори воситаси эмас. Фойдаланишдан олдин шифокор билан маслаҳатлашинг.',
 };
 

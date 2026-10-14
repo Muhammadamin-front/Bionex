@@ -17,9 +17,12 @@
   wrong-site and wrong-attempt (cData) tokens are refused.
 - ✅ Strict Zod validation (unknown keys refused, 8 KB limit, phone normalised to +998…,
   name character rules), the same rules as in the browser.
-- ✅ Per IP: 10 attempts per 10 minutes; per phone number: 5 per hour (HTTP 429).
+- ✅ Per IP: 3 order attempts per hour, failed ones included (`IP_ORDERS_PER_HOUR`); per phone
+  number: 5 per hour (HTTP 429, with the phone number to call).
+- ☐ Mobile operators put many customers behind one IP: if real customers say the site told them
+  "too many attempts", raise `IP_ORDERS_PER_HOUR` in `apps/worker/wrangler.jsonc` and `npm run deploy`.
 - ✅ One IP may order for at most `LEADS_PER_IP_PER_DAY` (3) different numbers a day; the
-  rest are told to call. Customers re-sending their own number are never blocked.
+  rest are told to call. Re-sending one's own number does not count toward this daily cap.
 - ✅ Repeats of a number within 24 h become one order plus a 🔁 note — decided inside one
   Durable Object, so simultaneous clicks can never create two orders.
 - ✅ Honeypot and made-up looking numbers are **flags** (⚠️ in the message), not blocks.
@@ -35,14 +38,14 @@
 - ✅ If Telegram is unreachable, messages wait and are retried (30 s … hourly, up to 7 days);
   `/api/health` shows how many are waiting.
 - ✅ Turnstile misconfiguration (wrong secret, test key, wrong address) warns the group.
-- ✅ Any unexpected error answers "try again or call +998 55 508 56 56" — never a false success.
+- ✅ Any unexpected error answers "try again" (plus "or call …" when `site.phone` is set) — never a false success.
 
 ## Privacy
 - ✅ IPs and phone numbers are stored only as HMAC hashes (secret generated inside the
   Durable Object), for 30 days.
 - ✅ Name and number are stored in clear only while a message waits for Telegram.
 - ✅ Nothing personal is written to logs.
-- ☐ Delete group messages older than the period stated in the privacy notice (`retentionText`).
+- ☐ Delete old order messages from the group when they are no longer needed.
 - ☐ Telegram and Cloudflare store data outside Uzbekistan; ask a lawyer about the
   personal-data law's localisation rules for your case.
 

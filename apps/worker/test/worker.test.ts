@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { site } from '../../web/src/config/product';
 
 /**
  * Runs the real Worker in workerd (the Cloudflare runtime) with its Durable Object.
@@ -49,6 +50,7 @@ function start(bindings: Record<string, string> = {}) {
     serviceBindings: { ASSETS: () => new Response('<!doctype html><title>site</title>') },
     outboundService: outbound,
     bindings: {
+      IP_ORDERS_PER_HOUR: '3',
       LEADS_PER_IP_PER_DAY: '3',
       DUPLICATE_WINDOW_HOURS: '24',
       TURNSTILE_SECRET_KEY: '0x4AAAAAAA-real-looking-secret',
@@ -74,6 +76,15 @@ function order(body: Record<string, unknown> = {}, opts: { ip?: string; origin?:
   });
 }
 const leadMessages = () => telegram.messages.filter((m) => m.text.startsWith('🆕'));
+
+/** Refusals offer the phone number only while the site shows one; never "call us" without a number. */
+function expectCallHint(message: string, withoutPhone: RegExp) {
+  if (site.phone) expect(message).toContain(site.phone);
+  else {
+    expect(message).toMatch(withoutPhone);
+    expect(message).not.toMatch(/қўнғироқ/);
+  }
+}
 
 beforeAll(async () => {
   const out = await build({
@@ -149,7 +160,7 @@ describe('repeats and retries', () => {
   });
 
   it('never creates two orders from simultaneous submissions of one number', async () => {
-    const results = await Promise.all(Array.from({ length: 5 }, () => order().then((r) => r.status)));
+    const results = await Promise.all(Array.from({ length: 5 }, (_, i) => order({}, { ip: `203.0.113.${i + 1}` }).then((r) => r.status)));
     expect(results.filter((s) => s === 201)).toHaveLength(1);
     expect(results.filter((s) => s === 200)).toHaveLength(4);
     expect(leadMessages()).toHaveLength(1);
@@ -164,21 +175,33 @@ describe('repeats and retries', () => {
 });
 
 describe('spam protection', () => {
-  it('lets one IP order for 3 different numbers a day, then points to the phone', async () => {
+  it('lets one IP order for 3 different numbers a day, then refuses', async () => {
+    await mf.dispose();
+    mf = start({ IP_ORDERS_PER_HOUR: '100' }); // the daily cap alone, without the hourly one
     const statuses = [];
     for (const n of ['61', '62', '63', '64']) statuses.push((await order({ phone: `+998 90 312 45 ${n}` })).status);
     expect(statuses).toEqual([201, 201, 201, 429]);
     const refused = await order({ phone: '+998 90 312 45 65' });
-    expect(((await refused.json()) as { error: { message: string } }).error.message).toContain('+998 55 508 56 56');
+    expectCallHint(((await refused.json()) as { error: { message: string } }).error.message, /эртага/);
     expect((await order({ phone: '+998 90 312 45 66' }, { ip: '203.0.113.5' })).status).toBe(201);
     expect(leadMessages().at(-2)!.text).toMatch(/бугун 3 та рақам/);
   });
 
-  it('cuts off a flood of requests from one IP', async () => {
+  it('allows one IP at most 3 attempts an hour, failed ones included', async () => {
     const statuses = [];
-    for (let i = 0; i < 12; i++) statuses.push((await order({ turnstileToken: 'bad', phone: `+998 90 312 45 ${10 + i}` })).status);
-    expect(statuses.slice(0, 10).every((s) => s === 403)).toBe(true);
-    expect(statuses.slice(10)).toEqual([429, 429]);
+    for (let i = 0; i < 5; i++) statuses.push((await order({ turnstileToken: 'bad', phone: `+998 90 312 45 ${10 + i}` })).status);
+    expect(statuses).toEqual([403, 403, 403, 429, 429]);
+    // A real customer on another network is unaffected.
+    expect((await order({}, { ip: '203.0.113.50' })).status).toBe(201);
+  });
+
+  it('refuses the 4th order from one IP within an hour', async () => {
+    const statuses = [];
+    for (const n of ['71', '72', '73']) statuses.push((await order({ phone: `+998 90 312 45 ${n}` })).status);
+    const fourth = await order({ phone: '+998 90 312 45 74' });
+    expect([...statuses, fourth.status]).toEqual([201, 201, 201, 429]);
+    expectCallHint(((await fourth.json()) as { error: { message: string } }).error.message, /бироздан сўнг/);
+    expect(leadMessages()).toHaveLength(3);
   });
 
   it('refuses failed, foreign-site and foreign-form Turnstile tokens', async () => {

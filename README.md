@@ -21,7 +21,7 @@ Visitor ─► Cloudflare Worker ──► website files (apps/web/dist)
 
 1. The form validates the name and the Uzbek phone number (also "8 90…" and "+998…" input).
 2. The Worker refuses posts from other websites, malformed or oversized bodies, and more than
-   10 attempts per IP in 10 minutes or 5 per phone number per hour.
+   3 attempts per IP per hour (`IP_ORDERS_PER_HOUR`, failed ones count) or 5 per phone number per hour.
 3. **Turnstile** is checked with Cloudflare: the token must be fresh, for this form, for this
    exact order attempt and for this site's address.
 4. The **LeadRegistry** decides, one order at a time (so two simultaneous clicks never make
@@ -63,8 +63,9 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 | | `VITE_META_PIXEL_ID` | Meta Pixel id (optional) |
 | Cloudflare secret | `TURNSTILE_SECRET_KEY` | Turnstile **secret** key |
 | | `TELEGRAM_BOT_TOKEN` | from @BotFather |
-| | `TELEGRAM_CHAT_ID` | the group id (`npm run telegram:setup` finds it) |
-| `apps/worker/wrangler.jsonc` | `LEADS_PER_IP_PER_DAY` | default 3 |
+| | `TELEGRAM_CHAT_ID` | the private group or channel id (`npm run telegram:setup` finds it) |
+| `apps/worker/wrangler.jsonc` | `IP_ORDERS_PER_HOUR` | order attempts per IP per hour, default 3 |
+| | `LEADS_PER_IP_PER_DAY` | different numbers per IP per day, default 3 |
 | | `DUPLICATE_WINDOW_HOURS` | default 24 |
 
 `GET /api/health` shows whether the secrets are set and how many messages wait for Telegram.
@@ -74,14 +75,12 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 The page content lives in `apps/web/src/config/product.ts`; images in
 `apps/web/public/images/zeynara/`. Every value marked **VERIFY** must be a fact you can prove:
 health statements (must match the supplement's approved label), delivery and payment promises,
-the "15 minutes" call-back promise, legal name, retention period.
+the "15 minutes" call-back promise, legal name.
 
 - `reviews` are the five real customer reviews from the old site; keep each customer's written
   consent on file. `expert` stays empty unless a real specialist gives written consent.
 - No medical/treatment/"clinically proven"/certification claims unless legally approved for this
   exact product.
-- The privacy notice says orders go to a closed Telegram group and are deleted after the
-  retention period: delete old messages in the group accordingly.
 
 ## Further documentation
 

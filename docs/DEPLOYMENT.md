@@ -4,14 +4,16 @@ Everything runs on one Cloudflare Worker (free plan: 100,000 requests a day). Th
 serves the website and handles orders; orders go to a Telegram group.
 
 The Worker is named `zeynara` (`apps/worker/wrangler.jsonc`), so the site appears at
-`https://zeynara.<your-account>.workers.dev`. The old site (`zeynera`, different spelling)
-is not touched.
+`https://zeynara.<your-subdomain>.workers.dev`. A new Cloudflare account picks its
+`workers.dev` subdomain once (Workers & Pages); verify the account email first.
 
 ## 1. Telegram
 
 1. In Telegram, open **@BotFather** → `/newbot` → give a name and a username ending in `bot`.
    Copy the token it gives.
-2. Create a group for the operators and add the bot to it. Write any message in the group.
+2. Create a **private** group or channel for the operators and add the bot (in a channel: as an
+   administrator with "Post messages"). Write any message there. The setup script refuses a
+   public chat — orders contain customers' names and numbers.
 
 ## 2. Turnstile keys
 
@@ -26,7 +28,7 @@ Create `apps/web/.env.production`:
 ```bash
 VITE_TURNSTILE_SITE_KEY=0x4AAAA...          # Site key (public)
 VITE_SITE_URL=https://zeynara.<your-account>.workers.dev
-VITE_META_PIXEL_ID=1079627421633529        # optional
+VITE_META_PIXEL_ID=                        # optional: your own Pixel ID
 ```
 
 `npm run deploy` refuses to publish with a Turnstile test key, an empty key or a non-https URL.

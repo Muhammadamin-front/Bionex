@@ -37,8 +37,9 @@ interface Verification {
   submissionId: string;
 }
 
-const CHECK_FAILED =
-  'Хавфсизлик текширувини ўтказиб бўлмади. Саҳифани янгилаб, қайта уриниб кўринг ёки бизга қўнғироқ қилинг.';
+const CHECK_FAILED = `Хавфсизлик текширувини ўтказиб бўлмади. Саҳифани янгилаб, қайта уриниб кўринг${
+  site.phone ? ` ёки ${site.phone} рақамига қўнғироқ қилинг` : ''
+}.`;
 
 /**
  * `full`: the order section's form. `compact`: the hero form — same behaviour, fields side
@@ -509,12 +510,7 @@ export function OrderForm({
         )}
 
         <p id={`${id}-privacy`} className="text-center text-[0.95rem] leading-relaxed text-muted sm:col-span-2">
-          Тугмани босиш орқали сиз{' '}
-          <a href="#maxfiylik" className="font-semibold text-ink underline underline-offset-2">
-            махфийлик сиёсати
-          </a>{' '}
-          билан танишганингизни ва исм ҳамда телефон рақамингиз буюртмани расмийлаштириш учун ишлатилишига розилик
-          билдирасиз.
+          Исмингиз ва рақамингиз фақат буюртмани расмийлаштириш учун ишлатилади.
         </p>
       </div>
     </form>

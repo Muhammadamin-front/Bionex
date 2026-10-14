@@ -1,7 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // The new site's address will be https://zeynara.<your-account>.workers.dev
-  // (the old site is "zeynera" — a different name, so deploying does not touch it).
+  // The site's address will be https://zeynara.<your-subdomain>.workers.dev
   "name": "zeynara",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
@@ -23,6 +22,8 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LeadRegistry"] }],
 
   "vars": {
+    // Order attempts one IP may make per hour (failed ones count too).
+    "IP_ORDERS_PER_HOUR": "3",
     // How many different phone numbers one IP may order for per day.
     "LEADS_PER_IP_PER_DAY": "3",
     // The same number again within this time is a repeat, not a new order.

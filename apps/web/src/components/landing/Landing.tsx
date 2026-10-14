@@ -11,7 +11,6 @@ import {
   Footer,
   Ingredients,
   Order,
-  Privacy,
   Process,
   Reviews,
   Risks,
@@ -74,7 +73,6 @@ export function Landing() {
         <Order utm={utm} orderRef={orderRef} order={order} onOrdered={setOrder} />
         <Faq />
         <Family />
-        <Privacy />
       </main>
       <Footer />
       <StickyCta visible={!order && !heroVisible && !orderVisible} />

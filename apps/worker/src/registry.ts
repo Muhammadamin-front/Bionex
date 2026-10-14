@@ -3,8 +3,7 @@ import { formatLead, formatRepeat, sendTelegram, TelegramError } from './telegra
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-/** Request limits, on top of Turnstile. Generous for a real person, tight for a script. */
-const IP_REQUESTS_PER_10_MIN = 10;
+/** Order attempts per phone number per hour, on top of Turnstile and the per-IP limit. */
 const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
@@ -79,7 +78,8 @@ export class LeadRegistry extends DurableObject<Env> {
     const count = (key: string, since: number) =>
       this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', key, since).one().n;
     this.sql.exec('INSERT INTO hits (key, at) VALUES (?, ?), (?, ?)', ipKey, input.now, phoneKey, input.now);
-    if (count(ipKey, input.now - 10 * 60_000) > IP_REQUESTS_PER_10_MIN) return { kind: 'limited' };
+    // Every attempt counts, failed ones too: a competitor's script gets a few tries an hour, not hundreds.
+    if (count(ipKey, input.now - HOUR) > Number(this.env.IP_ORDERS_PER_HOUR || 3)) return { kind: 'limited' };
     if (count(phoneKey, input.now - HOUR) > PHONE_REQUESTS_PER_HOUR) return { kind: 'limited' };
     return { kind: 'go' };
   }
