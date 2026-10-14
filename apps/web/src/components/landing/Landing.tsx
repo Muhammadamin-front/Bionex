@@ -24,7 +24,8 @@ export function Landing() {
   const heroRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
   const [heroVisible, setHeroVisible] = useState(true);
-  const [orderVisible, setOrderVisible] = useState(false);
+  /** A form field has focus: the phone keyboard is open, so the order bar steps aside. */
+  const [typing, setTyping] = useState(false);
   // One order result for the whole page: once either form succeeds, both show the
   // confirmation and the sticky bar stops asking to order.
   const [order, setOrder] = useState<OrderResult | null>(null);
@@ -33,22 +34,25 @@ export function Landing() {
     initPixel();
   }, []);
 
-  // The mobile order bar shows once the hero has scrolled away, and hides again while
-  // the real form is on screen. Two IntersectionObservers — no scroll listener.
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const watch = (el: Element | null, set: (v: boolean) => void) => {
-      if (!el) return () => {};
-      const io = new IntersectionObserver(([e]) => set(Boolean(e?.isIntersecting)), { threshold: 0 });
-      io.observe(el);
-      return () => io.disconnect();
-    };
-    const a = watch(heroRef.current, setHeroVisible);
-    const b = watch(orderRef.current, setOrderVisible);
+    const isField = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
+    const onIn = (e: FocusEvent) => isField(e.target) && setTyping(true);
+    const onOut = (e: FocusEvent) => isField(e.target) && setTyping(false);
+    document.addEventListener('focusin', onIn);
+    document.addEventListener('focusout', onOut);
     return () => {
-      a();
-      b();
+      document.removeEventListener('focusin', onIn);
+      document.removeEventListener('focusout', onOut);
     };
+  }, []);
+
+  // Whether the first-screen form is on screen, so the order bar can point to it.
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setHeroVisible(Boolean(e?.isIntersecting)), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   return (
@@ -75,7 +79,8 @@ export function Landing() {
         <Family />
       </main>
       <Footer />
-      <StickyCta visible={!order && !heroVisible && !orderVisible} />
+      {/* Always on screen (except while typing), as the owner asked. */}
+      <StickyCta visible={!typing} heroFormOnScreen={heroVisible && !order} />
     </>
   );
 }

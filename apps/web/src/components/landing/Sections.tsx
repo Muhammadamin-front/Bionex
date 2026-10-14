@@ -550,7 +550,7 @@ export function Footer() {
   );
 }
 
-export function StickyCta({ visible }: { visible: boolean }) {
+export function StickyCta({ visible, heroFormOnScreen }: { visible: boolean; heroFormOnScreen: boolean }) {
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_28px_-18px_rgba(13,58,39,0.55)] transition-transform duration-300 ease-out md:hidden"
@@ -571,6 +571,14 @@ export function StickyCta({ visible }: { visible: boolean }) {
         {/* A plain solid button here: it must always fit next to the call button on 320 px phones. */}
         <a
           href="#forma"
+          onClick={(e) => {
+            // Next to the first-screen form: use that one instead of jumping to the bottom of the page.
+            const heroName = heroFormOnScreen ? document.querySelector<HTMLInputElement>('#asosiy form input[name=name]') : null;
+            if (!heroName) return;
+            e.preventDefault();
+            heroName.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            heroName.focus({ preventScroll: true });
+          }}
           tabIndex={visible ? 0 : -1}
           className="inline-flex h-16 min-w-0 flex-1 items-center justify-center rounded-2xl bg-forest px-4 font-display text-[1.05rem] font-bold text-white shadow-[0_10px_24px_-10px_rgba(13,58,39,0.6)] active:scale-[0.98]"
         >
