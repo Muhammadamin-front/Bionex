@@ -93,3 +93,4 @@ the "15 minutes" call-back promise, legal name, retention period.
 The previous, heavier version (Express + PostgreSQL + admin panel + Google Sheets + AI
 assistant) is archived in `Desktop/Bionex-toliq-versiya-2026-10-14.tar.gz`.
 # Bionex
+# Bionex

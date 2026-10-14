@@ -1,0 +1,7 @@
+# Local secrets for `wrangler dev` (copy to .dev.vars). Never commit .dev.vars.
+# Cloudflare's "always passes" Turnstile test secret — local only.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+# Leave the bot empty locally: orders are printed in the terminal instead of sent.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_DRY_RUN=1

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+*.pem
+service-account*.json
+google-credentials*.json
+
+# Cloudflare local state and local secrets
+.wrangler/
+.dev.vars

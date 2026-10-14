@@ -1,0 +1,26 @@
+{
+  "name": "@bionex/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "STRICT_PRODUCTION_BUILD=1 npm run build --workspace=@bionex/web && wrangler deploy",
+    "types": "wrangler types",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "telegram:setup": "node scripts/telegram-setup.mjs"
+  },
+  "dependencies": {
+    "@bionex/shared": "1.0.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.1",
+    "esbuild": "0.28.2",
+    "miniflare": "5.20261012.0-beta",
+    "typescript": "6.0.3",
+    "vitest": "5.0.4",
+    "wrangler": "4.151.0"
+  }
+}

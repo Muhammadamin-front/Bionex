@@ -1,0 +1,20 @@
+{
+  "name": "bionex-landing",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace=@bionex/worker & npm run dev --workspace=@bionex/web & wait",
+    "build": "npm run build --workspace=@bionex/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "deploy": "npm run deploy --workspace=@bionex/worker",
+    "telegram:setup": "npm run telegram:setup --workspace=@bionex/worker"
+  }
+}
