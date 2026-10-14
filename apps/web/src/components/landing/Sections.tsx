@@ -523,10 +523,7 @@ export function Footer() {
     <footer className="on-dark bg-forest text-on-forest">
       {/* Extra bottom room on phones so the last links can scroll clear of the fixed order bar. */}
       <div className="mx-auto max-w-6xl px-4 pb-32 pt-10 sm:px-6 md:pb-10">
-        <p className="mx-auto max-w-3xl text-center font-display text-[1.05rem] font-bold leading-relaxed text-white">
-          {site.disclaimer}
-        </p>
-        <div className="mt-8 flex flex-col gap-4 border-t border-white/15 pt-6 text-[0.95rem] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 text-[0.95rem] sm:flex-row sm:items-center sm:justify-between">
           <p>
             © {new Date().getFullYear()} {site.legalName}. Барча ҳуқуқлар ҳимояланган.
           </p>

@@ -29,7 +29,6 @@ export const site = {
   phoneHref: null as string | null,
   /** Shown in the footer. VERIFY */
   legalName: 'Зейнара',
-  disclaimer: 'Биологик фаол қўшимча. Дори воситаси эмас. Фойдаланишдан олдин шифокор билан маслаҳатлашинг.',
 };
 
 export const product = {

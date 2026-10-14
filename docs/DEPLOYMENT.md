@@ -49,6 +49,22 @@ npm run telegram:setup    # checks the bot, finds the group, saves the two Teleg
 2. Place a test order from a phone (mobile data); it must appear in the group.
 3. Errors: Cloudflare dashboard → Workers → zeynara → **Logs**.
 
+## Alternative: deploy from GitHub (Workers Builds)
+
+Cloudflare → Workers & Pages → Create → Import a repository → this repo, then:
+
+| Field | Value |
+|---|---|
+| Project name | `zeynara` (must equal `name` in `apps/worker/wrangler.jsonc`) |
+| Build command | `STRICT_PRODUCTION_BUILD=1 npm run build` (first deploy, before keys exist: `npm run build`) |
+| Deploy command | `npx wrangler deploy -c apps/worker/wrangler.jsonc` |
+| Preview builds | off (previews would share the order registry and the Telegram channel) |
+
+Worker → Settings → **Build** → Variables: `VITE_TURNSTILE_SITE_KEY`, `VITE_SITE_URL`
+(and `VITE_META_PIXEL_ID`). Worker → Settings → **Variables and Secrets** (type *Secret*):
+`TURNSTILE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Every push to `main`
+redeploys.
+
 ## Own domain later
 
 Cloudflare → Workers → zeynara → Settings → **Domains & Routes** → add `zeynara.uz`. Then add
