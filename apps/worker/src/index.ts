@@ -1,6 +1,7 @@
 import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorCode, type LeadSubmitResponse } from '@bionex/shared/lead';
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
+import { HELP_TEXT, webhookSecret } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
 export { LeadRegistry } from './registry';
@@ -50,9 +51,13 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
+    if (url.pathname === '/api/telegram/hook' && request.method === 'POST') return telegramCommand(request, env);
+
     if (url.pathname === '/api/health' && request.method === 'GET') {
       // For a quick check after deploying. Says only whether settings exist, never their values.
-      const queued = await env.REGISTRY.get(env.REGISTRY.idFromName('main')).queued();
+      const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+      ctx.waitUntil(registry.ensureWebhook(url.origin));
+      const queued = await registry.queued();
       return json(200, {
         ok: true,
         turnstileSecret: Boolean(env.TURNSTILE_SECRET_KEY),
@@ -150,6 +155,7 @@ export default {
         now,
       });
       if (result.status === 'ip_limited') return fail(429, 'rate_limited', MESSAGES.ipDailyLimit);
+      ctx.waitUntil(registry.ensureWebhook(url.origin));
       return answer(result.status);
     } catch (err) {
       // Never "accepted" unless it was recorded: anything unexpected is a clear "try again / call".
@@ -158,6 +164,36 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * Commands typed in the operators' group, delivered by Telegram's webhook:
+ * /royxat sends the collected orders now, /holat reports that the bot is alive.
+ * Accepted only with the secret header Telegram was given, and only from our own group.
+ */
+async function telegramCommand(request: Request, env: Env): Promise<Response> {
+  const ok = new Response('ok');
+  if (!env.TELEGRAM_BOT_TOKEN || request.headers.get('x-telegram-bot-api-secret-token') !== (await webhookSecret(env.TELEGRAM_BOT_TOKEN))) {
+    return new Response('forbidden', { status: 403 });
+  }
+  const update = (await request.json().catch(() => null)) as { message?: { chat?: { id?: number }; text?: string } } | null;
+  const message = update?.message;
+  if (!message || String(message.chat?.id) !== String(env.TELEGRAM_CHAT_ID)) return ok;
+  // "/royxat", "/royxat@bionexecobot", "/royxat ..." — the command word only.
+  const command = /^\/([a-z_]+)(?:@\w+)?(?:\s|$)/i.exec(message.text?.trim() ?? '')?.[1]?.toLowerCase();
+  if (!command) return ok;
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const now = Date.now();
+  try {
+    if (command === 'royxat' || command === 'list') await registry.listNow(now);
+    else if (command === 'holat' || command === 'status') await registry.reportStatus(now);
+    else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now);
+  } catch (err) {
+    console.error('Telegram command failed', (err as Error)?.message);
+  }
+  // Always 200: Telegram re-sends anything else (which could send a list twice); replies that
+  // could not be delivered are retried by the outbox.
+  return ok;
+}
 
 function answer(status: 'accepted' | 'duplicate'): Response {
   const body: LeadSubmitResponse = { status, message: MESSAGES[status] };

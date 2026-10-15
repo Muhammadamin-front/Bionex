@@ -1,5 +1,16 @@
 import { DurableObject } from 'cloudflare:workers';
-import { formatLead, formatRepeat, sendTelegram, TelegramError } from './telegram';
+import {
+  callTelegram,
+  formatLead,
+  formatList,
+  formatListStatus,
+  formatRepeat,
+  formatStatus,
+  sendTelegram,
+  TelegramError,
+  webhookSecret,
+  type TelegramConfig,
+} from './telegram';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -32,7 +43,7 @@ export interface OrderInput {
  *
  * Privacy: phone numbers and IPs are kept only as keyed hashes (secret generated here and
  * never leaves this object). A name and number are stored in clear only inside a message
- * that is still waiting for Telegram, and deleted once it is sent.
+ * that is still waiting for Telegram, and until their 10-order list is sent (at most 30 days).
  */
 export class LeadRegistry extends DurableObject<Env> {
   private readonly sql: SqlStorage;
@@ -66,6 +77,13 @@ export class LeadRegistry extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS hits (key TEXT NOT NULL, at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS hits_key ON hits (key, at);
       CREATE TABLE IF NOT EXISTS alerts (kind TEXT PRIMARY KEY, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS list_items (
+        lead_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        flagged INTEGER NOT NULL DEFAULT 0
+      );
     `);
   }
 
@@ -117,15 +135,20 @@ export class LeadRegistry extends DurableObject<Env> {
     const leadId = this.sql
       .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, at) VALUES (?, ?, ?) RETURNING id', phoneHash, ipHash, now)
       .one().id;
+    const list = this.addToList(leadId, input, now);
     const text = formatLead({
+      number: leadId,
       fullName: input.fullName,
       phone: input.phone,
       createdAt: now,
       utm: input.utm,
       source: { id: ipHash.slice(0, 6), phonesToday: otherPhones + 1 },
       flags: input.flags,
+      list: list ? { count: list.count, size: list.size } : undefined,
     });
+    // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now });
+    if (list?.full) this.sendList(now);
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
     this.prune(now);
     await this.flush();
@@ -149,6 +172,111 @@ export class LeadRegistry extends DurableObject<Env> {
   /** Retries messages that could not be delivered earlier. */
   override async alarm(): Promise<void> {
     await this.flush();
+  }
+
+  /**
+   * Every LEADS_PER_LIST new orders (default 10), the group also gets them as one numbered
+   * list, so operators can share out the calls. Each order is still sent the moment it
+   * arrives; the list is only a summary. 0 turns the lists off.
+   */
+  private addToList(leadId: number, input: OrderInput, now: number): { count: number; size: number; full: boolean } | null {
+    const size = this.listSize();
+    if (size === 0) return null;
+    this.sql.exec(
+      'INSERT INTO list_items (lead_id, name, phone, at, flagged) VALUES (?, ?, ?, ?, ?)',
+      leadId,
+      input.fullName,
+      input.phone,
+      now,
+      input.flags.length > 0 ? 1 : 0,
+    );
+    const count = this.listCount();
+    return { count, size, full: count >= size };
+  }
+
+  private listSize(): number {
+    const size = Number(this.env.LEADS_PER_LIST ?? 10);
+    return size > 0 ? size : 0;
+  }
+
+  private listCount(): number {
+    return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM list_items').one().n;
+  }
+
+  /** Queues the collected orders (up to one list's worth) as one numbered list; returns how many. */
+  private sendList(now: number): number {
+    const items = this.sql
+      .exec<{ lead_id: number; name: string; phone: string; at: number; flagged: number }>(
+        'SELECT lead_id, name, phone, at, flagged FROM list_items ORDER BY lead_id LIMIT ?',
+        Math.max(this.listSize(), 1),
+      )
+      .toArray();
+    if (items.length === 0) return 0;
+    this.enqueue(
+      formatList(items.map((i) => ({ number: i.lead_id, fullName: i.name, phone: i.phone, createdAt: i.at, flagged: i.flagged === 1 }))),
+      { now },
+    );
+    this.sql.exec('DELETE FROM list_items WHERE lead_id <= ?', items[items.length - 1]!.lead_id);
+    return items.length;
+  }
+
+  /** /royxat in the group: send what has been collected now, even if fewer than the list size. */
+  async listNow(now: number): Promise<void> {
+    if (this.sendList(now) === 0) this.enqueue(formatListStatus(0, this.listSize() || 1), { now });
+    await this.flush();
+  }
+
+  /** /holat in the group: proof of life plus the numbers operators care about. */
+  async reportStatus(now: number): Promise<void> {
+    // Midnight in Tashkent (UTC+5, no daylight saving).
+    const tz = 5 * HOUR;
+    const dayStart = Math.floor((now + tz) / DAY) * DAY - tz;
+    const today = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM leads WHERE at >= ?', dayStart).one().n;
+    const last = this.sql.exec<{ at: number | null }>('SELECT max(at) AS at FROM leads').one().at;
+    const queued = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM outbox').one().n;
+    this.enqueue(formatStatus({ listCount: this.listCount(), listSize: this.listSize(), today, lastLeadAt: last, queued }), { now });
+    await this.flush();
+  }
+
+  /** Any other text for the group (the command help). */
+  async notify(text: string, now: number): Promise<void> {
+    this.enqueue(text, { now });
+    await this.flush();
+  }
+
+  /**
+   * Points the bot's webhook at this site once, so commands typed in the group (/royxat,
+   * /holat) reach the Worker, and registers them in Telegram's "/" menu. Done automatically
+   * on the first order or health check after deploying — nothing to configure by hand.
+   * Re-done once a day, so a new bot token or a removed webhook heals by itself.
+   */
+  async ensureWebhook(origin: string): Promise<void> {
+    if (this.env.TELEGRAM_DRY_RUN === '1' || !this.env.TELEGRAM_BOT_TOKEN || !origin.startsWith('https://')) return;
+    const url = `${origin}/api/telegram/hook`;
+    const done = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'webhook_url'").toArray()[0]?.v;
+    if (done && done.startsWith(`${url}|`) && Date.now() - Number(done.split('|')[1]) < DAY) return;
+    const cfg = this.telegramConfig();
+    try {
+      await callTelegram(cfg, 'setWebhook', {
+        url,
+        secret_token: await webhookSecret(cfg.token),
+        allowed_updates: ['message'],
+        drop_pending_updates: true,
+      });
+      await callTelegram(cfg, 'setMyCommands', {
+        commands: [
+          { command: 'royxat', description: 'Йиғилган буюртмалар рўйхатини ҳозир юбориш' },
+          { command: 'holat', description: 'Бот ишлаяптими, рўйхатда нечта буюртма бор' },
+        ],
+      });
+      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('webhook_url', ?)", `${url}|${Date.now()}`);
+    } catch (err) {
+      console.error('Telegram webhook setup failed (commands will not work yet)', (err as Error).message);
+    }
+  }
+
+  private telegramConfig(): TelegramConfig {
+    return { token: this.env.TELEGRAM_BOT_TOKEN, chatId: this.env.TELEGRAM_CHAT_ID, apiBase: this.env.TELEGRAM_API_BASE || undefined };
   }
 
   private enqueue(text: string, opts: { now: number; leadId?: number; replyToLead?: number }) {
@@ -205,17 +333,14 @@ export class LeadRegistry extends DurableObject<Env> {
       console.log(`[TELEGRAM_DRY_RUN] message to the operators' group:\n${text}`);
       return Math.floor(Math.random() * 1e9);
     }
-    return sendTelegram(
-      { token: this.env.TELEGRAM_BOT_TOKEN, chatId: this.env.TELEGRAM_CHAT_ID, apiBase: this.env.TELEGRAM_API_BASE || undefined },
-      text,
-      replyTo,
-    );
+    return sendTelegram(this.telegramConfig(), text, replyTo);
   }
 
   private prune(now: number) {
     this.sql.exec('DELETE FROM hits WHERE at < ?', now - DAY);
     this.sql.exec('DELETE FROM submissions WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
   }
 
   /** Keyed hash (HMAC-SHA-256) with a random secret created on first use and kept here. */

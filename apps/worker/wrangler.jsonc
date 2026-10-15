@@ -27,7 +27,9 @@
     // How many different phone numbers one IP may order for per day.
     "LEADS_PER_IP_PER_DAY": "3",
     // The same number again within this time is a repeat, not a new order.
-    "DUPLICATE_WINDOW_HOURS": "24"
+    "DUPLICATE_WINDOW_HOURS": "24",
+    // Every this many new orders, the group also gets them as one numbered list. 0 = off.
+    "LEADS_PER_LIST": "10"
   }
   // Secrets (never in this file): set once with `npx wrangler secret put NAME`
   //   TURNSTILE_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

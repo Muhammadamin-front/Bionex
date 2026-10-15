@@ -60,6 +60,12 @@ console.log(`✅ Bot topildi: @${me.result.username}\n`);
 let chats = [];
 for (;;) {
   const updates = await tg(token, 'getUpdates', { allowed_updates: ['message', 'channel_post', 'my_chat_member'] });
+  if (updates.error_code === 409) {
+    // The site already receives the bot's messages (webhook): it is connected and working.
+    console.log('✅ Bot saytga allaqachon ulangan va ishlayapti. Guruhda /holat deb yozib tekshiring.');
+    console.log('   Boshqa guruhga o‘tkazish kerak bo‘lsa, dasturchiga murojaat qiling.');
+    process.exit(0);
+  }
   chats = chatsFrom(updates.result ?? []);
   if (chats.length > 0) break;
   console.log(`2) @${me.result.username} ni kanalga (admin qilib) yoki guruhga qo‘shing va u yerga istalgan xabar yozing (masalan "salom").`);

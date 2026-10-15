@@ -14,7 +14,12 @@ let script = '';
 let mf: Miniflare;
 
 /** Fake Telegram: every sendMessage body; `down` makes it fail like an outage. */
-const telegram = { messages: [] as Array<{ chat_id: string; text: string; reply_parameters?: { message_id: number } }>, down: false };
+const telegram = {
+  messages: [] as Array<{ chat_id: string; text: string; reply_parameters?: { message_id: number } }>,
+  /** Other Bot API calls (setWebhook, setMyCommands) with their bodies. */
+  calls: [] as Array<{ method: string; body: Record<string, unknown> }>,
+  down: false,
+};
 let turnstileCalls = 0;
 
 async function outbound(request: Request): Promise<Response> {
@@ -35,6 +40,11 @@ async function outbound(request: Request): Promise<Response> {
   }
   if (url.hostname === 'telegram.mock') {
     if (telegram.down) return new Response('Bad Gateway', { status: 502 });
+    const method = url.pathname.split('/').pop()!;
+    if (method !== 'sendMessage') {
+      telegram.calls.push({ method, body: await request.json() });
+      return Response.json({ ok: true, result: true });
+    }
     telegram.messages.push(await request.json());
     return Response.json({ ok: true, result: { message_id: 1000 + telegram.messages.length } });
   }
@@ -105,6 +115,7 @@ beforeEach(async () => {
   await mf?.dispose();
   mf = start();
   telegram.messages = [];
+  telegram.calls = [];
   telegram.down = false;
   turnstileCalls = 0;
 });
@@ -135,6 +146,106 @@ describe('a new order', () => {
     await order({ contactFax: 'spam', phone: '+998 90 111 11 11' });
     expect(leadMessages()[0]!.text).toMatch(/бот бўлиши мумкин/);
     expect(leadMessages()[0]!.text).toMatch(/сунъийга ўхшайди/);
+  });
+});
+
+describe('numbers and lists for the operators', () => {
+  it('numbers every new order', async () => {
+    await order({ phone: '+998 90 312 45 31' });
+    await order({ phone: '+998 90 312 45 32' }, { ip: '203.0.113.21' });
+    expect(leadMessages().map((m) => m.text.split('\n')[0])).toEqual(['🆕 <b>Янги буюртма №1</b>', '🆕 <b>Янги буюртма №2</b>']);
+  });
+
+  it('sends a numbered list after every N new orders, without counting repeats', async () => {
+    await mf.dispose();
+    mf = start({ LEADS_PER_LIST: '3' });
+    const names = ['Алишер Каримов', 'Дилдора Ҳасанова', 'Рустам Носиров'];
+    await order({ fullName: names[0], phone: '+998 90 312 45 41' }, { ip: '203.0.113.31' });
+    await order({ fullName: names[0], phone: '+998 90 312 45 41' }, { ip: '203.0.113.31' }); // a repeat: no number, not listed
+    await order({ fullName: names[1], phone: '+998 93 444 55 66', contactFax: 'bot' }, { ip: '203.0.113.32' });
+    expect(telegram.messages.some((m) => m.text.startsWith('📋'))).toBe(false);
+    await order({ fullName: names[2], phone: '+998 97 777 88 99' }, { ip: '203.0.113.33' });
+
+    const list = telegram.messages.at(-1)!.text;
+    expect(list.startsWith('📋 <b>Рўйхат: №1–№3</b> (3 та буюртма)')).toBe(true);
+    expect(list).toContain('1. Алишер Каримов — +998 90 312 45 41');
+    expect(list).toContain('2. Дилдора Ҳасанова — +998 93 444 55 66');
+    expect(list).toMatch(/2\. Дилдора.*⚠️/);
+    expect(list).toContain('3. Рустам Носиров — +998 97 777 88 99');
+    // The next list starts again from the next order.
+    await order({ phone: '+998 91 222 33 44' }, { ip: '203.0.113.34' });
+    expect(telegram.messages.filter((m) => m.text.startsWith('📋'))).toHaveLength(1);
+  });
+
+  it('can turn the lists off', async () => {
+    await mf.dispose();
+    mf = start({ LEADS_PER_LIST: '0' });
+    for (let i = 0; i < 3; i++) await order({ phone: `+998 90 312 45 5${i}` }, { ip: `203.0.113.4${i}` });
+    expect(telegram.messages.some((m) => m.text.startsWith('📋'))).toBe(false);
+  });
+});
+
+describe('bot status and commands in the group', () => {
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  async function command(text: string, opts: { chatId?: string; secret?: string } = {}) {
+    return mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': opts.secret ?? (await secret()) },
+      body: JSON.stringify({ update_id: 1, message: { message_id: 5, chat: { id: Number(opts.chatId ?? CHAT), type: 'supergroup' }, text } }),
+    });
+  }
+
+  it('says under every order how many are collected and how many until the list', async () => {
+    await order({ phone: '+998 90 312 45 61' });
+    expect(leadMessages()[0]!.text).toContain('📋 Рўйхатда 1 та. Яна 9 та келса, рўйхатни юбораман');
+  });
+
+  it('/royxat sends the collected orders right away, even fewer than 10', async () => {
+    await order({ fullName: 'Алишер Каримов', phone: '+998 90 312 45 62' }, { ip: '203.0.113.51' });
+    await order({ fullName: 'Барно Олимова', phone: '+998 90 312 45 63' }, { ip: '203.0.113.52' });
+    expect((await command('/royxat@bionexecobot')).status).toBe(200);
+    const list = telegram.messages.at(-1)!.text;
+    expect(list.startsWith('📋 <b>Рўйхат: №1–№2</b> (2 та буюртма)')).toBe(true);
+    expect(list).toContain('Барно Олимова');
+    // Collected orders were handed over: the next /royxat has nothing to send.
+    await command('/royxat');
+    expect(telegram.messages.at(-1)!.text).toBe('📋 Рўйхатда ҳозир буюртма йўқ.');
+    // And counting starts again for the next list.
+    await order({ phone: '+998 90 312 45 64' }, { ip: '203.0.113.53' });
+    expect(leadMessages().at(-1)!.text).toContain('Рўйхатда 1 та. Яна 9 та');
+  });
+
+  it('/holat answers that the bot is alive, with the numbers', async () => {
+    await order({ phone: '+998 90 312 45 65' });
+    await command('/holat');
+    const status = telegram.messages.at(-1)!.text;
+    expect(status).toContain('✅ <b>Бот ишлаяпти.</b>');
+    expect(status).toContain('Рўйхатда 1 та');
+    expect(status).toContain('Бугун: 1 та янги буюртма');
+    expect(status).toContain('Барча хабарлар етказилган');
+  });
+
+  it('ignores calls without the secret and messages from other chats', async () => {
+    await order({ phone: '+998 90 312 45 66' });
+    const before = telegram.messages.length;
+    expect((await command('/royxat', { secret: 'guess' })).status).toBe(403);
+    expect((await command('/royxat', { chatId: '-100555' })).status).toBe(200);
+    expect((await command('salom')).status).toBe(200);
+    expect(telegram.messages.length).toBe(before);
+  });
+
+  it('connects the bot to the site by itself, once', async () => {
+    await mf.dispatchFetch(`${SITE}/api/health`);
+    await order({ phone: '+998 90 312 45 67' });
+    await mf.dispatchFetch(`${SITE}/api/health`);
+    await new Promise((r) => setTimeout(r, 200));
+    const hooks = telegram.calls.filter((c) => c.method === 'setWebhook');
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]!.body).toMatchObject({ url: `${SITE}/api/telegram/hook`, secret_token: await secret() });
+    expect(telegram.calls.some((c) => c.method === 'setMyCommands')).toBe(true);
   });
 });
 

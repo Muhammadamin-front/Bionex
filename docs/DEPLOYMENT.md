@@ -47,7 +47,9 @@ npm run telegram:setup    # checks the bot, finds the group, saves the two Teleg
 1. Open `https://zeynara.<account>.workers.dev/api/health` →
    `"turnstileSecret": true, "telegram": true, "waitingForTelegram": 0`.
 2. Place a test order from a phone (mobile data); it must appear in the group.
-3. Errors: Cloudflare dashboard → Workers → zeynara → **Logs**.
+3. Type `/holat` in the group: the bot answers "✅ Бот ишлаяпти" (commands start working after the
+   first health check or order — the site connects the webhook itself).
+4. Errors: Cloudflare dashboard → Workers → zeynara → **Logs**.
 
 ## Alternative: deploy from GitHub (Workers Builds)
 

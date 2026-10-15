@@ -2,6 +2,8 @@ import { formatUzPhone } from '@bionex/shared/phone';
 
 /** What the operators need to call the customer back. */
 export interface LeadMessage {
+  /** Running order number, so operators can refer to "№37". */
+  number: number;
   fullName: string;
   /** E.164: "+998901234567". */
   phone: string;
@@ -10,6 +12,8 @@ export interface LeadMessage {
   /** Short pseudonymous id of the visitor's network, and how many numbers it sent today. */
   source: { id: string; phonesToday: number };
   flags: string[];
+  /** Where this order stands in the next list, e.g. 3 of 10 (absent when lists are off). */
+  list?: { count: number; size: number };
 }
 
 export interface TelegramConfig {
@@ -38,7 +42,7 @@ const FLAG_TEXT: Record<string, string> = {
 
 export function formatLead(lead: LeadMessage): string {
   const lines = [
-    '🆕 <b>Янги буюртма</b>',
+    `🆕 <b>Янги буюртма №${lead.number}</b>`,
     `👤 ${escapeHtml(lead.fullName)}`,
     `📞 ${formatUzPhone(lead.phone)}`,
     `🕒 ${tashkentTime(lead.createdAt)}`,
@@ -50,7 +54,62 @@ export function formatLead(lead: LeadMessage): string {
   if (lead.flags.length > 0) {
     lines.push('', `⚠️ <b>Текширинг:</b> ${lead.flags.map((f) => FLAG_TEXT[f] ?? f).join('; ')}`);
   }
+  if (lead.list) lines.push('', formatListStatus(lead.list.count, lead.list.size));
   return lines.join('\n');
+}
+
+/** The bot's running status under every order, so the group can see it is alive and counting. */
+export function formatListStatus(count: number, size: number): string {
+  if (count >= size) return `📋 Рўйхатда ${size} та бўлди — рўйхат пастда юборилди.`;
+  if (count === 0) return '📋 Рўйхатда ҳозир буюртма йўқ.';
+  return `📋 Рўйхатда ${count} та. Яна ${size - count} та келса, рўйхатни юбораман (ҳозир керак бўлса: /royxat).`;
+}
+
+export function formatStatus(s: { listCount: number; listSize: number; today: number; lastLeadAt: number | null; queued: number }): string {
+  return [
+    '✅ <b>Бот ишлаяпти.</b>',
+    s.listSize > 0 ? formatListStatus(s.listCount, s.listSize) : '📋 Рўйхатлар ўчирилган.',
+    `📅 Бугун: ${s.today} та янги буюртма.`,
+    `🕒 Охирги буюртма: ${s.lastLeadAt ? tashkentTime(s.lastLeadAt) : 'ҳали йўқ'}`,
+    s.queued > 0 ? `⚠️ Telegram'га етказилмай турган хабарлар: ${s.queued} (ўзи қайта юборилади).` : '📨 Барча хабарлар етказилган.',
+  ].join('\n');
+}
+
+export const HELP_TEXT = [
+  '🤖 <b>Буйруқлар</b>',
+  '/royxat — йиғилган буюртмалар рўйхатини ҳозироқ юбориш',
+  '/holat — бот ишлаяптими, рўйхатда нечта буюртма бор',
+].join('\n');
+
+/** The secret Telegram sends with every webhook call; derived from the bot token, so nothing extra to configure. */
+export async function webhookSecret(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`zeynara-webhook:${token}`));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Calls a Bot API method that only needs `ok: true` back (setWebhook, setMyCommands). */
+export async function callTelegram(cfg: TelegramConfig, method: string, body: unknown): Promise<void> {
+  const res = await fetch(`${cfg.apiBase ?? 'https://api.telegram.org'}/bot${cfg.token}/${method}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8000),
+  });
+  const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
+  if (!data?.ok) throw new TelegramError(`Telegram ${method}: ${data?.description ?? res.status}`, false);
+}
+
+/** One line per order, for operators to split the work ("you take 31–35, I take 36–40"). */
+export function formatList(items: Array<{ number: number; fullName: string; phone: string; createdAt: number; flagged: boolean }>): string {
+  const first = items[0]!.number;
+  const last = items[items.length - 1]!.number;
+  return [
+    `📋 <b>Рўйхат: №${first}–№${last}</b> (${items.length} та буюртма)`,
+    '',
+    ...items.map(
+      (i) => `${i.number}. ${escapeHtml(i.fullName)} — ${formatUzPhone(i.phone)} — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
+    ),
+  ].join('\n');
 }
 
 export function formatRepeat(phone: string, count: number, at: number): string {

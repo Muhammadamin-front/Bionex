@@ -29,6 +29,8 @@
 - ✅ Every message shows a short source id (`#a1b2c3`) and how many numbers that source sent
   today, so operators can spot someone typing strangers' numbers.
 - ✅ Posts from other websites (foreign `Origin`) are refused.
+- ✅ Group commands (`/api/telegram/hook`) are accepted only with the secret header Telegram
+  was given (derived from the bot token) and only from `TELEGRAM_CHAT_ID`; anything else is ignored.
 - ✅ HTML in visitor input is escaped in Telegram messages.
 - ✅ No fingerprinting; cookies, localStorage and User-Agent are not used for identity.
 - ☐ Optional: a Cloudflare WAF rate-limit rule for `POST /api/leads`.
@@ -43,7 +45,8 @@
 ## Privacy
 - ✅ IPs and phone numbers are stored only as HMAC hashes (secret generated inside the
   Durable Object), for 30 days.
-- ✅ Name and number are stored in clear only while a message waits for Telegram.
+- ✅ Name and number are stored in clear only while a message waits for Telegram, and until
+  their 10-order list is sent (deleted after 30 days at the latest).
 - ✅ Nothing personal is written to logs.
 - ☐ Delete old order messages from the group when they are no longer needed.
 - ☐ Telegram and Cloudflare store data outside Uzbekistan; ask a lawyer about the
