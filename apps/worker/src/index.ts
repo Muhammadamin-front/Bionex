@@ -52,7 +52,7 @@ export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     // The operators' Mini App (served by the Worker for its own CSP, so Telegram can frame it).
-    if (url.pathname === '/panel' && request.method === 'GET') return panelPage();
+    if (url.pathname === '/panel' && (request.method === 'GET' || request.method === 'HEAD')) return panelPage();
     if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
