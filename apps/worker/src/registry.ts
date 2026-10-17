@@ -1,8 +1,8 @@
 import { NAME_MESSAGES, PHONE_MESSAGES } from '@bionex/shared/lead';
 import { normalizeName } from '@bionex/shared/name';
-import { normalizeUzPhone } from '@bionex/shared/phone';
+import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
-import { askName, askPhone, BOT_TEXT, done, welcome, type BotReply } from './bot';
+import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import {
   callTelegram,
   formatLead,
@@ -144,6 +144,8 @@ export class LeadRegistry extends DurableObject<Env> {
     // Added after launch: the topic a queued message goes to (live data already exists).
     const outboxColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(outbox)').toArray().map((c) => c.name);
     if (!outboxColumns.includes('thread_id')) this.sql.exec('ALTER TABLE outbox ADD COLUMN thread_id INTEGER');
+    const sessionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(bot_sessions)').toArray().map((c) => c.name);
+    if (!sessionColumns.includes('test')) this.sql.exec('ALTER TABLE bot_sessions ADD COLUMN test INTEGER NOT NULL DEFAULT 0');
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -508,22 +510,29 @@ export class LeadRegistry extends DurableObject<Env> {
     const { userId, now } = input;
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
     const session = this.sql
-      .exec<{ step: string; phone: string | null; verified: number }>('SELECT step, phone, verified FROM bot_sessions WHERE user_id = ?', userId)
+      .exec<{ step: string; phone: string | null; verified: number; test: number }>(
+        'SELECT step, phone, verified, test FROM bot_sessions WHERE user_id = ?',
+        userId,
+      )
       .toArray()[0];
+    let test = session?.test === 1;
     const save = (step: string, phone: string | null, verified: boolean) =>
       this.sql.exec(
-        'INSERT OR REPLACE INTO bot_sessions (user_id, step, phone, verified, updated_at) VALUES (?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO bot_sessions (user_id, step, phone, verified, updated_at, test) VALUES (?, ?, ?, ?, ?, ?)',
         userId,
         step,
         phone,
         verified ? 1 : 0,
         now,
+        test ? 1 : 0,
       );
     const text = input.text?.trim() ?? '';
 
     if (/^\/start\b/i.test(text) || !session) {
+      // t.me/<bot>?start=test arrives as "/start test": a dry run that creates no order.
+      test = /^\/start\s+test\b/i.test(text);
       save('phone', null, false);
-      return welcome(normalizeName(input.firstName).ok ? input.firstName : '');
+      return welcome(normalizeName(input.firstName).ok ? input.firstName : '', test);
     }
 
     if (session.step === 'phone') {
@@ -549,6 +558,16 @@ export class LeadRegistry extends DurableObject<Env> {
     const name = normalizeName(text);
     if (!name.ok) return { ...askName(null), text: BOT_TEXT.badName(NAME_MESSAGES[name.reason]) };
     this.sql.exec('DELETE FROM bot_sessions WHERE user_id = ?', userId);
+    if (test) {
+      // No order, no number, not in lists or reports: a clearly marked note in the reports topic.
+      const key = `test:${userId}`;
+      const today = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', key, now - DAY).one().n;
+      if (today >= 10) return done(BOT_TEXT.testLimited);
+      this.sql.exec('INSERT INTO hits (key, at) VALUES (?, ?)', key, now);
+      this.enqueue(testNotice(name.value, formatUzPhone(session.phone!), session.verified === 1), { now, thread: 'reports' });
+      await this.flush();
+      return done(BOT_TEXT.testDone);
+    }
     const result = await this.accept({
       submissionId: crypto.randomUUID(),
       ip: `tg:${userId}`,

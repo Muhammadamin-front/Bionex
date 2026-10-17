@@ -44,10 +44,28 @@ export const BOT_TEXT = {
   duplicate: '✅ Буюртмангиз аллақачон қабул қилинган. Оператор тез орада сизга қўнғироқ қилади.',
   limited: 'Бугун бу ҳисобдан жуда кўп буюртма юборилди. Илтимос, эртага қайта уриниб кўринг.',
   again: 'Яна буюртма бериш учун /start ни босинг.',
+  testWelcome:
+    '🧪 <b>СИНОВ РЕЖИМИ</b>\n\nБу ерда ҳамма нарса ҳақиқий буюртмадек ишлайди, лекин буюртма яратилмайди: ' +
+    'операторлар гуруҳига «🧪 СИНОВ — қўнғироқ қилманг» деб «📊 Ҳисобот» мавзусига тушади.\n\n' +
+    'Пастдаги «📱 Рақамни юбориш» тугмасини босинг.',
+  testDone:
+    '🧪 Синов тугади. Мижоз шу жойда «✅ Буюртмангиз қабул қилинди» деган жавобни кўради.\n\n' +
+    'Гуруҳнинг «📊 Ҳисобот» мавзусига синов хабари тушди. Ҳақиқий буюртма яратилмади.',
+  testLimited: '🧪 Бугун синов кўп бўлди. Эртага қайта уриниб кўринг.',
 };
 
-export function welcome(firstName: string): BotReply {
-  return { text: BOT_TEXT.welcome(firstName), keyboard: shareKeyboard };
+/** What the operators see for a test run: clearly not an order, nothing to call. */
+export function testNotice(name: string, phone: string, verified: boolean): string {
+  return [
+    '🧪 <b>СИНОВ — бу ҳақиқий буюртма эмас, қўнғироқ қилманг</b>',
+    `👤 ${name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}`,
+    `📞 ${phone}`,
+    verified ? '🤖 Telegram бот орқали · рақам тасдиқланган ✅' : '🤖 Telegram бот орқали · рақам қўлда ёзилган',
+  ].join('\n');
+}
+
+export function welcome(firstName: string, test = false): BotReply {
+  return { text: test ? BOT_TEXT.testWelcome : BOT_TEXT.welcome(firstName), keyboard: shareKeyboard };
 }
 
 export function askPhone(text: string): BotReply {

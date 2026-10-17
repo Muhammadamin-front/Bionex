@@ -95,7 +95,9 @@ health check, and re-checks it daily):
   asked to share their number with one button, then their name (one tap from their Telegram
   profile). The order goes through the same registry as a website order (numbering, repeats,
   3 different numbers per Telegram account a day) and arrives marked "🤖 Telegram бот орқали ·
-  рақам тасдиқланган ✅" (or "қўлда ёзилган" if typed);
+  рақам тасдиқланган ✅" (or "қўлда ёзилган" if typed). **Test it with t.me/<bot>?start=test**:
+  every step is the same, but no order is created — the group gets a "🧪 СИНОВ — қўнғироқ
+  қилманг" note in the reports topic, with no button, number or list entry;
 - `/hisobot` — the day's report (sold, no answer, rejected, untaken, per operator); it also
   arrives by itself every day at 20:00 Tashkent time (cron in `wrangler.jsonc`).
 

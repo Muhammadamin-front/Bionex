@@ -434,6 +434,24 @@ describe('ordering through the bot in a private chat', () => {
     expect(leadMessages()).toHaveLength(0);
   });
 
+  it('test mode (t.me/<bot>?start=test) goes through every step but creates no order', async () => {
+    let reply = await say({ text: '/start test' });
+    expect(reply!.text).toMatch(/СИНОВ РЕЖИМИ/);
+    await say({ contact: { phone_number: '998903124590', user_id: 777 } });
+    reply = await say({ text: 'Ойша' });
+    expect(reply!.text).toMatch(/Синов тугади/);
+    expect(leadMessages()).toHaveLength(0);
+    const note = telegram.messages.find((m) => String(m.chat_id) === CHAT && m.text.startsWith('🧪'))!;
+    expect(note.text).toContain('қўнғироқ қилманг');
+    expect(note.text).toContain('+998 90 312 45 90');
+    expect(note.reply_markup).toBeUndefined(); // no "take" button: nothing to call
+    // A normal order afterwards is still №1: the test used no number.
+    await say({ text: '/start' });
+    await say({ contact: { phone_number: '998903124591', user_id: 777 } });
+    reply = await say({ text: 'Ойша' });
+    expect(reply!.text).toMatch(/№1\)/);
+  });
+
   it('treats the same number again as already received', async () => {
     for (let i = 0; i < 2; i++) {
       await say({ text: '/start' });

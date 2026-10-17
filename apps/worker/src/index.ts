@@ -315,7 +315,7 @@ async function customerChat(message: TelegramMessage, env: Env): Promise<void> {
     now: Date.now(),
   });
   const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
-  await callTelegram(cfg, 'sendMessage', { chat_id: message.chat.id, text: reply.text, reply_markup: reply.keyboard });
+  await callTelegram(cfg, 'sendMessage', { chat_id: message.chat.id, text: reply.text, parse_mode: 'HTML', reply_markup: reply.keyboard });
 }
 
 function answer(status: 'accepted' | 'duplicate'): Response {
