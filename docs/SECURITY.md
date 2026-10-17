@@ -35,6 +35,11 @@
   operators pressing at once cannot both get it. Only operator first names and outcomes are
   stored for the report (30 days); the order message itself is reused, no customer data is kept.
 - ✅ HTML in visitor input is escaped in Telegram messages.
+- ✅ Operators' Mini App (`/panel`, `/api/panel/*`): every call must carry Telegram-signed
+  initData (HMAC with the bot token, at most 24 h old) of a current member of `TELEGRAM_CHAT_ID`
+  (checked with `getChatMember`, cached 5 min). The page holds no data, has its own CSP (nonce
+  script, `connect-src 'self'`, framing only by telegram.org) and builds every customer value
+  with `textContent`.
 - ✅ Bot orders: a shared contact is accepted only if it is the sender's own number
   (`contact.user_id`), typed numbers are marked as unconfirmed, names and numbers go through
   the same validation as the website, and one Telegram account may order for at most

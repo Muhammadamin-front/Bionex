@@ -14,6 +14,7 @@ import {
   formatStatus,
   operatorLine,
   sendTelegram,
+  sourceLabel,
   takeKeyboard,
   TelegramError,
   todayTitle,
@@ -31,7 +32,7 @@ const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Bump when the webhook needs new update types or commands. */
-const WEBHOOK_VERSION = 'v4';
+const WEBHOOK_VERSION = 'v5';
 
 /** Midnight in Tashkent (UTC+5, no daylight saving) for the day containing `now`. */
 function tashkentDayStart(now: number): number {
@@ -58,7 +59,35 @@ export interface BotInput {
 /** What a button press under an order changed (the Worker then edits the message). */
 export type ButtonResult =
   | { changed: false; toast: string }
-  | { changed: true; toast: string; line: string | null; keyboard: 'take' | 'outcome' };
+  | {
+      changed: true;
+      toast: string;
+      line: string | null;
+      keyboard: 'take' | 'outcome';
+      /** The group message and its original HTML, so the panel can update it too (7 days). */
+      messageId: number | null;
+      html: string | null;
+    };
+
+/** One order as the operators' panel shows it. */
+export interface PanelLead {
+  number: number;
+  name: string;
+  phone: string;
+  createdAt: number;
+  source: string | null;
+  flagged: boolean;
+  takerId: number | null;
+  takerName: string | null;
+  outcome: LeadOutcome | null;
+  outcomeAt: number | null;
+}
+
+export interface PanelData {
+  leads: PanelLead[];
+  /** The last 14 days, oldest first: orders, sold, spam per day. */
+  days: Array<{ date: number; total: number; sold: number; spam: number }>;
+}
 
 export interface OrderInput {
   submissionId: string;
@@ -152,6 +181,12 @@ export class LeadRegistry extends DurableObject<Env> {
     // Orders now stay listable after their 10-order list went out (for /royxat): mark, don't delete.
     const listColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(list_items)').toArray().map((c) => c.name);
     if (!listColumns.includes('listed')) this.sql.exec('ALTER TABLE list_items ADD COLUMN listed INTEGER NOT NULL DEFAULT 0');
+    // For the operators' panel: the order's group message (to update it) and where it came from.
+    if (!listColumns.includes('msg_html')) this.sql.exec('ALTER TABLE list_items ADD COLUMN msg_html TEXT');
+    if (!listColumns.includes('source')) this.sql.exec('ALTER TABLE list_items ADD COLUMN source TEXT');
+    this.sql.exec(
+      'CREATE TABLE IF NOT EXISTS spam_sources (lead_id INTEGER PRIMARY KEY, ip_hash TEXT NOT NULL, at INTEGER NOT NULL)',
+    );
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -199,6 +234,12 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().n;
     if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
 
+    // Operators marked an earlier order from this source as spam: say so on this one.
+    const flags = [...input.flags];
+    const spamBefore = this.sql.exec('SELECT 1 FROM spam_sources WHERE ip_hash = ? AND at > ? LIMIT 1', ipHash, now - 30 * DAY).toArray().length > 0;
+    if (spamBefore) flags.push('spam_source');
+    input = { ...input, flags };
+
     const leadId = this.sql
       .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, at) VALUES (?, ?, ?) RETURNING id', phoneHash, ipHash, now)
       .one().id;
@@ -215,6 +256,12 @@ export class LeadRegistry extends DurableObject<Env> {
       list: list ? { count: list.count, size: list.size } : undefined,
       via: input.via,
     });
+    this.sql.exec(
+      'UPDATE list_items SET msg_html = ?, source = ? WHERE lead_id = ?',
+      text,
+      input.via ? 'Telegram бот' : sourceLabel(input.utm),
+      leadId,
+    );
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
     if (list?.full) this.sendList(now);
@@ -340,11 +387,21 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!row) return { changed: false, toast: 'Бу буюртма жуда эски — тугмалари ишламайди.' };
     const mine = row.taker_id === input.userId;
     const name = input.userName.slice(0, 40) || 'Оператор';
+    const message = () => {
+      const m = this.sql
+        .exec<{ message_id: number | null; msg_html: string | null }>(
+          'SELECT l.message_id, li.msg_html FROM leads l LEFT JOIN list_items li ON li.lead_id = l.id WHERE l.id = ?',
+          input.leadId,
+        )
+        .toArray()[0];
+      return { messageId: m?.message_id ?? null, html: m?.msg_html ?? null };
+    };
 
     if (input.action === 'release') {
       if (row.taker_id === null) return { changed: false, toast: 'Буни ҳали ҳеч ким олмаган.' };
       this.sql.exec('UPDATE lead_status SET taker_id = NULL, taker_name = NULL, taken_at = NULL, outcome = NULL, outcome_at = NULL WHERE lead_id = ?', input.leadId);
-      return { changed: true, toast: 'Буюртма қайтарилди — энди бошқа оператор олиши мумкин.', line: null, keyboard: 'take' };
+      this.sql.exec('DELETE FROM spam_sources WHERE lead_id = ?', input.leadId);
+      return { changed: true, toast: 'Буюртма қайтарилди — энди бошқа оператор олиши мумкин.', line: null, keyboard: 'take', ...message() };
     }
     if (row.taker_id !== null && !mine) return { changed: false, toast: `Бу буюртмани ${row.taker_name} олган.` };
 
@@ -356,6 +413,7 @@ export class LeadRegistry extends DurableObject<Env> {
         toast: 'Сиз олдингиз. Мижозга қўнғироқ қилинг.',
         line: operatorLine({ takerName: name, takenAt: input.now, outcome: null, outcomeAt: null }),
         keyboard: 'outcome',
+        ...message(),
       };
     }
 
@@ -370,12 +428,72 @@ export class LeadRegistry extends DurableObject<Env> {
       input.now,
       input.leadId,
     );
+    // Spam: remember its source, so later orders from it arrive marked "⚠️ аввал спам белгиланган".
+    this.sql.exec('DELETE FROM spam_sources WHERE lead_id = ?', input.leadId);
+    if (input.action === 'spam') {
+      this.sql.exec(
+        'INSERT INTO spam_sources (lead_id, ip_hash, at) SELECT id, ip_hash, ? FROM leads WHERE id = ?',
+        input.now,
+        input.leadId,
+      );
+    }
     return {
       changed: true,
-      toast: 'Белгиланди.',
+      toast: input.action === 'spam' ? 'Спам деб белгиланди. Бу манбадан келадиган кейинги буюртмалар ⚠️ билан келади.' : 'Белгиланди.',
       line: operatorLine({ takerName: row.taker_name ?? name, takenAt, outcome: input.action, outcomeAt: input.now }),
       keyboard: 'outcome',
+      ...message(),
     };
+  }
+
+  /** The operators' panel: orders of the last `days` days (names and numbers are kept 7 days) and 14 days of totals. */
+  async panelData(input: { days: number; now: number }): Promise<PanelData> {
+    const since = tashkentDayStart(input.now) - (Math.min(Math.max(input.days, 1), 7) - 1) * DAY;
+    const leads = this.sql
+      .exec<{
+        lead_id: number;
+        name: string;
+        phone: string;
+        at: number;
+        source: string | null;
+        flagged: number;
+        taker_id: number | null;
+        taker_name: string | null;
+        outcome: string | null;
+        outcome_at: number | null;
+      }>(
+        `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.flagged,
+                ls.taker_id, ls.taker_name, ls.outcome, ls.outcome_at
+           FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
+          WHERE li.at >= ? ORDER BY li.lead_id DESC LIMIT 500`,
+        since,
+      )
+      .toArray()
+      .map((r) => ({
+        number: r.lead_id,
+        name: r.name,
+        phone: r.phone,
+        createdAt: r.at,
+        source: r.source,
+        flagged: r.flagged === 1,
+        takerId: r.taker_id,
+        takerName: r.taker_name,
+        outcome: r.outcome as LeadOutcome | null,
+        outcomeAt: r.outcome_at,
+      }));
+    const first = tashkentDayStart(input.now) - 13 * DAY;
+    const rows = this.sql
+      .exec<{ created_at: number; outcome: string | null }>('SELECT created_at, outcome FROM lead_status WHERE created_at >= ?', first)
+      .toArray();
+    const days = Array.from({ length: 14 }, (_, i) => ({ date: first + i * DAY, total: 0, sold: 0, spam: 0 }));
+    for (const r of rows) {
+      const d = days[Math.floor((r.created_at - first) / DAY)];
+      if (!d) continue;
+      d.total++;
+      if (r.outcome === 'sold') d.sold++;
+      if (r.outcome === 'spam') d.spam++;
+    }
+    return { leads, days };
   }
 
   /** The day's numbers for the group: every evening by cron, and on /hisobot. */
@@ -401,6 +519,7 @@ export class LeadRegistry extends DurableObject<Env> {
         sold: count((r) => r.outcome === 'sold'),
         noanswer: count((r) => r.outcome === 'noanswer'),
         rejected: count((r) => r.outcome === 'rejected'),
+        spam: count((r) => r.outcome === 'spam'),
         inProgress: count((r) => r.taker_name !== null && r.outcome === null),
         untaken: count((r) => r.taker_name === null),
         repeats,
@@ -453,6 +572,7 @@ export class LeadRegistry extends DurableObject<Env> {
           { command: 'royxat', description: 'Бугунги барча буюртмалар: ким олди, натижаси' },
           { command: 'holat', description: 'Бот ишлаяптими, рўйхатда нечта буюртма бор' },
           { command: 'hisobot', description: 'Бугунги ҳисобот: нечта сотилди, ким нечта олди' },
+          { command: 'panel', description: 'Операторлар панели (барча буюртмалар, статистика, спам)' },
         ],
       });
       // What a customer reads before pressing Start.
@@ -664,6 +784,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM spam_sources WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
   }
 

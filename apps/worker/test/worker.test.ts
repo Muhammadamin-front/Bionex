@@ -21,6 +21,8 @@ const telegram = {
   down: false,
   /** The group has Topics turned on (getChat → is_forum). */
   forum: false,
+  /** Telegram user ids that are members of the operators' group. */
+  members: new Set<number>(),
 };
 let turnstileCalls = 0;
 
@@ -58,6 +60,11 @@ async function outbound(request: Request): Promise<Response> {
     if (method !== 'sendMessage') {
       telegram.calls.push({ method, body: await request.json() });
       if (method === 'getChat') return Response.json({ ok: true, result: { id: Number(CHAT), is_forum: telegram.forum } });
+      if (method === 'getChatMember') {
+        const body = telegram.calls.at(-1)!.body as { user_id: number };
+        return Response.json({ ok: true, result: { status: telegram.members.has(body.user_id) ? 'member' : 'left' } });
+      }
+      if (method === 'getMe') return Response.json({ ok: true, result: { id: 1, username: 'bionexecobot' } });
       if (method === 'createForumTopic') {
         const n = telegram.calls.filter((c) => c.method === 'createForumTopic').length;
         return Response.json({ ok: true, result: { message_thread_id: 500 + n } });
@@ -127,6 +134,7 @@ beforeAll(async () => {
     conditions: ['workerd', 'worker', 'browser'],
     mainFields: ['module', 'main'],
     external: ['cloudflare:*'],
+    loader: { '.html': 'text' }, // like wrangler's default rule: the panel page is imported as text
     write: false,
   });
   script = out.outputFiles[0]!.text;
@@ -139,6 +147,7 @@ beforeEach(async () => {
   telegram.calls = [];
   telegram.down = false;
   telegram.forum = false;
+  telegram.members = new Set([11, 22]);
   turnstileCalls = 0;
   meta.bodies = [];
   meta.events = [];
@@ -324,7 +333,7 @@ describe('order buttons, copyable phone and the daily report', () => {
     let edit = lastEdit()!;
     expect(edit.text).toMatch(/━━━━━━━━━━\n📞 Ойша олди — \d\d\.\d\d, \d\d:\d\d$/);
     expect(edit.entities).toEqual([{ type: 'bold', offset: 0, length: 18 }]);
-    expect(edit.reply_markup.inline_keyboard.flat().map((b) => b.callback_data)).toEqual(['s:1:sold', 's:1:noanswer', 's:1:rejected', 'r:1']);
+    expect(edit.reply_markup.inline_keyboard.flat().map((b) => b.callback_data)).toEqual(['s:1:sold', 's:1:noanswer', 's:1:rejected', 'r:1', 's:1:spam']);
     expect(lastToast()).toMatch(/Сиз олдингиз/);
 
     shownText = edit.text;
@@ -496,6 +505,110 @@ describe('group topics and the source line', () => {
     expect(sent.filter((m) => m.text.startsWith('🆕')).every((m) => m.message_thread_id === 501)).toBe(true);
     expect(sent.find((m) => m.text.startsWith('📋'))!.message_thread_id).toBe(502);
   });
+});
+
+describe("the operators' Mini App panel", () => {
+  const TOKEN = '123456:test-token';
+  const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const hmac = async (key: ArrayBuffer | Uint8Array, data: string) =>
+    crypto.subtle.sign('HMAC', await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']), new TextEncoder().encode(data));
+  /** initData exactly as Telegram signs it for a Mini App user. */
+  async function initData(user: { id: number; first_name: string }, opts: { authDate?: number; token?: string } = {}) {
+    const fields: Record<string, string> = {
+      auth_date: String(opts.authDate ?? Math.floor(Date.now() / 1000)),
+      query_id: 'AAH',
+      user: JSON.stringify(user),
+    };
+    const check = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join('\n');
+    const secret = await hmac(new TextEncoder().encode('WebAppData'), opts.token ?? TOKEN);
+    return new URLSearchParams({ ...fields, hash: hex(await hmac(secret, check)) }).toString();
+  }
+  const ali = { id: 11, first_name: 'Ойша' };
+  const panel = async (path: string, init: { auth?: string; method?: string; body?: unknown } = {}) =>
+    mf.dispatchFetch(`${SITE}${path}`, {
+      method: init.method ?? 'GET',
+      headers: { ...(init.auth !== undefined ? { authorization: `tma ${init.auth}` } : {}), 'content-type': 'application/json' },
+      ...(init.body ? { body: JSON.stringify(init.body) } : {}),
+    });
+
+  it('serves the page with its own CSP that lets Telegram frame it', async () => {
+    const res = await mf.dispatchFetch(`${SITE}/panel`);
+    expect(res.status).toBe(200);
+    const csp = res.headers.get('content-security-policy')!;
+    expect(csp).toMatch(/script-src 'nonce-[0-9a-f]{32}'/);
+    expect(csp).toContain('frame-ancestors https://web.telegram.org');
+    const html = await res.text();
+    expect(html).toContain('<script nonce="');
+    expect(html).not.toContain('{{NONCE}}');
+  });
+
+  it('refuses a missing or forged signature, an old one, and people outside the group', async () => {
+    expect((await panel('/api/panel/data')).status).toBe(401);
+    expect((await panel('/api/panel/data', { auth: await initData(ali, { token: '999:other-bot' }) })).status).toBe(401);
+    const stale = await initData(ali, { authDate: Math.floor(Date.now() / 1000) - 2 * 86400 });
+    expect((await panel('/api/panel/data', { auth: stale })).status).toBe(401);
+    const stranger = await panel('/api/panel/data', { auth: await initData({ id: 555, first_name: 'Бегона' }) });
+    expect(stranger.status).toBe(403);
+    expect(((await stranger.json()) as { message: string }).message).toMatch(/гуруҳи аъзолари/);
+  });
+
+  it('shows orders and 14 days of numbers to a group member', async () => {
+    await order({ fullName: 'Алишер Каримов', phone: '+998 90 312 45 91', utm: { source: 'ig' } }, { ip: '203.0.113.91' });
+    await order({ fullName: 'Барно Олимова', phone: '+998 90 312 45 92' }, { ip: '203.0.113.92' });
+    const res = await panel('/api/panel/data?days=1', { auth: await initData(ali) });
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { me: { id: number }; leads: Array<{ number: number; name: string; phone: string; source: string | null }>; days: Array<{ total: number }> };
+    expect(data.me.id).toBe(11);
+    expect(data.leads.map((l) => l.name)).toEqual(['Барно Олимова', 'Алишер Каримов']); // newest first
+    expect(data.leads[1]).toMatchObject({ number: 1, phone: '+998903124591', source: 'Instagram' });
+    expect(data.days).toHaveLength(14);
+    expect(data.days.at(-1)!.total).toBe(2);
+  });
+
+  it('takes and closes an order from the panel and updates the group message too', async () => {
+    await order({ fullName: 'Алишер Каримов', phone: '+998 90 312 45 93' }, { ip: '203.0.113.93' });
+    const auth = await initData(ali);
+    let r = await panel('/api/panel/action', { auth, method: 'POST', body: { leadId: 1, action: 'take' } });
+    expect(((await r.json()) as { changed: boolean }).changed).toBe(true);
+    let edit = telegram.calls.filter((c) => c.method === 'editMessageText').at(-1)!.body as { text: string; parse_mode: string; message_id: number };
+    expect(edit.message_id).toBe(1001);
+    expect(edit.parse_mode).toBe('HTML');
+    expect(edit.text).toMatch(/^🆕 <b>Янги буюртма №1<\/b>/);
+    expect(edit.text).toMatch(/━━━━━━━━━━\n📞 Ойша олди/);
+
+    r = await panel('/api/panel/action', { auth, method: 'POST', body: { leadId: 1, action: 'sold' } });
+    edit = telegram.calls.filter((c) => c.method === 'editMessageText').at(-1)!.body as typeof edit;
+    expect(edit.text).toMatch(/✅ Сотилди — Ойша/);
+    const data = (await (await panel('/api/panel/data', { auth })).json()) as { leads: Array<{ outcome: string; takerName: string }> };
+    expect(data.leads[0]).toMatchObject({ outcome: 'sold', takerName: 'Ойша' });
+    expect((await panel('/api/panel/action', { auth, method: 'POST', body: { leadId: 1, action: 'delete-all' } })).status).toBe(400);
+  });
+
+  it('marking spam flags the next order from the same source', async () => {
+    await order({ fullName: 'Ёлғон Исм', phone: '+998 90 312 45 94' }, { ip: '198.51.100.99' });
+    await panel('/api/panel/action', { auth: await initData(ali), method: 'POST', body: { leadId: 1, action: 'spam' } });
+    await order({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 95' }, { ip: '198.51.100.99' });
+    expect(leadMessages().at(-1)!.text).toContain('бу манбадан аввал спам белгиланган');
+    await hook({ message: { message_id: 3, chat: { id: Number(CHAT) }, text: '/hisobot' } });
+    expect(telegram.messages.at(-1)!.text).toContain('🚫 Спам: 1');
+  });
+
+  it('/panel posts and pins the button that opens the panel', async () => {
+    await hook({ message: { message_id: 4, chat: { id: Number(CHAT) }, text: '/panel' } });
+    const msg = telegram.messages.at(-1) as unknown as { text: string; reply_markup: { inline_keyboard: Array<Array<{ url: string }>> } };
+    expect(msg.text).toContain('Операторлар панели');
+    expect(msg.reply_markup.inline_keyboard[0]![0]!.url).toBe('https://t.me/bionexecobot?startapp=panel');
+    expect(telegram.calls.some((c) => c.method === 'pinChatMessage')).toBe(true);
+  });
+
+  async function hook(update: unknown) {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`zeynara-webhook:${TOKEN}`));
+    return mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': hex(d) },
+      body: JSON.stringify({ update_id: 1, ...(update as object) }),
+    });
+  }
 });
 
 describe('repeats and retries', () => {

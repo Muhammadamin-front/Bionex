@@ -45,7 +45,7 @@ export interface TelegramConfig {
   apiBase?: string;
 }
 
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const tashkentTime = (ms: number) =>
   new Intl.DateTimeFormat('ru-RU', {
@@ -60,6 +60,7 @@ const FLAG_TEXT: Record<string, string> = {
   honeypot: 'бот бўлиши мумкин (яширин майдон тўлдирилган)',
   phone_pattern: 'рақам сунъийга ўхшайди (масалан 90 111 11 11)',
   multi_phone_ip: 'бу манбадан бугун бир нечта рақам юборилди',
+  spam_source: 'бу манбадан аввал спам белгиланган',
 };
 
 export function formatLead(lead: LeadMessage): string {
@@ -110,14 +111,15 @@ export const HELP_TEXT = [
   '/royxat — бугунги барча буюртмалар: ким олди, натижаси',
   '/holat — бот ишлаяптими, рўйхатда нечта буюртма бор',
   '/hisobot — бугунги ҳисобот (ҳар куни 20:00 да ўзи ҳам келади)',
+  '/panel — операторлар панели: барча буюртмалар, статистика, спам',
   '',
   'Ҳар буюртма остида: «📞 Мен оламан» → қўнғироқдан кейин «✅ Сотилди», «🔁 Кўтармади» ёки «❌ Рад этди».',
 ].join('\n');
 
 // ── Buttons under every order ─────────────────────────────────────────────
 
-export type LeadOutcome = 'sold' | 'noanswer' | 'rejected';
-export type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
+export type LeadOutcome = 'sold' | 'noanswer' | 'rejected' | 'spam';
+export type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> };
 
 /** callback_data is at most 64 bytes: "t:37" take, "r:37" release, "s:37:sold" outcome. */
 export function takeKeyboard(leadId: number): InlineKeyboard {
@@ -132,12 +134,25 @@ export function outcomeKeyboard(leadId: number): InlineKeyboard {
         { text: '🔁 Кўтармади', callback_data: `s:${leadId}:noanswer` },
         { text: '❌ Рад этди', callback_data: `s:${leadId}:rejected` },
       ],
-      [{ text: '↩️ Қайтариш (бошқа олсин)', callback_data: `r:${leadId}` }],
+      [
+        { text: '↩️ Қайтариш', callback_data: `r:${leadId}` },
+        { text: '🚫 Спам', callback_data: `s:${leadId}:spam` },
+      ],
     ],
   };
 }
 
-const OUTCOME_TEXT: Record<LeadOutcome, string> = { sold: '✅ Сотилди', noanswer: '🔁 Кўтармади', rejected: '❌ Рад этди' };
+export const OUTCOME_TEXT: Record<LeadOutcome, string> = {
+  sold: '✅ Сотилди',
+  noanswer: '🔁 Кўтармади',
+  rejected: '❌ Рад этди',
+  spam: '🚫 Спам',
+};
+
+/** A link button that opens the operators' Mini App (web_app buttons are not allowed in groups). */
+export function panelKeyboard(url: string): InlineKeyboard {
+  return { inline_keyboard: [[{ text: '📊 Панелни очиш', url }]] };
+}
 
 /** The line the bot adds under an order once an operator has it. */
 export function operatorLine(s: { takerName: string; takenAt: number; outcome: LeadOutcome | null; outcomeAt: number | null }): string {
@@ -154,6 +169,7 @@ export interface DayReport {
   sold: number;
   noanswer: number;
   rejected: number;
+  spam: number;
   inProgress: number;
   untaken: number;
   repeats: number;
@@ -169,6 +185,7 @@ export function formatReport(r: DayReport): string {
     `✅ Сотилди: ${r.sold}`,
     `🔁 Кўтармади: ${r.noanswer}`,
     `❌ Рад этди: ${r.rejected}`,
+    ...(r.spam > 0 ? [`🚫 Спам: ${r.spam}`] : []),
     `📞 Олинган, натижа йўқ: ${r.inProgress}`,
     `⏳ Ҳеч ким олмаган: ${r.untaken}`,
   ];

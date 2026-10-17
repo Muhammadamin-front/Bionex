@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="uz-Cyrl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Зейнара · Операторлар панели</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f1f3f5; --text: #111418; --hint: #555e6a; --link: #1d6fae;
+    --btn: #1d6fae; --btn-text: #ffffff; --line: rgba(0,0,0,.08);
+    --ok: #15803d; --warn: #b45309; --bad: #c0352a; --spam: #6d28d9; --wait: #556070;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg2); color: var(--text); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 12px 8px; }
+  .top { display: flex; align-items: center; gap: 8px; }
+  .top h1 { font-size: 17px; margin: 0; flex: 1; }
+  .top small { color: var(--hint); font-size: 12px; }
+  .seg { display: flex; gap: 6px; margin-top: 8px; }
+  .seg button, .tabs button { border: 0; background: var(--bg2); color: var(--text); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; white-space: nowrap; }
+  .seg button.on, .tabs button.on { background: var(--btn); color: var(--btn-text); }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 2px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs .n { opacity: .75; margin-left: 4px; }
+  main { padding: 10px 12px 24px; max-width: 720px; margin: 0 auto; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stat { background: var(--bg); border-radius: 12px; padding: 10px 8px; text-align: center; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { font-size: 11px; color: var(--hint); }
+  .chart { background: var(--bg); border-radius: 12px; padding: 10px 10px 6px; margin-top: 8px; }
+  .chart .t { font-size: 12px; color: var(--hint); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 70px; }
+  .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; }
+  .bar i { display: block; background: var(--btn); opacity: .35; border-radius: 4px 4px 0 0; min-height: 2px; }
+  .bar i.s { background: var(--ok); opacity: 1; border-radius: 0; position: absolute; bottom: 0; left: 0; right: 0; }
+  .days { display: flex; gap: 4px; font-size: 10px; color: var(--hint); margin-top: 3px; }
+  .days span { flex: 1; text-align: center; }
+  .search { width: 100%; margin-top: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .card { background: var(--bg); border-radius: 14px; padding: 12px; margin-top: 8px; }
+  .row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--hint); }
+  .row1 .num { color: var(--text); font-weight: 700; }
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg2); color: var(--hint); }
+  .badge { margin-left: auto; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; color: #fff; }
+  .b-wait { background: var(--wait); } .b-work { background: var(--warn); } .b-sold { background: var(--ok); }
+  .b-noanswer { background: #0369a1; } .b-rejected { background: var(--bad); } .b-spam { background: var(--spam); }
+  .name { font-size: 16px; font-weight: 600; margin-top: 6px; }
+  .flag { color: var(--warn); font-size: 12px; margin-top: 2px; }
+  .phone { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .phone a { font-size: 18px; font-weight: 600; color: var(--link); text-decoration: none; letter-spacing: .2px; }
+  .copy { border: 1px solid var(--line); background: var(--bg2); color: var(--text); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; }
+  .who { font-size: 13px; color: var(--hint); margin-top: 6px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .acts button { flex: 1 1 auto; border: 0; border-radius: 10px; padding: 10px 8px; font: inherit; font-size: 14px; font-weight: 600; background: var(--bg2); color: var(--text); min-height: 42px; }
+  .acts .primary { background: var(--btn); color: var(--btn-text); flex-basis: 100%; }
+  .acts .sold { background: var(--ok); color: #fff; }
+  .acts .small { flex: 0 1 auto; font-weight: 500; font-size: 13px; }
+  .empty, .msg { text-align: center; color: var(--hint); padding: 40px 16px; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(20,22,26,.92); color: #fff; padding: 10px 14px; border-radius: 12px; font-size: 14px; max-width: 90vw; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.on { opacity: 1; }
+  button:disabled { opacity: .5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>📊 Буюртмалар</h1><small id="updated"></small></div>
+  <div class="seg" id="period">
+    <button data-days="1" class="on">Бугун</button><button data-days="3">3 кун</button><button data-days="7">7 кун</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</header>
+<main id="main"><div class="msg">Юкланмоқда…</div></main>
+<div class="toast" id="toast"></div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+  // ── Telegram Mini App plumbing, without the external SDK (the page's CSP allows only this script).
+  function post(type, data) {
+    var payload = data || {};
+    try {
+      if (window.TelegramWebviewProxy && window.TelegramWebviewProxy.postEvent) window.TelegramWebviewProxy.postEvent(type, JSON.stringify(payload));
+      else if (window.external && 'notify' in window.external) window.external.notify(JSON.stringify({ eventType: type, eventData: payload }));
+      else if (window.parent !== window) window.parent.postMessage(JSON.stringify({ eventType: type, eventData: payload }), '*');
+    } catch (e) { /* not inside Telegram */ }
+  }
+  var hash = new URLSearchParams(location.hash.slice(1));
+  var initData = hash.get('tgWebAppData') || '';
+  try {
+    if (initData) sessionStorage.setItem('initData', initData); else initData = sessionStorage.getItem('initData') || '';
+  } catch (e) { /* storage blocked */ }
+  try {
+    var theme = JSON.parse(hash.get('tgWebAppThemeParams') || '{}');
+    var map = { bg_color: '--bg', secondary_bg_color: '--bg2', text_color: '--text', hint_color: '--hint', link_color: '--link', button_color: '--btn', button_text_color: '--btn-text' };
+    Object.keys(map).forEach(function (k) { if (theme[k]) document.documentElement.style.setProperty(map[k], theme[k]); });
+  } catch (e) { /* default colours */ }
+  post('web_app_ready'); post('web_app_expand');
+
+  var STATUS = {
+    wait: ['⏳ Олинмаган', 'b-wait'], work: ['📞 Жараёнда', 'b-work'], sold: ['✅ Сотилди', 'b-sold'],
+    noanswer: ['🔁 Кўтармади', 'b-noanswer'], rejected: ['❌ Рад этди', 'b-rejected'], spam: ['🚫 Спам', 'b-spam']
+  };
+  var TABS = [['all', 'Ҳаммаси'], ['wait', '⏳ Олинмаган'], ['mine', '👤 Менда'], ['sold', '✅ Сотилди'], ['noanswer', '🔁 Кўтармади'], ['rejected', '❌ Рад'], ['spam', '🚫 Спам / шубҳали']];
+  var state = { days: 1, tab: 'all', q: '', data: null, busy: false, open: {} };
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function statusOf(l) { return l.outcome || (l.takerId ? 'work' : 'wait'); }
+  var timeFmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
+  var dayFmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' });
+  function when(ms) { var d = new Date(ms); return state.days === 1 ? timeFmt.format(d) : dayFmt.format(d) + ' ' + timeFmt.format(d); }
+  function prettyPhone(p) { var d = p.replace(/\D/g, ''); return '+' + d.slice(0, 3) + ' ' + d.slice(3, 5) + ' ' + d.slice(5, 8) + ' ' + d.slice(8, 10) + ' ' + d.slice(10, 12); }
+
+  var toastTimer;
+  function toast(text) {
+    var t = document.getElementById('toast'); t.textContent = text; t.classList.add('on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
+  }
+  function copy(text) {
+    function fallback() {
+      var a = document.createElement('textarea'); a.value = text; a.style.position = 'fixed'; a.style.opacity = '0';
+      document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(a);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(fallback); else fallback();
+    post('web_app_trigger_haptic_feedback', { type: 'notification', notification_type: 'success' });
+    toast('Рақам нусхаланди');
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ authorization: 'tma ' + initData }, opts.headers || {});
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) { if (!r.ok) throw body; return body; });
+    });
+  }
+
+  function load() {
+    if (!initData) { show('Бу панел фақат Telegram\'даги «Bionex Leads» гуруҳидаги «📊 Панелни очиш» тугмаси орқали очилади.'); return; }
+    api('/api/panel/data?days=' + state.days).then(function (d) {
+      state.data = d; render();
+      document.getElementById('updated').textContent = 'янгиланди ' + timeFmt.format(new Date());
+    }).catch(function (e) { show((e && e.message) || 'Маълумотни олиб бўлмади. Интернетни текширинг.'); });
+  }
+  function show(text) { var m = document.getElementById('main'); m.textContent = ''; m.appendChild(el('div', 'msg', text)); }
+
+  function act(lead, action) {
+    if (state.busy) return; state.busy = true;
+    post('web_app_trigger_haptic_feedback', { type: 'impact', impact_style: 'light' });
+    api('/api/panel/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ leadId: lead.number, action: action }) })
+      .then(function (r) { toast(r.message || 'Тайёр'); })
+      .catch(function (e) { toast((e && e.message) || 'Бажариб бўлмади'); })
+      .then(function () { state.busy = false; load(); });
+  }
+
+  function inPeriod(leads) {
+    var q = state.q.trim().toLowerCase(), digits = q.replace(/\D/g, ''), me = state.data.me.id;
+    return leads.filter(function (l) {
+      var s = statusOf(l);
+      if (state.tab === 'mine' && l.takerId !== me) return false;
+      if (state.tab === 'spam' && !(s === 'spam' || l.flagged)) return false;
+      if (['wait', 'sold', 'noanswer', 'rejected'].indexOf(state.tab) >= 0 && s !== state.tab) return false;
+      if (q && l.name.toLowerCase().indexOf(q) < 0 && !(digits && l.phone.indexOf(digits) >= 0) && String(l.number) !== q.replace('№', '')) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    var d = state.data, leads = d.leads, me = d.me.id;
+    // Tabs with counts.
+    var tabs = document.getElementById('tabs'); tabs.textContent = '';
+    TABS.forEach(function (t) {
+      var n = leads.filter(function (l) {
+        var s = statusOf(l);
+        return t[0] === 'all' || (t[0] === 'mine' ? l.takerId === me : t[0] === 'spam' ? (s === 'spam' || l.flagged) : s === t[0]);
+      }).length;
+      var b = el('button', state.tab === t[0] ? 'on' : '', t[1]); b.appendChild(el('span', 'n', String(n)));
+      b.onclick = function () { state.tab = t[0]; render(); }; tabs.appendChild(b);
+    });
+
+    var main = document.getElementById('main'); main.textContent = '';
+    // Numbers for the chosen period.
+    var count = function (f) { return leads.filter(f).length; };
+    var sold = count(function (l) { return l.outcome === 'sold'; });
+    var spam = count(function (l) { return l.outcome === 'spam'; });
+    var real = leads.length - spam;
+    var stats = el('div', 'stats');
+    [[leads.length, 'Буюртма'], [count(function (l) { return !l.takerId; }), 'Олинмаган'], [sold, 'Сотилди'], [real ? Math.round(sold / real * 100) + '%' : '—', 'Конверсия']]
+      .forEach(function (s) { var c = el('div', 'stat'); c.appendChild(el('b', '', String(s[0]))); c.appendChild(el('span', '', s[1])); stats.appendChild(c); });
+    main.appendChild(stats);
+
+    // 14 days: orders (light) and sold (green).
+    var chart = el('div', 'chart'), t = el('div', 't'), max = Math.max.apply(null, d.days.map(function (x) { return x.total; }).concat([1]));
+    t.appendChild(el('span', '', '14 кун: буюртма / сотилди')); var total14 = d.days.reduce(function (a, x) { return a + x.total; }, 0);
+    t.appendChild(el('span', '', total14 + ' та')); chart.appendChild(t);
+    var bars = el('div', 'bars'), days = el('div', 'days');
+    d.days.forEach(function (x, i) {
+      var bar = el('div', 'bar'); bar.title = dayFmt.format(new Date(x.date)) + ': ' + x.total + ' / ' + x.sold;
+      var all = el('i'); all.style.height = (x.total / max * 100) + '%'; bar.appendChild(all);
+      var s = el('i', 's'); s.style.height = (x.sold / max * 100) + '%'; bar.appendChild(s); bars.appendChild(bar);
+      days.appendChild(el('span', '', i % 2 === 1 || i === 13 ? dayFmt.format(new Date(x.date)).slice(0, 2) : ''));
+    });
+    chart.appendChild(bars); chart.appendChild(days); main.appendChild(chart);
+
+    var search = el('input', 'search'); search.type = 'search'; search.placeholder = '🔍 Исм, рақам ёки №'; search.value = state.q;
+    search.oninput = function () { state.q = search.value; renderList(listBox); }; main.appendChild(search);
+    var listBox = el('div'); main.appendChild(listBox); renderList(listBox);
+  }
+
+  function renderList(box) {
+    box.textContent = '';
+    var me = state.data.me.id, list = inPeriod(state.data.leads);
+    if (!list.length) { box.appendChild(el('div', 'empty', 'Бу ерда ҳозирча буюртма йўқ.')); return; }
+    list.forEach(function (l) {
+      var s = statusOf(l), card = el('div', 'card'), r1 = el('div', 'row1');
+      r1.appendChild(el('span', 'num', '№' + l.number)); r1.appendChild(el('span', '', when(l.createdAt)));
+      if (l.source) r1.appendChild(el('span', 'chip', l.source));
+      r1.appendChild(el('span', 'badge ' + STATUS[s][1], STATUS[s][0])); card.appendChild(r1);
+      card.appendChild(el('div', 'name', l.name));
+      if (l.flagged) card.appendChild(el('div', 'flag', '⚠️ Шубҳали белги бор — текширинг'));
+      var ph = el('div', 'phone'), a = el('a', '', prettyPhone(l.phone)); a.href = 'tel:' + l.phone;
+      var c = el('button', 'copy', 'Нусха'); c.onclick = function () { copy(l.phone); };
+      ph.appendChild(a); ph.appendChild(c); card.appendChild(ph);
+      if (l.takerName) card.appendChild(el('div', 'who', (l.outcome ? STATUS[s][0] + ' — ' : '📞 Олди: ') + l.takerName));
+
+      var acts = el('div', 'acts'), mine = l.takerId === me;
+      function btn(text, cls, action) { var b = el('button', cls, text); b.onclick = function () { act(l, action); }; acts.appendChild(b); }
+      // A finished order (sold, rejected, spam) stays calm: one small button opens the choices again.
+      var closed = l.outcome && l.outcome !== 'noanswer';
+      if (!l.takerId) { btn('📞 Мен оламан', 'primary', 'take'); btn('🚫 Спам', 'small', 'spam'); }
+      else if (mine && closed && !state.open[l.number]) {
+        var edit = el('button', 'small', '✏️ Ўзгартириш');
+        edit.onclick = function () { state.open[l.number] = true; renderList(box); };
+        acts.appendChild(edit);
+      }
+      else if (mine) {
+        btn('✅ Сотилди', 'sold', 'sold'); btn('🔁 Кўтармади', '', 'noanswer'); btn('❌ Рад', '', 'rejected');
+        btn('🚫 Спам', 'small', 'spam'); btn('↩️ Қайтариш', 'small', 'release');
+      } else btn('↩️ Қайтариш (' + l.takerName + ')', 'small', 'release');
+      card.appendChild(acts); box.appendChild(card);
+    });
+  }
+
+  document.getElementById('period').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.days = Number(b.getAttribute('data-days'));
+    Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
+    load();
+  });
+  load();
+  setInterval(function () { if (!document.hidden && !state.busy) load(); }, 30000);
+})();
+</script>
+</body>
+</html>

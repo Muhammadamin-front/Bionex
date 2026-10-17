@@ -2,7 +2,8 @@ import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorC
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
 import { metaConfig, sendMetaLead } from './meta';
-import { callTelegram, HELP_TEXT, outcomeKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
+import { panelApi, panelPage } from './panel';
+import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
 export { LeadRegistry } from './registry';
@@ -50,6 +51,9 @@ const CONFIG_ALERT: Record<string, string> = {
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
+    // The operators' Mini App (served by the Worker for its own CSP, so Telegram can frame it).
+    if (url.pathname === '/panel' && request.method === 'GET') return panelPage();
+    if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
     if (url.pathname === '/api/telegram/hook' && request.method === 'POST') return telegramCommand(request, env);
@@ -227,6 +231,7 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
     if (command === 'royxat' || command === 'list') await registry.listNow(now, thread);
     else if (command === 'holat' || command === 'status') await registry.reportStatus(now, thread);
     else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now, thread);
+    else if (command === 'panel') await sendPanelButton(env, Number(message.chat.id), thread);
     else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now, thread);
   } catch (err) {
     console.error('Telegram command failed', (err as Error)?.message);
@@ -301,6 +306,25 @@ async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env
     }
   }
   await toast(result.toast);
+}
+
+/**
+ * /panel in the group: a message with the button that opens the operators' Mini App, pinned so
+ * it is always one tap away. The Mini App is the bot's Main Mini App (BotFather → Bot Settings →
+ * Configure Mini App → https://<site>/panel); web_app buttons are not allowed in groups, so this
+ * is a t.me link that Telegram opens in-app.
+ */
+async function sendPanelButton(env: Env, chatId: number, thread?: number): Promise<void> {
+  const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
+  const me = await callTelegram<{ username: string }>(cfg, 'getMe', {});
+  const sent = await callTelegram<{ message_id: number }>(cfg, 'sendMessage', {
+    chat_id: chatId,
+    ...(thread ? { message_thread_id: thread } : {}),
+    text: '📊 <b>Операторлар панели</b>\nБарча буюртмалар, кунлик сонлар, сотилди / сотилмади, спам. Фақат шу гуруҳ аъзолари учун.',
+    parse_mode: 'HTML',
+    reply_markup: panelKeyboard(`https://t.me/${me.username}?startapp=panel`),
+  });
+  await callTelegram(cfg, 'pinChatMessage', { chat_id: chatId, message_id: sent.message_id, disable_notification: true }).catch(() => undefined);
 }
 
 /** A customer ordering in a private chat with the bot (see bot.ts for the conversation). */
