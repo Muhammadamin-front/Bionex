@@ -14,6 +14,28 @@ export interface LeadMessage {
   flags: string[];
   /** Where this order stands in the next list, e.g. 3 of 10 (absent when lists are off). */
   list?: { count: number; size: number };
+  /** Ordered through the Telegram bot: the number was shared as a contact (verified) or typed. */
+  via?: 'bot-contact' | 'bot-typed';
+}
+
+/** Where the visitor came from, in words an operator understands (ad ids are left out). */
+export function sourceLabel(utm: Record<string, string | undefined>): string | null {
+  const src = (utm.source ?? '').toLowerCase();
+  const known: Record<string, string> = {
+    ig: 'Instagram',
+    instagram: 'Instagram',
+    fb: 'Facebook',
+    facebook: 'Facebook',
+    tg: 'Telegram',
+    telegram: 'Telegram',
+    google: 'Google',
+    youtube: 'YouTube',
+  };
+  const name = known[src] ?? (utm.source || null);
+  if (!name) return null;
+  // Campaign names help; numeric ad ids ("120253199231260134") only clutter the message.
+  const campaign = utm.campaign && !/^\d{6,}$/.test(utm.campaign) ? utm.campaign : null;
+  return campaign ? `${name} · ${campaign}` : name;
 }
 
 export interface TelegramConfig {
@@ -44,12 +66,16 @@ export function formatLead(lead: LeadMessage): string {
   const lines = [
     `🆕 <b>Янги буюртма №${lead.number}</b>`,
     `👤 ${escapeHtml(lead.fullName)}`,
-    // <code>: one tap copies the number, ready to paste into the phone app.
-    `📞 <code>${formatUzPhone(lead.phone)}</code>`,
+    // Plain text on purpose: Telegram makes it a phone link — one tap offers "Call" and "Copy".
+    `📞 ${formatUzPhone(lead.phone)}`,
     `🕒 ${tashkentTime(lead.createdAt)}`,
   ];
-  const utm = [lead.utm.source, lead.utm.campaign, lead.utm.content].filter(Boolean).join(' / ');
-  if (utm) lines.push(`📣 ${escapeHtml(utm)}`);
+  if (lead.via) {
+    lines.push(lead.via === 'bot-contact' ? '🤖 Telegram бот орқали · рақам тасдиқланган ✅' : '🤖 Telegram бот орқали · рақам қўлда ёзилган');
+  } else {
+    const source = sourceLabel(lead.utm);
+    if (source) lines.push(`📣 ${escapeHtml(source)}`);
+  }
   // The source line matters only when something looks off; otherwise it is noise.
   if (lead.source.phonesToday > 1 || lead.flags.length > 0) {
     const sourceNote = lead.source.phonesToday > 1 ? ` (бугун ${lead.source.phonesToday} та рақам)` : '';
@@ -159,16 +185,17 @@ export async function webhookSecret(token: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Calls a Bot API method that only needs `ok: true` back (setWebhook, setMyCommands). */
-export async function callTelegram(cfg: TelegramConfig, method: string, body: unknown): Promise<void> {
+/** Calls any Bot API method and returns its `result` (throws if Telegram says not ok). */
+export async function callTelegram<T = unknown>(cfg: TelegramConfig, method: string, body: unknown): Promise<T> {
   const res = await fetch(`${cfg.apiBase ?? 'https://api.telegram.org'}/bot${cfg.token}/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
   });
-  const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
+  const data = (await res.json().catch(() => null)) as { ok?: boolean; result?: T; description?: string } | null;
   if (!data?.ok) throw new TelegramError(`Telegram ${method}: ${data?.description ?? res.status}`, false);
+  return data.result as T;
 }
 
 /** One line per order, for operators to split the work ("you take 31–35, I take 36–40"). */
@@ -179,7 +206,7 @@ export function formatList(items: Array<{ number: number; fullName: string; phon
     `📋 <b>Рўйхат: №${first}–№${last}</b> (${items.length} та буюртма)`,
     '',
     ...items.map(
-      (i) => `${i.number}. ${escapeHtml(i.fullName)} — <code>${formatUzPhone(i.phone)}</code> — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
+      (i) => `${i.number}. ${escapeHtml(i.fullName)} — ${formatUzPhone(i.phone)} — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
     ),
   ].join('\n');
 }
@@ -199,7 +226,13 @@ export class TelegramError extends Error {
 }
 
 /** Sends a message to the operators' group and returns its id (used to reply to it later). */
-export async function sendTelegram(cfg: TelegramConfig, text: string, replyTo?: number, replyMarkup?: InlineKeyboard): Promise<number> {
+export async function sendTelegram(
+  cfg: TelegramConfig,
+  text: string,
+  replyTo?: number,
+  replyMarkup?: InlineKeyboard,
+  threadId?: number,
+): Promise<number> {
   const url = `${cfg.apiBase ?? 'https://api.telegram.org'}/bot${cfg.token}/sendMessage`;
   let res: Response;
   try {
@@ -213,6 +246,7 @@ export async function sendTelegram(cfg: TelegramConfig, text: string, replyTo?: 
         link_preview_options: { is_disabled: true },
         ...(replyTo ? { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } } : {}),
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+        ...(threadId ? { message_thread_id: threadId } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     });

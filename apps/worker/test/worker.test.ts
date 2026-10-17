@@ -19,6 +19,8 @@ const telegram = {
   /** Other Bot API calls (setWebhook, setMyCommands) with their bodies. */
   calls: [] as Array<{ method: string; body: Record<string, unknown> }>,
   down: false,
+  /** The group has Topics turned on (getChat → is_forum). */
+  forum: false,
 };
 let turnstileCalls = 0;
 
@@ -55,6 +57,11 @@ async function outbound(request: Request): Promise<Response> {
     const method = url.pathname.split('/').pop()!;
     if (method !== 'sendMessage') {
       telegram.calls.push({ method, body: await request.json() });
+      if (method === 'getChat') return Response.json({ ok: true, result: { id: Number(CHAT), is_forum: telegram.forum } });
+      if (method === 'createForumTopic') {
+        const n = telegram.calls.filter((c) => c.method === 'createForumTopic').length;
+        return Response.json({ ok: true, result: { message_thread_id: 500 + n } });
+      }
       return Response.json({ ok: true, result: true });
     }
     telegram.messages.push(await request.json());
@@ -131,6 +138,7 @@ beforeEach(async () => {
   telegram.messages = [];
   telegram.calls = [];
   telegram.down = false;
+  telegram.forum = false;
   turnstileCalls = 0;
   meta.bodies = [];
   meta.events = [];
@@ -150,7 +158,7 @@ describe('a new order', () => {
     expect(msg.chat_id).toBe(CHAT);
     expect(msg.text).toContain('Ойша Тошева');
     expect(msg.text).toContain('+998 90 312 45 67');
-    expect(msg.text).toContain('facebook / kuz');
+    expect(msg.text).toContain('📣 Facebook · kuz');
   });
 
   it('escapes HTML coming from the visitor', async () => {
@@ -184,10 +192,10 @@ describe('numbers and lists for the operators', () => {
 
     const list = telegram.messages.at(-1)!.text;
     expect(list.startsWith('📋 <b>Рўйхат: №1–№3</b> (3 та буюртма)')).toBe(true);
-    expect(list).toContain('1. Алишер Каримов — <code>+998 90 312 45 41</code>');
-    expect(list).toContain('2. Дилдора Ҳасанова — <code>+998 93 444 55 66</code>');
+    expect(list).toContain('1. Алишер Каримов — +998 90 312 45 41');
+    expect(list).toContain('2. Дилдора Ҳасанова — +998 93 444 55 66');
     expect(list).toMatch(/2\. Дилдора.*⚠️/);
-    expect(list).toContain('3. Рустам Носиров — <code>+998 97 777 88 99</code>');
+    expect(list).toContain('3. Рустам Носиров — +998 97 777 88 99');
     // The next list starts again from the next order.
     await order({ phone: '+998 91 222 33 44' }, { ip: '203.0.113.34' });
     expect(telegram.messages.filter((m) => m.text.startsWith('📋'))).toHaveLength(1);
@@ -298,10 +306,10 @@ describe('order buttons, copyable phone and the daily report', () => {
     shownText = '🆕 Янги буюртма №1\n👤 Ойша Тошева\n📞 +998 90 312 45 67';
   });
 
-  it('puts a copyable phone and a "take" button under every order', async () => {
+  it('puts a tappable phone and a "take" button under every order', async () => {
     await order({ phone: '+998 90 312 45 67' });
     const msg = leadMessages()[0]!;
-    expect(msg.text).toContain('📞 <code>+998 90 312 45 67</code>');
+    expect(msg.text).toContain('📞 +998 90 312 45 67'); // plain: Telegram offers Call / Copy
     expect(msg.text).not.toContain('Манба'); // only shown when something looks off
     expect(msg.reply_markup?.inline_keyboard[0]![0]).toEqual({ text: '📞 Мен оламан', callback_data: 't:1' });
   });
@@ -369,6 +377,96 @@ describe('order buttons, copyable phone and the daily report', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(telegram.messages.length).toBe(before + 1);
     expect(telegram.messages.at(-1)!.text).toMatch(/^📊 <b>Ҳисобот/);
+  });
+});
+
+describe('ordering through the bot in a private chat', () => {
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const say = async (msg: Record<string, unknown>, user = { id: 777, first_name: 'Ойша' }) => {
+    await mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+      body: JSON.stringify({ update_id: 1, message: { message_id: 1, chat: { id: user.id, type: 'private' }, from: user, ...msg } }),
+    });
+    return telegram.messages.filter((m) => String(m.chat_id) === String(user.id)).at(-1) as
+      | { text: string; reply_markup: { keyboard?: Array<Array<{ text: string; request_contact?: boolean }>>; remove_keyboard?: boolean } }
+      | undefined;
+  };
+
+  it('takes an order: Start → share the number → name → the group gets it', async () => {
+    let reply = await say({ text: '/start' });
+    expect(reply!.text).toMatch(/^Ассалому алайкум, Ойша!/);
+    expect(reply!.reply_markup.keyboard![0]![0]).toEqual({ text: '📱 Рақамни юбориш', request_contact: true });
+
+    reply = await say({ contact: { phone_number: '998903124567', user_id: 777 } });
+    expect(reply!.text).toMatch(/исмингизни ёзинг/);
+    expect(reply!.reply_markup.keyboard![0]![0]!.text).toBe('Ойша'); // one tap
+
+    reply = await say({ text: 'Ойша Тошева' });
+    expect(reply!.text).toMatch(/Буюртмангиз қабул қилинди \(№1\)/);
+    expect(reply!.reply_markup.remove_keyboard).toBe(true);
+
+    const lead = leadMessages().at(-1)!;
+    expect(lead.text).toContain('Ойша Тошева');
+    expect(lead.text).toContain('+998 90 312 45 67');
+    expect(lead.text).toContain('🤖 Telegram бот орқали · рақам тасдиқланган ✅');
+    expect(lead.reply_markup?.inline_keyboard[0]![0]!.callback_data).toBe('t:1');
+  });
+
+  it('accepts a typed number too, marked as not confirmed by Telegram', async () => {
+    await say({ text: '/start' });
+    await say({ text: '8 90 312 45 68' });
+    await say({ text: 'Рустам' });
+    expect(leadMessages().at(-1)!.text).toContain('рақам қўлда ёзилган');
+  });
+
+  it("refuses someone else's contact and a bad number, and asks again", async () => {
+    await say({ text: '/start' });
+    let reply = await say({ contact: { phone_number: '998903124569', user_id: 999 } });
+    expect(reply!.text).toMatch(/ўзингизнинг рақамингизни/);
+    reply = await say({ text: '12345' });
+    expect(reply!.text).toMatch(/нотўғри/);
+    reply = await say({ text: 'салом' });
+    expect(reply!.text).toMatch(/Рақамни юбориш/);
+    expect(leadMessages()).toHaveLength(0);
+  });
+
+  it('treats the same number again as already received', async () => {
+    for (let i = 0; i < 2; i++) {
+      await say({ text: '/start' });
+      await say({ contact: { phone_number: '998903124570', user_id: 777 } });
+      const reply = await say({ text: 'Ойша' });
+      if (i === 1) expect(reply!.text).toMatch(/аллақачон қабул қилинган/);
+    }
+    expect(leadMessages()).toHaveLength(1);
+  });
+});
+
+describe('group topics and the source line', () => {
+  it('shows where the visitor came from in plain words, without ad ids', async () => {
+    await order({ utm: { source: 'ig', campaign: '120253199231260134', content: '120253199231280134' } });
+    const text = leadMessages()[0]!.text;
+    expect(text).toContain('📣 Instagram');
+    expect(text).not.toContain('120253199231260134');
+  });
+
+  it('with Topics on, orders go to "🆕 Буюртмалар" and lists/reports to "📊 Ҳисобот"', async () => {
+    await mf.dispose();
+    mf = start({ LEADS_PER_LIST: '2' });
+    telegram.forum = true;
+    await mf.dispatchFetch(`${SITE}/api/health`);
+    await new Promise((r) => setTimeout(r, 300));
+    const topics = telegram.calls.filter((c) => c.method === 'createForumTopic').map((c) => c.body.name);
+    expect(topics).toEqual(['🆕 Буюртмалар', '📊 Ҳисобот']);
+
+    await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' });
+    await order({ phone: '+998 90 312 45 82' }, { ip: '203.0.113.82' });
+    const sent = telegram.messages as Array<{ text: string; message_thread_id?: number }>;
+    expect(sent.filter((m) => m.text.startsWith('🆕')).every((m) => m.message_thread_id === 501)).toBe(true);
+    expect(sent.find((m) => m.text.startsWith('📋'))!.message_thread_id).toBe(502);
   });
 });
 

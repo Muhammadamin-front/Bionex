@@ -35,6 +35,11 @@
   operators pressing at once cannot both get it. Only operator first names and outcomes are
   stored for the report (30 days); the order message itself is reused, no customer data is kept.
 - ✅ HTML in visitor input is escaped in Telegram messages.
+- ✅ Bot orders: a shared contact is accepted only if it is the sender's own number
+  (`contact.user_id`), typed numbers are marked as unconfirmed, names and numbers go through
+  the same validation as the website, and one Telegram account may order for at most
+  `LEADS_PER_IP_PER_DAY` different numbers a day. The conversation state (number before the
+  name arrives) is kept at most 24 h.
 - ✅ No fingerprinting *for abuse decisions*: whether an order is accepted, refused or counted
   as a repeat depends only on hashed IP and phone. Cookies, localStorage and User-Agent play
   no part in it. (Meta's `_fbp`/`_fbc` cookies and the User-Agent are forwarded to the

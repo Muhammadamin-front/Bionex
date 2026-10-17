@@ -1,4 +1,8 @@
+import { NAME_MESSAGES, PHONE_MESSAGES } from '@bionex/shared/lead';
+import { normalizeName } from '@bionex/shared/name';
+import { normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
+import { askName, askPhone, BOT_TEXT, done, welcome, type BotReply } from './bot';
 import {
   callTelegram,
   formatLead,
@@ -24,7 +28,7 @@ const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Bump when the webhook needs new update types or commands. */
-const WEBHOOK_VERSION = 'v2';
+const WEBHOOK_VERSION = 'v3';
 
 /** Midnight in Tashkent (UTC+5, no daylight saving) for the day containing `now`. */
 function tashkentDayStart(now: number): number {
@@ -33,7 +37,20 @@ function tashkentDayStart(now: number): number {
 }
 
 export type CheckResult = { kind: 'go' } | { kind: 'replay'; status: 'accepted' | 'duplicate' } | { kind: 'limited' };
-export type AcceptResult = { status: 'accepted' | 'duplicate' | 'ip_limited' };
+export type AcceptResult = { status: 'accepted' | 'duplicate' | 'ip_limited'; number?: number };
+
+/** Where a group message goes when the group uses topics. */
+type Thread = 'leads' | 'reports' | number | undefined;
+
+/** One update from a customer's private chat with the bot. */
+export interface BotInput {
+  userId: number;
+  firstName: string;
+  text?: string;
+  /** A shared contact; `ownerId` is whose number it is (Telegram fills it for "share my number"). */
+  contact?: { phone: string; ownerId?: number };
+  now: number;
+}
 
 /** What a button press under an order changed (the Worker then edits the message). */
 export type ButtonResult =
@@ -49,6 +66,8 @@ export interface OrderInput {
   utm: Record<string, string | undefined>;
   flags: string[];
   now: number;
+  /** Ordered through the Telegram bot (the number shared as a contact, or typed). */
+  via?: 'bot-contact' | 'bot-typed';
 }
 
 /**
@@ -66,6 +85,8 @@ export interface OrderInput {
 export class LeadRegistry extends DurableObject<Env> {
   private readonly sql: SqlStorage;
   private secret: CryptoKey | null = null;
+  /** A webhook setup already running: simultaneous requests wait for it instead of repeating it. */
+  private webhookJob: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -112,7 +133,17 @@ export class LeadRegistry extends DurableObject<Env> {
         outcome_at INTEGER
       );
       CREATE INDEX IF NOT EXISTS lead_status_created ON lead_status (created_at);
+      CREATE TABLE IF NOT EXISTS bot_sessions (
+        user_id INTEGER PRIMARY KEY,
+        step TEXT NOT NULL,
+        phone TEXT,
+        verified INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL
+      );
     `);
+    // Added after launch: the topic a queued message goes to (live data already exists).
+    const outboxColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(outbox)').toArray().map((c) => c.name);
+    if (!outboxColumns.includes('thread_id')) this.sql.exec('ALTER TABLE outbox ADD COLUMN thread_id INTEGER');
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -148,7 +179,7 @@ export class LeadRegistry extends DurableObject<Env> {
       // The same customer again (impatient, or pressed twice): one order, and a nudge to the operators.
       const repeats = earlier.repeats + 1;
       this.sql.exec('UPDATE leads SET repeats = ? WHERE id = ?', repeats, earlier.id);
-      if (repeats <= 5) this.enqueue(formatRepeat(input.phone, repeats, now), { replyToLead: earlier.id, now });
+      if (repeats <= 5) this.enqueue(formatRepeat(input.phone, repeats, now), { replyToLead: earlier.id, now, thread: 'leads' });
       this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'duplicate', now);
       await this.flush();
       return { status: 'duplicate' };
@@ -174,14 +205,15 @@ export class LeadRegistry extends DurableObject<Env> {
       source: { id: ipHash.slice(0, 6), phonesToday: otherPhones + 1 },
       flags: input.flags,
       list: list ? { count: list.count, size: list.size } : undefined,
+      via: input.via,
     });
     // The order first, then (if it completed one) the list under it.
-    this.enqueue(text, { leadId, now });
+    this.enqueue(text, { leadId, now, thread: 'leads' });
     if (list?.full) this.sendList(now);
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
     this.prune(now);
     await this.flush();
-    return { status: 'accepted' };
+    return { status: 'accepted', number: leadId };
   }
 
   /** A configuration problem that silently loses every order: tell the group, at most hourly. */
@@ -189,7 +221,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const last = this.sql.exec<{ at: number }>('SELECT at FROM alerts WHERE kind = ?', kind).toArray()[0];
     if (last && now - last.at < HOUR) return;
     this.sql.exec('INSERT OR REPLACE INTO alerts (kind, at) VALUES (?, ?)', kind, now);
-    this.enqueue(text, { now });
+    this.enqueue(text, { now, thread: 'reports' });
     await this.flush();
   }
 
@@ -233,7 +265,7 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /** Queues the collected orders (up to one list's worth) as one numbered list; returns how many. */
-  private sendList(now: number): number {
+  private sendList(now: number, thread: Thread = 'reports'): number {
     const items = this.sql
       .exec<{ lead_id: number; name: string; phone: string; at: number; flagged: number }>(
         'SELECT lead_id, name, phone, at, flagged FROM list_items ORDER BY lead_id LIMIT ?',
@@ -243,26 +275,30 @@ export class LeadRegistry extends DurableObject<Env> {
     if (items.length === 0) return 0;
     this.enqueue(
       formatList(items.map((i) => ({ number: i.lead_id, fullName: i.name, phone: i.phone, createdAt: i.at, flagged: i.flagged === 1 }))),
-      { now },
+      { now, thread },
     );
     this.sql.exec('DELETE FROM list_items WHERE lead_id <= ?', items[items.length - 1]!.lead_id);
     return items.length;
   }
 
   /** /royxat in the group: send what has been collected now, even if fewer than the list size. */
-  async listNow(now: number): Promise<void> {
-    if (this.sendList(now) === 0) this.enqueue(formatListStatus(0, this.listSize() || 1), { now });
+  async listNow(now: number, thread?: number): Promise<void> {
+    const where: Thread = thread ?? 'reports';
+    if (this.sendList(now, where) === 0) this.enqueue(formatListStatus(0, this.listSize() || 1), { now, thread: where });
     await this.flush();
   }
 
   /** /holat in the group: proof of life plus the numbers operators care about. */
-  async reportStatus(now: number): Promise<void> {
+  async reportStatus(now: number, thread?: number): Promise<void> {
     // Midnight in Tashkent (UTC+5, no daylight saving).
     const dayStart = tashkentDayStart(now);
     const today = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM leads WHERE at >= ?', dayStart).one().n;
     const last = this.sql.exec<{ at: number | null }>('SELECT max(at) AS at FROM leads').one().at;
     const queued = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM outbox').one().n;
-    this.enqueue(formatStatus({ listCount: this.listCount(), listSize: this.listSize(), today, lastLeadAt: last, queued }), { now });
+    this.enqueue(formatStatus({ listCount: this.listCount(), listSize: this.listSize(), today, lastLeadAt: last, queued }), {
+      now,
+      thread: thread ?? 'reports',
+    });
     await this.flush();
   }
 
@@ -319,7 +355,7 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /** The day's numbers for the group: every evening by cron, and on /hisobot. */
-  async dailyReport(now: number): Promise<void> {
+  async dailyReport(now: number, thread?: number): Promise<void> {
     const dayStart = tashkentDayStart(now);
     const rows = this.sql
       .exec<{ taker_name: string | null; outcome: string | null }>('SELECT taker_name, outcome FROM lead_status WHERE created_at >= ?', dayStart)
@@ -346,14 +382,14 @@ export class LeadRegistry extends DurableObject<Env> {
         repeats,
         operators: [...operators].map(([n, o]) => ({ name: n, ...o })).sort((a, b) => b.taken - a.taken),
       }),
-      { now },
+      { now, thread: thread ?? 'reports' },
     );
     await this.flush();
   }
 
   /** Any other text for the group (the command help). */
-  async notify(text: string, now: number): Promise<void> {
-    this.enqueue(text, { now });
+  async notify(text: string, now: number, thread?: number): Promise<void> {
+    this.enqueue(text, { now, thread });
     await this.flush();
   }
 
@@ -365,6 +401,13 @@ export class LeadRegistry extends DurableObject<Env> {
    */
   async ensureWebhook(origin: string): Promise<void> {
     if (this.env.TELEGRAM_DRY_RUN === '1' || !this.env.TELEGRAM_BOT_TOKEN || !origin.startsWith('https://')) return;
+    this.webhookJob ??= this.setUpWebhook(origin).finally(() => {
+      this.webhookJob = null;
+    });
+    return this.webhookJob;
+  }
+
+  private async setUpWebhook(origin: string): Promise<void> {
     const url = `${origin}/api/telegram/hook`;
     const done = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'webhook_url'").toArray()[0]?.v;
     // The version part forces one re-registration when the bot gains new update types or commands.
@@ -378,14 +421,24 @@ export class LeadRegistry extends DurableObject<Env> {
         allowed_updates: ['message', 'callback_query'],
         drop_pending_updates: true,
       });
+      // Customers (private chats) see only /start; the operators' group sees its own commands.
+      await callTelegram(cfg, 'setMyCommands', { commands: [{ command: 'start', description: 'Буюртма бериш' }] });
       await callTelegram(cfg, 'setMyCommands', {
+        scope: { type: 'chat', chat_id: cfg.chatId },
         commands: [
           { command: 'royxat', description: 'Йиғилган буюртмалар рўйхатини ҳозир юбориш' },
           { command: 'holat', description: 'Бот ишлаяптими, рўйхатда нечта буюртма бор' },
           { command: 'hisobot', description: 'Бугунги ҳисобот: нечта сотилди, ким нечта олди' },
         ],
       });
+      // What a customer reads before pressing Start.
+      await callTelegram(cfg, 'setMyDescription', {
+        description:
+          'Зейнара — юрак ва қон томирлар учун табиий сироп.\n\n«Start» тугмасини босинг, рақамингизни юборинг — оператор қўнғироқ қилиб, барча саволларга жавоб беради. Тўлов маҳсулотни олганда.',
+      });
+      await callTelegram(cfg, 'setMyShortDescription', { short_description: 'Зейнара буюртма бериш: «Start» тугмасини босинг.' });
       this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('webhook_url', ?)", `${key}|${Date.now()}`);
+      await this.ensureTopics();
     } catch (err) {
       console.error('Telegram webhook setup failed (commands will not work yet)', (err as Error).message);
     }
@@ -395,22 +448,127 @@ export class LeadRegistry extends DurableObject<Env> {
     return { token: this.env.TELEGRAM_BOT_TOKEN, chatId: this.env.TELEGRAM_CHAT_ID, apiBase: this.env.TELEGRAM_API_BASE || undefined };
   }
 
-  private enqueue(text: string, opts: { now: number; leadId?: number; replyToLead?: number }) {
+  private enqueue(text: string, opts: { now: number; leadId?: number; replyToLead?: number; thread?: Thread }) {
     this.sql.exec(
-      'INSERT INTO outbox (text, lead_id, reply_to_lead, created, next_try) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO outbox (text, lead_id, reply_to_lead, created, next_try, thread_id) VALUES (?, ?, ?, ?, ?, ?)',
       text,
       opts.leadId ?? null,
       opts.replyToLead ?? null,
       opts.now,
       opts.now,
+      this.threadId(opts.thread),
     );
+  }
+
+  /** The topic id for a kind of message, when the group is split into topics (else none). */
+  private threadId(thread: Thread): number | null {
+    if (typeof thread === 'number') return thread;
+    if (!thread) return null;
+    const v = this.sql.exec<{ v: string }>('SELECT v FROM meta WHERE k = ?', `topic_${thread}`).toArray()[0]?.v;
+    return v ? Number(v) : null;
+  }
+
+  /**
+   * When the group has Topics turned on, keeps all orders in "🆕 Буюртмалар" and lists, reports
+   * and warnings in "📊 Ҳисобот", so they never mix with the operators' own chat. The bot
+   * creates both topics itself (it needs the "Manage topics" admin right). Without topics
+   * everything goes to the group as before.
+   */
+  async ensureTopics(): Promise<void> {
+    if (this.env.TELEGRAM_DRY_RUN === '1' || !this.env.TELEGRAM_BOT_TOKEN) return;
+    const have = (k: string) => this.sql.exec('SELECT 1 FROM meta WHERE k = ?', k).toArray().length > 0;
+    if (have('topic_leads') && have('topic_reports')) return;
+    const checked = Number(this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'topics_checked'").toArray()[0]?.v ?? 0);
+    if (Date.now() - checked < 60_000) return; // at most once a minute while topics are off
+    this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('topics_checked', ?)", String(Date.now()));
+    const cfg = this.telegramConfig();
+    try {
+      const chat = await callTelegram<{ is_forum?: boolean }>(cfg, 'getChat', { chat_id: cfg.chatId });
+      if (!chat?.is_forum) return;
+      for (const [key, name, color] of [
+        ['topic_leads', '🆕 Буюртмалар', 0x6fb9f0],
+        ['topic_reports', '📊 Ҳисобот', 0xffd67e],
+      ] as const) {
+        if (have(key)) continue;
+        const topic = await callTelegram<{ message_thread_id: number }>(cfg, 'createForumTopic', { chat_id: cfg.chatId, name, icon_color: color });
+        this.sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', key, String(topic.message_thread_id));
+      }
+    } catch (err) {
+      console.error('Could not set up group topics (give the bot the "Manage topics" admin right)', (err as Error).message);
+    }
+  }
+
+  /**
+   * One message from a customer in a private chat with the bot. The conversation is one
+   * question at a time; the finished order goes through accept() like a website order, so
+   * repeats, limits and numbering are the same. "Ip" is the Telegram account, so the daily
+   * cap of different numbers applies per account.
+   */
+  async botMessage(input: BotInput): Promise<BotReply> {
+    const { userId, now } = input;
+    this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
+    const session = this.sql
+      .exec<{ step: string; phone: string | null; verified: number }>('SELECT step, phone, verified FROM bot_sessions WHERE user_id = ?', userId)
+      .toArray()[0];
+    const save = (step: string, phone: string | null, verified: boolean) =>
+      this.sql.exec(
+        'INSERT OR REPLACE INTO bot_sessions (user_id, step, phone, verified, updated_at) VALUES (?, ?, ?, ?, ?)',
+        userId,
+        step,
+        phone,
+        verified ? 1 : 0,
+        now,
+      );
+    const text = input.text?.trim() ?? '';
+
+    if (/^\/start\b/i.test(text) || !session) {
+      save('phone', null, false);
+      return welcome(normalizeName(input.firstName).ok ? input.firstName : '');
+    }
+
+    if (session.step === 'phone') {
+      let raw: string | null = null;
+      let verified = false;
+      if (input.contact) {
+        // Only the customer's own number: "share my number" is filled in by Telegram itself.
+        if (input.contact.ownerId !== userId) return askPhone(BOT_TEXT.notOwnContact);
+        raw = input.contact.phone.startsWith('+') ? input.contact.phone : `+${input.contact.phone}`;
+        verified = true;
+      } else if (/\d/.test(text)) {
+        raw = text;
+      }
+      if (!raw) return askPhone(BOT_TEXT.askPhoneAgain);
+      const phone = normalizeUzPhone(raw);
+      if (!phone.ok) return askPhone(BOT_TEXT.badPhone(PHONE_MESSAGES[phone.reason]));
+      save('name', phone.e164, verified);
+      const suggested = normalizeName(input.firstName);
+      return askName(suggested.ok ? suggested.value : null);
+    }
+
+    // step === 'name'
+    const name = normalizeName(text);
+    if (!name.ok) return { ...askName(null), text: BOT_TEXT.badName(NAME_MESSAGES[name.reason]) };
+    this.sql.exec('DELETE FROM bot_sessions WHERE user_id = ?', userId);
+    const result = await this.accept({
+      submissionId: crypto.randomUUID(),
+      ip: `tg:${userId}`,
+      phone: session.phone!,
+      fullName: name.value,
+      utm: { source: 'telegram' },
+      flags: [],
+      now,
+      via: session.verified ? 'bot-contact' : 'bot-typed',
+    });
+    if (result.status === 'ip_limited') return done(BOT_TEXT.limited);
+    if (result.status === 'duplicate') return done(BOT_TEXT.duplicate);
+    return done(BOT_TEXT.accepted(result.number!));
   }
 
   private async flush(): Promise<void> {
     const now = Date.now();
     const due = this.sql
-      .exec<{ id: number; text: string; lead_id: number | null; reply_to_lead: number | null; created: number; attempts: number }>(
-        'SELECT id, text, lead_id, reply_to_lead, created, attempts FROM outbox WHERE next_try <= ? ORDER BY id LIMIT 20',
+      .exec<{ id: number; text: string; lead_id: number | null; reply_to_lead: number | null; created: number; attempts: number; thread_id: number | null }>(
+        'SELECT id, text, lead_id, reply_to_lead, created, attempts, thread_id FROM outbox WHERE next_try <= ? ORDER BY id LIMIT 20',
         now,
       )
       .toArray();
@@ -423,10 +581,16 @@ export class LeadRegistry extends DurableObject<Env> {
           ? (this.sql.exec<{ message_id: number | null }>('SELECT message_id FROM leads WHERE id = ?', m.reply_to_lead).toArray()[0]?.message_id ?? undefined)
           : undefined;
         // Orders carry the "📞 Мен оламан" button; everything else is plain text.
-        const messageId = await this.deliver(m.text, replyTo, m.lead_id ? takeKeyboard(m.lead_id) : undefined);
+        const messageId = await this.deliver(m.text, replyTo, m.lead_id ? takeKeyboard(m.lead_id) : undefined, m.thread_id ?? undefined);
         if (m.lead_id) this.sql.exec('UPDATE leads SET message_id = ? WHERE id = ?', messageId, m.lead_id);
         this.sql.exec('DELETE FROM outbox WHERE id = ?', m.id);
       } catch (err) {
+        // The topic was deleted or topics were turned off: forget it and send to the group instead.
+        if (m.thread_id && /thread|topic/i.test((err as Error).message)) {
+          this.sql.exec("DELETE FROM meta WHERE k IN ('topic_leads', 'topic_reports')");
+          this.sql.exec('UPDATE outbox SET thread_id = NULL, next_try = ? WHERE thread_id IS NOT NULL', now);
+          continue;
+        }
         const attempts = m.attempts + 1;
         const permanent = err instanceof TelegramError && err.permanent;
         console.error(`Telegram delivery failed (attempt ${attempts})${permanent ? ': check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID' : ''}`, (err as Error).message);
@@ -445,12 +609,12 @@ export class LeadRegistry extends DurableObject<Env> {
     if (next !== null) await this.ctx.storage.setAlarm(Math.max(next, Date.now() + 1000));
   }
 
-  private async deliver(text: string, replyTo?: number, keyboard?: InlineKeyboard): Promise<number> {
+  private async deliver(text: string, replyTo?: number, keyboard?: InlineKeyboard, threadId?: number): Promise<number> {
     if (this.env.TELEGRAM_DRY_RUN === '1') {
       console.log(`[TELEGRAM_DRY_RUN] message to the operators' group:\n${text}`);
       return Math.floor(Math.random() * 1e9);
     }
-    return sendTelegram(this.telegramConfig(), text, replyTo, keyboard);
+    return sendTelegram(this.telegramConfig(), text, replyTo, keyboard, threadId);
   }
 
   private prune(now: number) {
@@ -459,6 +623,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
   }
 
   /** Keyed hash (HMAC-SHA-256) with a random secret created on first use and kept here. */

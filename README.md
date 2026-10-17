@@ -80,12 +80,22 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 **In the group** (the site connects the bot's webhook by itself after the first order or
 health check, and re-checks it daily):
 
-- every order has a copyable phone (one tap) and a **📞 Мен оламан** button. The first operator
+- with **Topics** turned on in the group (and the bot's "Manage topics" admin right), the bot
+  creates "🆕 Буюртмалар" (orders only) and "📊 Ҳисобот" (lists, reports, warnings), so orders
+  never mix with the operators' chat. Without topics everything goes to the group as before;
+- the source shows in words ("📣 Instagram"), never as ad ids; the phone is plain text, so a tap
+  offers Call / Copy;
+- every order has a **📞 Мен оламан** button. The first operator
   to press it gets the order ("📞 Дилноза олди — 14:07"); others are told who has it. Then
   **✅ Сотилди / 🔁 Кўтармади / ❌ Рад этди**, or **↩️ Қайтариш** to hand it back;
 - `/royxat` sends the orders collected so far as a list now, even fewer than 10;
 - `/holat` answers that the bot is alive, with today's count, the last order time and anything
   still waiting for Telegram;
+- **ordering in the bot itself:** anyone who opens the bot (t.me/<bot>) and presses Start is
+  asked to share their number with one button, then their name (one tap from their Telegram
+  profile). The order goes through the same registry as a website order (numbering, repeats,
+  3 different numbers per Telegram account a day) and arrives marked "🤖 Telegram бот орқали ·
+  рақам тасдиқланган ✅" (or "қўлда ёзилган" if typed);
 - `/hisobot` — the day's report (sold, no answer, rejected, untaken, per operator); it also
   arrives by itself every day at 20:00 Tashkent time (cron in `wrangler.jsonc`).
 

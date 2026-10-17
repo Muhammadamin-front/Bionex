@@ -207,17 +207,27 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
     return ok;
   }
   const message = update?.message;
-  if (!message || String(message.chat?.id) !== String(env.TELEGRAM_CHAT_ID)) return ok;
+  if (!message?.chat) return ok;
+  // A customer writing to the bot directly: the ordering conversation.
+  if (message.chat.type === 'private') {
+    await customerChat(message, env).catch((err: unknown) => console.error('Bot conversation failed', (err as Error)?.message));
+    return ok;
+  }
+  if (String(message.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return ok;
   // "/royxat", "/royxat@bionexecobot", "/royxat ..." — the command word only.
   const command = /^\/([a-z_]+)(?:@\w+)?(?:\s|$)/i.exec(message.text?.trim() ?? '')?.[1]?.toLowerCase();
   if (!command) return ok;
   const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
   const now = Date.now();
+  // Answer in the topic the command was typed in (undefined = the group's main chat).
+  const thread = message.is_topic_message ? message.message_thread_id : undefined;
   try {
-    if (command === 'royxat' || command === 'list') await registry.listNow(now);
-    else if (command === 'holat' || command === 'status') await registry.reportStatus(now);
-    else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now);
-    else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now);
+    // Topics turned on since the last check? Set them up now, before answering.
+    await registry.ensureTopics();
+    if (command === 'royxat' || command === 'list') await registry.listNow(now, thread);
+    else if (command === 'holat' || command === 'status') await registry.reportStatus(now, thread);
+    else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now, thread);
+    else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now, thread);
   } catch (err) {
     console.error('Telegram command failed', (err as Error)?.message);
   }
@@ -232,8 +242,17 @@ interface TelegramEntity {
   length: number;
   [k: string]: unknown;
 }
+interface TelegramMessage {
+  message_id?: number;
+  chat?: { id?: number; type?: string };
+  from?: { id: number; first_name?: string; last_name?: string };
+  text?: string;
+  contact?: { phone_number: string; user_id?: number };
+  message_thread_id?: number;
+  is_topic_message?: boolean;
+}
 interface TelegramUpdate {
-  message?: { chat?: { id?: number }; text?: string };
+  message?: TelegramMessage;
   callback_query?: {
     id: string;
     from: { id: number; first_name?: string; last_name?: string; username?: string };
@@ -249,7 +268,9 @@ interface TelegramUpdate {
  */
 async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env: Env): Promise<void> {
   const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
-  const toast = (text: string) => callTelegram(cfg, 'answerCallbackQuery', { callback_query_id: q.id, text, show_alert: false });
+  const toast = async (text: string) => {
+    await callTelegram(cfg, 'answerCallbackQuery', { callback_query_id: q.id, text, show_alert: false });
+  };
   const msg = q.message;
   const m = /^(t|r|s):(\d+)(?::(sold|noanswer|rejected))?$/.exec(q.data ?? '');
   if (!msg || !m || String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return toast('Бу тугма ишламайди.');
@@ -280,6 +301,21 @@ async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env
     }
   }
   await toast(result.toast);
+}
+
+/** A customer ordering in a private chat with the bot (see bot.ts for the conversation). */
+async function customerChat(message: TelegramMessage, env: Env): Promise<void> {
+  if (!message.from || !message.chat?.id) return;
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const reply = await registry.botMessage({
+    userId: message.from.id,
+    firstName: message.from.first_name ?? '',
+    text: message.text,
+    contact: message.contact ? { phone: message.contact.phone_number, ownerId: message.contact.user_id } : undefined,
+    now: Date.now(),
+  });
+  const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
+  await callTelegram(cfg, 'sendMessage', { chat_id: message.chat.id, text: reply.text, reply_markup: reply.keyboard });
 }
 
 function answer(status: 'accepted' | 'duplicate'): Response {
