@@ -61,6 +61,7 @@ const FLAG_TEXT: Record<string, string> = {
   phone_pattern: 'рақам сунъийга ўхшайди (масалан 90 111 11 11)',
   multi_phone_ip: 'бу манбадан бугун бир нечта рақам юборилди',
   spam_source: 'бу манбадан аввал спам белгиланган',
+  no_captcha: '«бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)',
 };
 
 export function formatLead(lead: LeadMessage): string {

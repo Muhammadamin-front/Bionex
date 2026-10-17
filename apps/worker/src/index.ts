@@ -113,21 +113,26 @@ export default {
       if (pre.kind === 'limited') return fail(429, 'rate_limited', MESSAGES.rateLimited);
 
       // 2. Cloudflare Turnstile, checked with Cloudflare — never trusted from the browser.
-      if (!data.turnstileToken) return fail(403, 'turnstile_failed', MESSAGES.turnstile);
-      let check;
-      try {
-        check = await verifyTurnstile({
-          secret: env.TURNSTILE_SECRET_KEY,
-          token: data.turnstileToken,
-          ip,
-          submissionId: data.submissionId,
-          hostname: url.hostname,
-          verifyUrl: env.TURNSTILE_VERIFY_URL || undefined,
-        });
-      } catch (err) {
-        if (!(err instanceof TurnstileUnavailable)) throw err;
-        console.error('Turnstile siteverify unreachable');
-        return fail(503, 'unavailable', MESSAGES.unavailable);
+      //    A failed or missing check does NOT refuse the order: on some phones and in-app
+      //    browsers Turnstile cannot finish, and refusing would lose real customers. Such an
+      //    order arrives marked "⚠️" for the operators; the per-IP and per-phone limits, the
+      //    honeypot and the spam marking still hold scripted spam back.
+      let check: { ok: boolean; errors: string[] } = { ok: false, errors: ['missing-input-response'] };
+      if (data.turnstileToken) {
+        try {
+          check = await verifyTurnstile({
+            secret: env.TURNSTILE_SECRET_KEY,
+            token: data.turnstileToken,
+            ip,
+            submissionId: data.submissionId,
+            hostname: url.hostname,
+            verifyUrl: env.TURNSTILE_VERIFY_URL || undefined,
+          });
+        } catch (err) {
+          if (!(err instanceof TurnstileUnavailable)) throw err;
+          console.error('Turnstile siteverify unreachable');
+          check = { ok: false, errors: ['siteverify-unreachable'] };
+        }
       }
       if (!check.ok) {
         const configError = check.errors.find((e) => CONFIG_ERRORS.has(e));
@@ -136,18 +141,18 @@ export default {
           ctx.waitUntil(
             registry.alert(
               `turnstile:${configError}`,
-              `⚠️ <b>Сайт созламасида хато:</b> ${CONFIG_ALERT[configError]}. Ҳозир барча буюртмалар рад этиляпти — дастурчига хабар беринг.`,
+              `⚠️ <b>Сайт созламасида хато:</b> ${CONFIG_ALERT[configError]}. Буюртмалар «⚠️ текширув ўтмади» белгиси билан келяпти — дастурчига хабар беринг.`,
               now,
             ),
           );
         }
-        return fail(403, 'turnstile_failed', MESSAGES.turnstile);
       }
 
       // 3. Signals for the operators; they do not block the order.
       const flags: string[] = [];
       if (data[HONEYPOT_FIELD]?.trim()) flags.push('honeypot');
       if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
+      if (!check.ok) flags.push('no_captcha');
 
       // 4. New, repeat, or refused — decided and recorded in one place, one order at a time.
       const result = await registry.accept({
@@ -166,7 +171,8 @@ export default {
       //    browser's pixel was blocked. Only genuinely new orders, exactly like the pixel —
       //    a repeat must not become a second Lead. Runs after the answer; never delays it.
       const meta = metaConfig(env);
-      if (meta && result.status === 'accepted') {
+      // Not for unchecked orders: a bot's order must not teach the ads whom to look for.
+      if (meta && result.status === 'accepted' && check.ok) {
         ctx.waitUntil(
           sendMetaLead(meta, {
             submissionId: data.submissionId,

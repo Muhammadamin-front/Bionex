@@ -37,6 +37,8 @@ interface Verification {
   submissionId: string;
 }
 
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 const CHECK_FAILED = `Хавфсизлик текширувини ўтказиб бўлмади. Саҳифани янгилаб, қайта уриниб кўринг${
   site.phone ? ` ёки ${site.phone} рақамига қўнғироқ қилинг` : ''
 }.`;
@@ -270,26 +272,25 @@ export function OrderForm({
       // A previous attempt got no answer and the details changed → it must be a new submission.
       if (unansweredPayload.current && unansweredPayload.current !== payloadKey) {
         unansweredPayload.current = null;
-        await refreshVerification();
+        void refreshVerification().catch(() => undefined);
       }
-      await prepare();
-      if (!verification.current) await refreshVerification();
+      // Never let the security check hold an order hostage: the Turnstile script may be slow or
+      // blocked (in-app browsers, VPNs, old phones). Wait a little, then send the order anyway —
+      // the server accepts it marked "⚠️ check" instead of losing the customer.
+      await Promise.race([prepare(), delay(6_000)]);
+      // The id is set synchronously, even if the widget itself never loads.
+      if (!verification.current) void refreshVerification().catch(() => undefined);
 
       setWaitingForCheck(!turnstileToken.current);
-      const token = await waitForTurnstile(20_000);
+      const token = await waitForTurnstile(8_000);
       setWaitingForCheck(false);
-      if (!token) {
-        setFormError(CHECK_FAILED);
-        setBusy(false);
-        return;
-      }
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;
       const response = await submitLead({
         fullName,
         phone: fullPhone,
         submissionId: verification.current!.submissionId,
-        turnstileToken: token,
+        turnstileToken: token ?? undefined,
         [HONEYPOT_FIELD]: honeypotRef.current?.value ?? '',
         utm,
       });

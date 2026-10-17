@@ -676,7 +676,7 @@ describe('spam protection', () => {
   it('allows one IP at most 3 attempts an hour, failed ones included', async () => {
     const statuses = [];
     for (let i = 0; i < 5; i++) statuses.push((await order({ turnstileToken: 'bad', phone: `+998 90 312 45 ${10 + i}` })).status);
-    expect(statuses).toEqual([403, 403, 403, 429, 429]);
+    expect(statuses).toEqual([201, 201, 201, 429, 429]); // unchecked orders still count toward the limit
     // A real customer on another network is unaffected.
     expect((await order({}, { ip: '203.0.113.50' })).status).toBe(201);
   });
@@ -690,12 +690,30 @@ describe('spam protection', () => {
     expect(leadMessages()).toHaveLength(3);
   });
 
-  it('refuses failed, foreign-site and foreign-form Turnstile tokens', async () => {
-    expect((await order({ turnstileToken: 'bad' })).status).toBe(403);
-    expect((await order({ turnstileToken: 'other-site' }, { ip: '198.51.100.8' })).status).toBe(403);
-    expect((await order({ turnstileToken: 'other-form' }, { ip: '198.51.100.9' })).status).toBe(403);
-    expect((await order({ turnstileToken: undefined }, { ip: '198.51.100.10' })).status).toBe(403);
-    expect(leadMessages()).toHaveLength(0);
+  it('never loses an order to a failed security check: it arrives marked ⚠️ instead', async () => {
+    const cases: Array<[string | undefined, string, string]> = [
+      ['bad', '198.51.100.7', '+998 90 312 45 21'],
+      ['other-site', '198.51.100.8', '+998 90 312 45 22'],
+      ['other-form', '198.51.100.9', '+998 90 312 45 23'],
+      [undefined, '198.51.100.10', '+998 90 312 45 24'], // the widget never loaded
+    ];
+    for (const [token, ip, phone] of cases) expect((await order({ turnstileToken: token, phone }, { ip })).status).toBe(201);
+    expect(leadMessages()).toHaveLength(4);
+    expect(leadMessages().every((m) => m.text.includes('«бот эмасман» текшируви ўтмади'))).toBe(true);
+    // A passed check carries no such mark.
+    await order({ phone: '+998 90 312 45 25' }, { ip: '198.51.100.11' });
+    expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
+  });
+
+  it('keeps unchecked orders away from Meta, so bots do not train the ads', async () => {
+    await mf.dispose();
+    mf = start({ META_PIXEL_ID: '1109358048693673', META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock' });
+    meta.events = [];
+    await order({ turnstileToken: 'bad', phone: '+998 90 312 45 26' }, { ip: '198.51.100.12' });
+    await order({ phone: '+998 90 312 45 27' }, { ip: '198.51.100.13' });
+    for (let i = 0; i < 50 && meta.events.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.events).toHaveLength(1);
   });
 
   it('warns the group once when the Turnstile secret is wrong', async () => {
