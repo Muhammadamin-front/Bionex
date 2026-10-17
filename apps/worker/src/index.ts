@@ -1,7 +1,8 @@
 import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorCode, type LeadSubmitResponse } from '@bionex/shared/lead';
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
-import { HELP_TEXT, webhookSecret } from './telegram';
+import { metaConfig, sendMetaLead } from './meta';
+import { callTelegram, HELP_TEXT, outcomeKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
 export { LeadRegistry } from './registry';
@@ -156,12 +157,37 @@ export default {
       });
       if (result.status === 'ip_limited') return fail(429, 'rate_limited', MESSAGES.ipDailyLimit);
       ctx.waitUntil(registry.ensureWebhook(url.origin));
+
+      // 5. Tell Meta about the order from here too, so ad optimisation still sees it when the
+      //    browser's pixel was blocked. Only genuinely new orders, exactly like the pixel —
+      //    a repeat must not become a second Lead. Runs after the answer; never delays it.
+      const meta = metaConfig(env);
+      if (meta && result.status === 'accepted') {
+        ctx.waitUntil(
+          sendMetaLead(meta, {
+            submissionId: data.submissionId,
+            phone: data.phone,
+            fullName: data.fullName,
+            ip,
+            userAgent: request.headers.get('user-agent'),
+            cookie: request.headers.get('cookie'),
+            sourceUrl: request.headers.get('referer') || url.origin,
+            now,
+          }),
+        );
+      }
       return answer(result.status);
     } catch (err) {
       // Never "accepted" unless it was recorded: anything unexpected is a clear "try again / call".
       console.error('Order failed', (err as Error)?.message);
       return fail(503, 'unavailable', MESSAGES.unavailable);
     }
+  },
+
+  /** Every evening (cron in wrangler.jsonc): the day's report to the group, which also shows the bot is alive. */
+  async scheduled(_controller, env, ctx) {
+    if (env.TELEGRAM_DRY_RUN !== '1' && !(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)) return;
+    ctx.waitUntil(env.REGISTRY.get(env.REGISTRY.idFromName('main')).dailyReport(Date.now()));
   },
 } satisfies ExportedHandler<Env>;
 
@@ -175,7 +201,11 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
   if (!env.TELEGRAM_BOT_TOKEN || request.headers.get('x-telegram-bot-api-secret-token') !== (await webhookSecret(env.TELEGRAM_BOT_TOKEN))) {
     return new Response('forbidden', { status: 403 });
   }
-  const update = (await request.json().catch(() => null)) as { message?: { chat?: { id?: number }; text?: string } } | null;
+  const update = (await request.json().catch(() => null)) as TelegramUpdate | null;
+  if (update?.callback_query) {
+    await orderButton(update.callback_query, env).catch((err: unknown) => console.error('Telegram button failed', (err as Error)?.message));
+    return ok;
+  }
   const message = update?.message;
   if (!message || String(message.chat?.id) !== String(env.TELEGRAM_CHAT_ID)) return ok;
   // "/royxat", "/royxat@bionexecobot", "/royxat ..." — the command word only.
@@ -186,6 +216,7 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
   try {
     if (command === 'royxat' || command === 'list') await registry.listNow(now);
     else if (command === 'holat' || command === 'status') await registry.reportStatus(now);
+    else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now);
     else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now);
   } catch (err) {
     console.error('Telegram command failed', (err as Error)?.message);
@@ -193,6 +224,62 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
   // Always 200: Telegram re-sends anything else (which could send a list twice); replies that
   // could not be delivered are retried by the outbox.
   return ok;
+}
+
+interface TelegramEntity {
+  type: string;
+  offset: number;
+  length: number;
+  [k: string]: unknown;
+}
+interface TelegramUpdate {
+  message?: { chat?: { id?: number }; text?: string };
+  callback_query?: {
+    id: string;
+    from: { id: number; first_name?: string; last_name?: string; username?: string };
+    data?: string;
+    message?: { message_id: number; chat: { id: number }; text?: string; entities?: TelegramEntity[] };
+  };
+}
+
+/**
+ * "📞 Мен оламан" and the outcome buttons under an order. The registry decides (so only one
+ * operator can take an order); then the message is rewritten with the operator's line.
+ * The message's own text and formatting are reused, so no customer data is stored for this.
+ */
+async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env: Env): Promise<void> {
+  const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
+  const toast = (text: string) => callTelegram(cfg, 'answerCallbackQuery', { callback_query_id: q.id, text, show_alert: false });
+  const msg = q.message;
+  const m = /^(t|r|s):(\d+)(?::(sold|noanswer|rejected))?$/.exec(q.data ?? '');
+  if (!msg || !m || String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return toast('Бу тугма ишламайди.');
+
+  const leadId = Number(m[2]);
+  const action = m[1] === 't' ? 'take' : m[1] === 'r' ? 'release' : (m[3] as LeadOutcome);
+  const userName = [q.from.first_name, q.from.last_name].filter(Boolean).join(' ') || q.from.username || 'Оператор';
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const result = await registry.button({ leadId, action, userId: q.from.id, userName, now: Date.now() });
+
+  if (result.changed && msg.text) {
+    // Keep the order exactly as it was (with its formatting) and rewrite only the status part.
+    const cut = msg.text.indexOf(STATUS_MARK);
+    const base = cut >= 0 ? msg.text.slice(0, cut) : msg.text;
+    const entities = (msg.entities ?? []).filter((e) => e.offset + e.length <= base.length);
+    try {
+      await callTelegram(cfg, 'editMessageText', {
+        chat_id: msg.chat.id,
+        message_id: msg.message_id,
+        text: result.line ? `${base}${STATUS_MARK}${result.line}` : base,
+        entities,
+        link_preview_options: { is_disabled: true },
+        reply_markup: result.keyboard === 'take' ? takeKeyboard(leadId) : outcomeKeyboard(leadId),
+      });
+    } catch (err) {
+      // The choice is saved either way; only the message's look is behind.
+      console.error('Could not update the order message', (err as Error)?.message);
+    }
+  }
+  await toast(result.toast);
 }
 
 function answer(status: 'accepted' | 'duplicate'): Response {

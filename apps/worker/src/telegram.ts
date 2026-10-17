@@ -44,13 +44,17 @@ export function formatLead(lead: LeadMessage): string {
   const lines = [
     `🆕 <b>Янги буюртма №${lead.number}</b>`,
     `👤 ${escapeHtml(lead.fullName)}`,
-    `📞 ${formatUzPhone(lead.phone)}`,
+    // <code>: one tap copies the number, ready to paste into the phone app.
+    `📞 <code>${formatUzPhone(lead.phone)}</code>`,
     `🕒 ${tashkentTime(lead.createdAt)}`,
   ];
   const utm = [lead.utm.source, lead.utm.campaign, lead.utm.content].filter(Boolean).join(' / ');
   if (utm) lines.push(`📣 ${escapeHtml(utm)}`);
-  const sourceNote = lead.source.phonesToday > 1 ? ` (бугун ${lead.source.phonesToday} та рақам)` : '';
-  lines.push(`🔎 Манба #${lead.source.id}${sourceNote}`);
+  // The source line matters only when something looks off; otherwise it is noise.
+  if (lead.source.phonesToday > 1 || lead.flags.length > 0) {
+    const sourceNote = lead.source.phonesToday > 1 ? ` (бугун ${lead.source.phonesToday} та рақам)` : '';
+    lines.push(`🔎 Манба #${lead.source.id}${sourceNote}`);
+  }
   if (lead.flags.length > 0) {
     lines.push('', `⚠️ <b>Текширинг:</b> ${lead.flags.map((f) => FLAG_TEXT[f] ?? f).join('; ')}`);
   }
@@ -79,7 +83,75 @@ export const HELP_TEXT = [
   '🤖 <b>Буйруқлар</b>',
   '/royxat — йиғилган буюртмалар рўйхатини ҳозироқ юбориш',
   '/holat — бот ишлаяптими, рўйхатда нечта буюртма бор',
+  '/hisobot — бугунги ҳисобот (ҳар куни 20:00 да ўзи ҳам келади)',
+  '',
+  'Ҳар буюртма остида: «📞 Мен оламан» → қўнғироқдан кейин «✅ Сотилди», «🔁 Кўтармади» ёки «❌ Рад этди».',
 ].join('\n');
+
+// ── Buttons under every order ─────────────────────────────────────────────
+
+export type LeadOutcome = 'sold' | 'noanswer' | 'rejected';
+export type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
+
+/** callback_data is at most 64 bytes: "t:37" take, "r:37" release, "s:37:sold" outcome. */
+export function takeKeyboard(leadId: number): InlineKeyboard {
+  return { inline_keyboard: [[{ text: '📞 Мен оламан', callback_data: `t:${leadId}` }]] };
+}
+
+export function outcomeKeyboard(leadId: number): InlineKeyboard {
+  return {
+    inline_keyboard: [
+      [
+        { text: '✅ Сотилди', callback_data: `s:${leadId}:sold` },
+        { text: '🔁 Кўтармади', callback_data: `s:${leadId}:noanswer` },
+        { text: '❌ Рад этди', callback_data: `s:${leadId}:rejected` },
+      ],
+      [{ text: '↩️ Қайтариш (бошқа олсин)', callback_data: `r:${leadId}` }],
+    ],
+  };
+}
+
+const OUTCOME_TEXT: Record<LeadOutcome, string> = { sold: '✅ Сотилди', noanswer: '🔁 Кўтармади', rejected: '❌ Рад этди' };
+
+/** The line the bot adds under an order once an operator has it. */
+export function operatorLine(s: { takerName: string; takenAt: number; outcome: LeadOutcome | null; outcomeAt: number | null }): string {
+  if (s.outcome && s.outcomeAt) return `${OUTCOME_TEXT[s.outcome]} — ${s.takerName}, ${tashkentTime(s.outcomeAt)}`;
+  return `📞 ${s.takerName} олди — ${tashkentTime(s.takenAt)}`;
+}
+
+/** Everything after this marker in an order message is the operator's status, rewritten on each press. */
+export const STATUS_MARK = '\n\n━━━━━━━━━━\n';
+
+export interface DayReport {
+  date: number;
+  total: number;
+  sold: number;
+  noanswer: number;
+  rejected: number;
+  inProgress: number;
+  untaken: number;
+  repeats: number;
+  operators: Array<{ name: string; taken: number; sold: number }>;
+}
+
+export function formatReport(r: DayReport): string {
+  const day = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' }).format(new Date(r.date));
+  if (r.total === 0) return `📊 <b>Ҳисобот (${day})</b>\nБугун янги буюртма бўлмади. Бот ишлаяпти ✅`;
+  const lines = [
+    `📊 <b>Ҳисобот (${day})</b>`,
+    `🆕 Янги буюртмалар: ${r.total}`,
+    `✅ Сотилди: ${r.sold}`,
+    `🔁 Кўтармади: ${r.noanswer}`,
+    `❌ Рад этди: ${r.rejected}`,
+    `📞 Олинган, натижа йўқ: ${r.inProgress}`,
+    `⏳ Ҳеч ким олмаган: ${r.untaken}`,
+  ];
+  if (r.repeats > 0) lines.push(`🔁 Такрор юборганлар: ${r.repeats}`);
+  if (r.operators.length > 0) {
+    lines.push('', '<b>Операторлар:</b>', ...r.operators.map((o) => `• ${escapeHtml(o.name)} — ${o.taken} та олди, ${o.sold} та сотди`));
+  }
+  return lines.join('\n');
+}
 
 /** The secret Telegram sends with every webhook call; derived from the bot token, so nothing extra to configure. */
 export async function webhookSecret(token: string): Promise<string> {
@@ -107,7 +179,7 @@ export function formatList(items: Array<{ number: number; fullName: string; phon
     `📋 <b>Рўйхат: №${first}–№${last}</b> (${items.length} та буюртма)`,
     '',
     ...items.map(
-      (i) => `${i.number}. ${escapeHtml(i.fullName)} — ${formatUzPhone(i.phone)} — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
+      (i) => `${i.number}. ${escapeHtml(i.fullName)} — <code>${formatUzPhone(i.phone)}</code> — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
     ),
   ].join('\n');
 }
@@ -127,7 +199,7 @@ export class TelegramError extends Error {
 }
 
 /** Sends a message to the operators' group and returns its id (used to reply to it later). */
-export async function sendTelegram(cfg: TelegramConfig, text: string, replyTo?: number): Promise<number> {
+export async function sendTelegram(cfg: TelegramConfig, text: string, replyTo?: number, replyMarkup?: InlineKeyboard): Promise<number> {
   const url = `${cfg.apiBase ?? 'https://api.telegram.org'}/bot${cfg.token}/sendMessage`;
   let res: Response;
   try {
@@ -140,6 +212,7 @@ export async function sendTelegram(cfg: TelegramConfig, text: string, replyTo?: 
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
         ...(replyTo ? { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } } : {}),
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     });

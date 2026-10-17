@@ -5,10 +5,15 @@ import {
   formatList,
   formatListStatus,
   formatRepeat,
+  formatReport,
   formatStatus,
+  operatorLine,
   sendTelegram,
+  takeKeyboard,
   TelegramError,
   webhookSecret,
+  type InlineKeyboard,
+  type LeadOutcome,
   type TelegramConfig,
 } from './telegram';
 
@@ -18,9 +23,22 @@ const DAY = 24 * HOUR;
 const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
+/** Bump when the webhook needs new update types or commands. */
+const WEBHOOK_VERSION = 'v2';
+
+/** Midnight in Tashkent (UTC+5, no daylight saving) for the day containing `now`. */
+function tashkentDayStart(now: number): number {
+  const tz = 5 * HOUR;
+  return Math.floor((now + tz) / DAY) * DAY - tz;
+}
 
 export type CheckResult = { kind: 'go' } | { kind: 'replay'; status: 'accepted' | 'duplicate' } | { kind: 'limited' };
 export type AcceptResult = { status: 'accepted' | 'duplicate' | 'ip_limited' };
+
+/** What a button press under an order changed (the Worker then edits the message). */
+export type ButtonResult =
+  | { changed: false; toast: string }
+  | { changed: true; toast: string; line: string | null; keyboard: 'take' | 'outcome' };
 
 export interface OrderInput {
   submissionId: string;
@@ -84,6 +102,16 @@ export class LeadRegistry extends DurableObject<Env> {
         at INTEGER NOT NULL,
         flagged INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS lead_status (
+        lead_id INTEGER PRIMARY KEY,
+        created_at INTEGER NOT NULL,
+        taker_id INTEGER,
+        taker_name TEXT,
+        taken_at INTEGER,
+        outcome TEXT,
+        outcome_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS lead_status_created ON lead_status (created_at);
     `);
   }
 
@@ -135,6 +163,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const leadId = this.sql
       .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, at) VALUES (?, ?, ?) RETURNING id', phoneHash, ipHash, now)
       .one().id;
+    this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
     const list = this.addToList(leadId, input, now);
     const text = formatLead({
       number: leadId,
@@ -229,12 +258,96 @@ export class LeadRegistry extends DurableObject<Env> {
   /** /holat in the group: proof of life plus the numbers operators care about. */
   async reportStatus(now: number): Promise<void> {
     // Midnight in Tashkent (UTC+5, no daylight saving).
-    const tz = 5 * HOUR;
-    const dayStart = Math.floor((now + tz) / DAY) * DAY - tz;
+    const dayStart = tashkentDayStart(now);
     const today = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM leads WHERE at >= ?', dayStart).one().n;
     const last = this.sql.exec<{ at: number | null }>('SELECT max(at) AS at FROM leads').one().at;
     const queued = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM outbox').one().n;
     this.enqueue(formatStatus({ listCount: this.listCount(), listSize: this.listSize(), today, lastLeadAt: last, queued }), { now });
+    await this.flush();
+  }
+
+  /**
+   * A button under an order: "📞 Мен оламан", then the call's outcome. One order at a time, so
+   * when two operators press "take" together only the first gets it.
+   */
+  async button(input: { leadId: number; action: 'take' | 'release' | LeadOutcome; userId: number; userName: string; now: number }): Promise<ButtonResult> {
+    const row = this.sql
+      .exec<{ taker_id: number | null; taker_name: string | null; taken_at: number | null; outcome: string | null }>(
+        'SELECT taker_id, taker_name, taken_at, outcome FROM lead_status WHERE lead_id = ?',
+        input.leadId,
+      )
+      .toArray()[0];
+    if (!row) return { changed: false, toast: 'Бу буюртма жуда эски — тугмалари ишламайди.' };
+    const mine = row.taker_id === input.userId;
+    const name = input.userName.slice(0, 40) || 'Оператор';
+
+    if (input.action === 'release') {
+      if (row.taker_id === null) return { changed: false, toast: 'Буни ҳали ҳеч ким олмаган.' };
+      this.sql.exec('UPDATE lead_status SET taker_id = NULL, taker_name = NULL, taken_at = NULL, outcome = NULL, outcome_at = NULL WHERE lead_id = ?', input.leadId);
+      return { changed: true, toast: 'Буюртма қайтарилди — энди бошқа оператор олиши мумкин.', line: null, keyboard: 'take' };
+    }
+    if (row.taker_id !== null && !mine) return { changed: false, toast: `Бу буюртмани ${row.taker_name} олган.` };
+
+    if (input.action === 'take') {
+      if (mine) return { changed: false, toast: 'Сиз буни аллақачон олгансиз.' };
+      this.sql.exec('UPDATE lead_status SET taker_id = ?, taker_name = ?, taken_at = ? WHERE lead_id = ?', input.userId, name, input.now, input.leadId);
+      return {
+        changed: true,
+        toast: 'Сиз олдингиз. Мижозга қўнғироқ қилинг.',
+        line: operatorLine({ takerName: name, takenAt: input.now, outcome: null, outcomeAt: null }),
+        keyboard: 'outcome',
+      };
+    }
+
+    // An outcome. Pressed without "take" first: the presser takes it at the same time.
+    const takenAt = row.taken_at ?? input.now;
+    this.sql.exec(
+      'UPDATE lead_status SET taker_id = ?, taker_name = ?, taken_at = ?, outcome = ?, outcome_at = ? WHERE lead_id = ?',
+      input.userId,
+      row.taker_name ?? name,
+      takenAt,
+      input.action,
+      input.now,
+      input.leadId,
+    );
+    return {
+      changed: true,
+      toast: 'Белгиланди.',
+      line: operatorLine({ takerName: row.taker_name ?? name, takenAt, outcome: input.action, outcomeAt: input.now }),
+      keyboard: 'outcome',
+    };
+  }
+
+  /** The day's numbers for the group: every evening by cron, and on /hisobot. */
+  async dailyReport(now: number): Promise<void> {
+    const dayStart = tashkentDayStart(now);
+    const rows = this.sql
+      .exec<{ taker_name: string | null; outcome: string | null }>('SELECT taker_name, outcome FROM lead_status WHERE created_at >= ?', dayStart)
+      .toArray();
+    const count = (f: (r: (typeof rows)[number]) => boolean) => rows.filter(f).length;
+    const operators = new Map<string, { taken: number; sold: number }>();
+    for (const r of rows) {
+      if (!r.taker_name) continue;
+      const o = operators.get(r.taker_name) ?? { taken: 0, sold: 0 };
+      o.taken++;
+      if (r.outcome === 'sold') o.sold++;
+      operators.set(r.taker_name, o);
+    }
+    const repeats = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM leads WHERE at >= ? AND repeats > 1', dayStart).one().n;
+    this.enqueue(
+      formatReport({
+        date: now,
+        total: rows.length,
+        sold: count((r) => r.outcome === 'sold'),
+        noanswer: count((r) => r.outcome === 'noanswer'),
+        rejected: count((r) => r.outcome === 'rejected'),
+        inProgress: count((r) => r.taker_name !== null && r.outcome === null),
+        untaken: count((r) => r.taker_name === null),
+        repeats,
+        operators: [...operators].map(([n, o]) => ({ name: n, ...o })).sort((a, b) => b.taken - a.taken),
+      }),
+      { now },
+    );
     await this.flush();
   }
 
@@ -254,22 +367,25 @@ export class LeadRegistry extends DurableObject<Env> {
     if (this.env.TELEGRAM_DRY_RUN === '1' || !this.env.TELEGRAM_BOT_TOKEN || !origin.startsWith('https://')) return;
     const url = `${origin}/api/telegram/hook`;
     const done = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'webhook_url'").toArray()[0]?.v;
-    if (done && done.startsWith(`${url}|`) && Date.now() - Number(done.split('|')[1]) < DAY) return;
+    // The version part forces one re-registration when the bot gains new update types or commands.
+    const key = `${url}|${WEBHOOK_VERSION}`;
+    if (done && done.startsWith(`${key}|`) && Date.now() - Number(done.split('|')[2]) < DAY) return;
     const cfg = this.telegramConfig();
     try {
       await callTelegram(cfg, 'setWebhook', {
         url,
         secret_token: await webhookSecret(cfg.token),
-        allowed_updates: ['message'],
+        allowed_updates: ['message', 'callback_query'],
         drop_pending_updates: true,
       });
       await callTelegram(cfg, 'setMyCommands', {
         commands: [
           { command: 'royxat', description: 'Йиғилган буюртмалар рўйхатини ҳозир юбориш' },
           { command: 'holat', description: 'Бот ишлаяптими, рўйхатда нечта буюртма бор' },
+          { command: 'hisobot', description: 'Бугунги ҳисобот: нечта сотилди, ким нечта олди' },
         ],
       });
-      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('webhook_url', ?)", `${url}|${Date.now()}`);
+      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('webhook_url', ?)", `${key}|${Date.now()}`);
     } catch (err) {
       console.error('Telegram webhook setup failed (commands will not work yet)', (err as Error).message);
     }
@@ -306,7 +422,8 @@ export class LeadRegistry extends DurableObject<Env> {
         const replyTo = m.reply_to_lead
           ? (this.sql.exec<{ message_id: number | null }>('SELECT message_id FROM leads WHERE id = ?', m.reply_to_lead).toArray()[0]?.message_id ?? undefined)
           : undefined;
-        const messageId = await this.deliver(m.text, replyTo);
+        // Orders carry the "📞 Мен оламан" button; everything else is plain text.
+        const messageId = await this.deliver(m.text, replyTo, m.lead_id ? takeKeyboard(m.lead_id) : undefined);
         if (m.lead_id) this.sql.exec('UPDATE leads SET message_id = ? WHERE id = ?', messageId, m.lead_id);
         this.sql.exec('DELETE FROM outbox WHERE id = ?', m.id);
       } catch (err) {
@@ -328,12 +445,12 @@ export class LeadRegistry extends DurableObject<Env> {
     if (next !== null) await this.ctx.storage.setAlarm(Math.max(next, Date.now() + 1000));
   }
 
-  private async deliver(text: string, replyTo?: number): Promise<number> {
+  private async deliver(text: string, replyTo?: number, keyboard?: InlineKeyboard): Promise<number> {
     if (this.env.TELEGRAM_DRY_RUN === '1') {
       console.log(`[TELEGRAM_DRY_RUN] message to the operators' group:\n${text}`);
       return Math.floor(Math.random() * 1e9);
     }
-    return sendTelegram(this.telegramConfig(), text, replyTo);
+    return sendTelegram(this.telegramConfig(), text, replyTo, keyboard);
   }
 
   private prune(now: number) {
@@ -341,6 +458,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM submissions WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
   }
 
   /** Keyed hash (HMAC-SHA-256) with a random secret created on first use and kept here. */

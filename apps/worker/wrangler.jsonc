@@ -21,6 +21,9 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LeadRegistry"] }],
 
+  // The day's report to the operators' group at 20:00 Tashkent time (15:00 UTC).
+  "triggers": { "crons": ["0 15 * * *"] },
+
   "vars": {
     // Order attempts one IP may make per hour (failed ones count too).
     "IP_ORDERS_PER_HOUR": "3",
@@ -33,4 +36,6 @@
   }
   // Secrets (never in this file): set once with `npx wrangler secret put NAME`
   //   TURNSTILE_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+  //   META_PIXEL_ID, META_CAPI_TOKEN — optional, both or neither: the server-side copy of
+  //   the Lead event for Meta ads. Without them leads are reported from the browser only.
 }

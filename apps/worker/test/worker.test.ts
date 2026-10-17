@@ -5,7 +5,7 @@ import { site } from '../../web/src/config/product';
 
 /**
  * Runs the real Worker in workerd (the Cloudflare runtime) with its Durable Object.
- * Telegram and Turnstile are replaced by fakes that record what they receive.
+ * Telegram, Turnstile and Meta are replaced by fakes that record what they receive.
  */
 
 const SITE = 'https://zeynara.example';
@@ -15,15 +15,27 @@ let mf: Miniflare;
 
 /** Fake Telegram: every sendMessage body; `down` makes it fail like an outage. */
 const telegram = {
-  messages: [] as Array<{ chat_id: string; text: string; reply_parameters?: { message_id: number } }>,
+  messages: [] as Array<{ chat_id: string; text: string; reply_parameters?: { message_id: number }; reply_markup?: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } }>,
   /** Other Bot API calls (setWebhook, setMyCommands) with their bodies. */
   calls: [] as Array<{ method: string; body: Record<string, unknown> }>,
   down: false,
 };
 let turnstileCalls = 0;
 
+/** Fake Meta Graph API: the Conversions API bodies and the events inside them. */
+const meta = {
+  bodies: [] as Array<{ access_token: string; test_event_code?: string; data: Array<Record<string, any>> }>,
+  events: [] as Array<Record<string, any>>,
+};
+
 async function outbound(request: Request): Promise<Response> {
   const url = new URL(request.url);
+  if (url.hostname === 'graph.mock') {
+    const body = (await request.json()) as { access_token: string; data: Array<Record<string, any>> };
+    meta.bodies.push(body);
+    meta.events.push(...body.data);
+    return Response.json({ events_received: body.data.length, fbtrace_id: 'test' });
+  }
   if (url.hostname === 'turnstile.mock') {
     turnstileCalls++;
     const form = await request.formData();
@@ -76,9 +88,11 @@ function start(bindings: Record<string, string> = {}) {
 let ids = 0;
 const sid = () => `3f2c1d4e-5b6a-4c7d-8e9f-${String(++ids).padStart(12, '0')}`;
 
-function order(body: Record<string, unknown> = {}, opts: { ip?: string; origin?: string | null } = {}) {
+function order(body: Record<string, unknown> = {}, opts: { ip?: string; origin?: string | null; cookie?: string; userAgent?: string } = {}) {
   const headers: Record<string, string> = { 'content-type': 'application/json', 'cf-connecting-ip': opts.ip ?? '198.51.100.7' };
   if (opts.origin !== null) headers.origin = opts.origin ?? SITE;
+  if (opts.cookie) headers.cookie = opts.cookie;
+  if (opts.userAgent) headers['user-agent'] = opts.userAgent;
   return mf.dispatchFetch(`${SITE}/api/leads`, {
     method: 'POST',
     headers,
@@ -118,6 +132,8 @@ beforeEach(async () => {
   telegram.calls = [];
   telegram.down = false;
   turnstileCalls = 0;
+  meta.bodies = [];
+  meta.events = [];
 });
 
 afterAll(async () => {
@@ -168,10 +184,10 @@ describe('numbers and lists for the operators', () => {
 
     const list = telegram.messages.at(-1)!.text;
     expect(list.startsWith('📋 <b>Рўйхат: №1–№3</b> (3 та буюртма)')).toBe(true);
-    expect(list).toContain('1. Алишер Каримов — +998 90 312 45 41');
-    expect(list).toContain('2. Дилдора Ҳасанова — +998 93 444 55 66');
+    expect(list).toContain('1. Алишер Каримов — <code>+998 90 312 45 41</code>');
+    expect(list).toContain('2. Дилдора Ҳасанова — <code>+998 93 444 55 66</code>');
     expect(list).toMatch(/2\. Дилдора.*⚠️/);
-    expect(list).toContain('3. Рустам Носиров — +998 97 777 88 99');
+    expect(list).toContain('3. Рустам Носиров — <code>+998 97 777 88 99</code>');
     // The next list starts again from the next order.
     await order({ phone: '+998 91 222 33 44' }, { ip: '203.0.113.34' });
     expect(telegram.messages.filter((m) => m.text.startsWith('📋'))).toHaveLength(1);
@@ -246,6 +262,113 @@ describe('bot status and commands in the group', () => {
     expect(hooks).toHaveLength(1);
     expect(hooks[0]!.body).toMatchObject({ url: `${SITE}/api/telegram/hook`, secret_token: await secret() });
     expect(telegram.calls.some((c) => c.method === 'setMyCommands')).toBe(true);
+  });
+});
+
+describe('order buttons, copyable phone and the daily report', () => {
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const hook = async (update: unknown) =>
+    mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+      body: JSON.stringify({ update_id: 1, ...(update as object) }),
+    });
+  /** What Telegram hands back on a button press: the message as plain text plus its entities. */
+  let shownText = '🆕 Янги буюртма №1\n👤 Ойша Тошева\n📞 +998 90 312 45 67';
+  const press = (data: string, user: { id: number; first_name: string }, chatId = CHAT) =>
+    hook({
+      callback_query: {
+        id: `cb${Math.random()}`,
+        from: user,
+        data,
+        message: { message_id: 1001, chat: { id: Number(chatId) }, text: shownText, entities: [{ type: 'bold', offset: 0, length: 18 }] },
+      },
+    });
+  const lastEdit = () => telegram.calls.filter((c) => c.method === 'editMessageText').at(-1)?.body as
+    | { text: string; entities: unknown[]; reply_markup: { inline_keyboard: Array<Array<{ callback_data: string }>> } }
+    | undefined;
+  const lastToast = () => (telegram.calls.filter((c) => c.method === 'answerCallbackQuery').at(-1)?.body as { text: string }).text;
+  const ali = { id: 11, first_name: 'Ойша' };
+  const bek = { id: 22, first_name: 'Дилноза' };
+
+  beforeEach(() => {
+    shownText = '🆕 Янги буюртма №1\n👤 Ойша Тошева\n📞 +998 90 312 45 67';
+  });
+
+  it('puts a copyable phone and a "take" button under every order', async () => {
+    await order({ phone: '+998 90 312 45 67' });
+    const msg = leadMessages()[0]!;
+    expect(msg.text).toContain('📞 <code>+998 90 312 45 67</code>');
+    expect(msg.text).not.toContain('Манба'); // only shown when something looks off
+    expect(msg.reply_markup?.inline_keyboard[0]![0]).toEqual({ text: '📞 Мен оламан', callback_data: 't:1' });
+  });
+
+  it('gives an order to the first operator who takes it, then records the outcome', async () => {
+    await order({ phone: '+998 90 312 45 67' });
+    await press('t:1', ali);
+    let edit = lastEdit()!;
+    expect(edit.text).toMatch(/━━━━━━━━━━\n📞 Ойша олди — \d\d\.\d\d, \d\d:\d\d$/);
+    expect(edit.entities).toEqual([{ type: 'bold', offset: 0, length: 18 }]);
+    expect(edit.reply_markup.inline_keyboard.flat().map((b) => b.callback_data)).toEqual(['s:1:sold', 's:1:noanswer', 's:1:rejected', 'r:1']);
+    expect(lastToast()).toMatch(/Сиз олдингиз/);
+
+    shownText = edit.text;
+    const edits = telegram.calls.filter((c) => c.method === 'editMessageText').length;
+    await press('t:1', bek);
+    expect(lastToast()).toBe('Бу буюртмани Ойша олган.');
+    await press('s:1:sold', bek);
+    expect(telegram.calls.filter((c) => c.method === 'editMessageText').length).toBe(edits);
+
+    await press('s:1:sold', ali);
+    edit = lastEdit()!;
+    expect(edit.text.split('━━━━━━━━━━').length).toBe(2); // the status is replaced, not stacked
+    expect(edit.text).toMatch(/✅ Сотилди — Ойша, /);
+  });
+
+  it('lets an order be handed back for someone else', async () => {
+    await order({ phone: '+998 90 312 45 67' });
+    await press('t:1', ali);
+    shownText = lastEdit()!.text;
+    await press('r:1', ali);
+    const edit = lastEdit()!;
+    expect(edit.text).toBe('🆕 Янги буюртма №1\n👤 Ойша Тошева\n📞 +998 90 312 45 67');
+    expect(edit.reply_markup.inline_keyboard[0]![0]!.callback_data).toBe('t:1');
+    await press('t:1', bek);
+    expect(lastEdit()!.text).toMatch(/Дилноза олди/);
+  });
+
+  it('ignores buttons from other chats', async () => {
+    await order({ phone: '+998 90 312 45 67' });
+    await press('t:1', ali, '-100555');
+    expect(lastEdit()).toBeUndefined();
+    expect(lastToast()).toBe('Бу тугма ишламайди.');
+  });
+
+  it('/hisobot and the evening cron report the day, per operator', async () => {
+    await order({ fullName: 'Алишер Каримов', phone: '+998 90 312 45 71' }, { ip: '203.0.113.71' });
+    await order({ fullName: 'Барно Олимова', phone: '+998 90 312 45 72' }, { ip: '203.0.113.72' });
+    await order({ fullName: 'Рустам Носиров', phone: '+998 90 312 45 73' }, { ip: '203.0.113.73' });
+    await press('s:1:sold', ali);
+    await press('t:2', bek);
+    await press('s:2:noanswer', bek);
+    await hook({ message: { message_id: 9, chat: { id: Number(CHAT) }, text: '/hisobot' } });
+    const report = telegram.messages.at(-1)!.text;
+    expect(report).toContain('🆕 Янги буюртмалар: 3');
+    expect(report).toContain('✅ Сотилди: 1');
+    expect(report).toContain('🔁 Кўтармади: 1');
+    expect(report).toContain('⏳ Ҳеч ким олмаган: 1');
+    expect(report).toContain('• Ойша — 1 та олди, 1 та сотди');
+    expect(report).toContain('• Дилноза — 1 та олди, 0 та сотди');
+
+    const before = telegram.messages.length;
+    const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+    await worker.scheduled({ cron: '0 15 * * *' });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(telegram.messages.length).toBe(before + 1);
+    expect(telegram.messages.at(-1)!.text).toMatch(/^📊 <b>Ҳисобот/);
   });
 });
 
@@ -361,3 +484,96 @@ describe('configuration', () => {
     expect((await mf.dispatchFetch(`${SITE}/api/nothing`)).status).toBe(404);
   });
 });
+
+describe('the Lead event sent to Meta from the server', () => {
+  const PIXEL = '1109358048693673';
+  const withMeta = (extra: Record<string, string> = {}) =>
+    start({ META_PIXEL_ID: PIXEL, META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock', ...extra });
+
+  /** The event leaves after the customer's answer (ctx.waitUntil), so give it a moment. */
+  const settled = async (n = 1) => {
+    for (let i = 0; i < 50 && meta.events.length < n; i++) await new Promise((r) => setTimeout(r, 10));
+    return meta.events;
+  };
+
+  beforeEach(async () => {
+    await mf.dispose();
+    mf = withMeta();
+  });
+
+  it('stays off unless both the pixel id and the token are set', async () => {
+    const half: Array<Record<string, string>> = [{}, { META_PIXEL_ID: PIXEL }, { META_CAPI_TOKEN: 'EAA-test-token' }];
+    for (const bindings of half) {
+      await mf.dispose();
+      mf = start({ META_API_BASE: 'https://graph.mock', ...bindings });
+      expect((await order()).status).toBe(201);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(meta.events).toHaveLength(0);
+    }
+  });
+
+  it('sends one Lead for a new order, keyed to the same id the browser pixel uses', async () => {
+    const submissionId = sid();
+    expect((await order({ submissionId })).status).toBe(201);
+    const [event] = await settled();
+    expect(event).toMatchObject({ event_name: 'Lead', action_source: 'website', event_id: submissionId });
+    expect(event!.event_time).toBeCloseTo(Math.floor(Date.now() / 1000), -1);
+    expect(meta.bodies[0]!.access_token).toBe('EAA-test-token');
+    // Sent to the right dataset, and the token never travels in the URL.
+    expect(meta.bodies).toHaveLength(1);
+  });
+
+  it('identifies the customer only by one-way hashes, never the number itself', async () => {
+    await order({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67' });
+    const [event] = await settled();
+    const sent = JSON.stringify(event);
+    expect(sent).not.toContain('998903124567');
+    expect(sent).not.toContain('Ойша');
+    // SHA-256 of "998903124567" and of "ойша" — what Meta matches on.
+    expect(event!.user_data.ph).toMatch(/^[0-9a-f]{64}$/);
+    expect(event!.user_data.fn).toMatch(/^[0-9a-f]{64}$/);
+    expect(event!.user_data.ln).toMatch(/^[0-9a-f]{64}$/);
+    expect(event!.user_data.ph).toBe(await sha256('998903124567'));
+    expect(event!.user_data.fn).toBe(await sha256('ойша'));
+  });
+
+  it('passes on the Meta cookies and the visitor details that make the match work', async () => {
+    await order(
+      {},
+      {
+        ip: '203.0.113.77',
+        userAgent: 'Mozilla/5.0 (iPhone) Instagram',
+        cookie: '_ga=GA1.1.x; _fbp=fb.1.1760000000000.1234567890; _fbc=fb.1.1760000000000.IwAR-click-id',
+      },
+    );
+    const [event] = await settled();
+    expect(event!.user_data).toMatchObject({
+      client_ip_address: '203.0.113.77',
+      client_user_agent: 'Mozilla/5.0 (iPhone) Instagram',
+      fbp: 'fb.1.1760000000000.1234567890',
+      fbc: 'fb.1.1760000000000.IwAR-click-id',
+    });
+  });
+
+  it('does not count a repeat of the same number as a second Lead', async () => {
+    await order({ phone: '+998 90 312 45 68' });
+    await settled();
+    const repeat = await order({ phone: '+998 90 312 45 68' });
+    expect(await repeat.json()).toMatchObject({ status: 'duplicate' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(meta.events).toHaveLength(1);
+  });
+
+  it('still accepts the order when Meta is unreachable', async () => {
+    await mf.dispose();
+    mf = withMeta({ META_API_BASE: 'https://graph-down.mock' });
+    const res = await order();
+    expect(res.status).toBe(201);
+    expect(leadMessages()).toHaveLength(1);
+  });
+});
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}

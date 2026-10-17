@@ -42,6 +42,16 @@ npx wrangler secret put TURNSTILE_SECRET_KEY   # paste the Secret key
 npm run telegram:setup    # checks the bot, finds the group, saves the two Telegram secrets
 ```
 
+Optional, for Meta ads — **both or neither**, otherwise the feature stays off:
+
+```bash
+cd apps/worker
+printf "<your pixel id>" | npx wrangler secret put META_PIXEL_ID
+npx wrangler secret put META_CAPI_TOKEN   # paste the Conversions API token
+```
+
+See [META-CAPI.md](META-CAPI.md) for where that token comes from and how to verify it.
+
 ## 5. Check
 
 1. Open `https://zeynara.<account>.workers.dev/api/health` →
@@ -64,8 +74,8 @@ Cloudflare → Workers & Pages → Create → Import a repository → this repo,
 
 Worker → Settings → **Build** → Variables: `VITE_TURNSTILE_SITE_KEY`, `VITE_SITE_URL`
 (and `VITE_META_PIXEL_ID`). Worker → Settings → **Variables and Secrets** (type *Secret*):
-`TURNSTILE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Every push to `main`
-redeploys.
+`TURNSTILE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and optionally
+`META_PIXEL_ID` + `META_CAPI_TOKEN`. Every push to `main` redeploys.
 
 ## Own domain later
 

@@ -14,7 +14,8 @@ Visitor ─► Cloudflare Worker ──► website files (apps/web/dist)
               │  POST /api/leads
               ├─► Cloudflare Turnstile (is it a real person?)
               ├─► LeadRegistry (Durable Object: repeats, per-IP limit, retry queue)
-              └─► Telegram group of the operators
+              ├─► Telegram group of the operators
+              └─► Meta Conversions API (optional: the server-side copy of the Lead event)
 ```
 
 ## How an order is handled
@@ -67,6 +68,8 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 | Cloudflare secret | `TURNSTILE_SECRET_KEY` | Turnstile **secret** key |
 | | `TELEGRAM_BOT_TOKEN` | from @BotFather |
 | | `TELEGRAM_CHAT_ID` | the private group or channel id (`npm run telegram:setup` finds it) |
+| | `META_PIXEL_ID` | same id as `VITE_META_PIXEL_ID`; optional, **both or neither** |
+| | `META_CAPI_TOKEN` | Conversions API access token ([docs/META-CAPI.md](docs/META-CAPI.md)) |
 | `apps/worker/wrangler.jsonc` | `IP_ORDERS_PER_HOUR` | order attempts per IP per hour, default 3 |
 | | `LEADS_PER_IP_PER_DAY` | different numbers per IP per day, default 3 |
 | | `DUPLICATE_WINDOW_HOURS` | default 24 |
@@ -74,10 +77,17 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 
 `GET /api/health` shows whether the secrets are set and how many messages wait for Telegram.
 
-**Commands in the group** (the site connects the bot's webhook by itself after the first
-order or health check, and re-checks it daily): `/royxat` sends the orders collected so far
-as a list now, even fewer than 10; `/holat` answers that the bot is alive, with today's count,
-the last order time and anything still waiting for Telegram.
+**In the group** (the site connects the bot's webhook by itself after the first order or
+health check, and re-checks it daily):
+
+- every order has a copyable phone (one tap) and a **📞 Мен оламан** button. The first operator
+  to press it gets the order ("📞 Дилноза олди — 14:07"); others are told who has it. Then
+  **✅ Сотилди / 🔁 Кўтармади / ❌ Рад этди**, or **↩️ Қайтариш** to hand it back;
+- `/royxat` sends the orders collected so far as a list now, even fewer than 10;
+- `/holat` answers that the bot is alive, with today's count, the last order time and anything
+  still waiting for Telegram;
+- `/hisobot` — the day's report (sold, no answer, rejected, untaken, per operator); it also
+  arrives by itself every day at 20:00 Tashkent time (cron in `wrangler.jsonc`).
 
 ## Before you launch — content checklist
 
@@ -96,9 +106,8 @@ the "15 minutes" call-back promise, legal name.
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — publishing on Cloudflare, step by step
 - [docs/TURNSTILE.md](docs/TURNSTILE.md) — Turnstile keys
 - [docs/SECURITY.md](docs/SECURITY.md) — what protects the form, and why
+- [docs/META-CAPI.md](docs/META-CAPI.md) — the server-side Lead event for Meta ads
 - [docs/ANIMATIONS.md](docs/ANIMATIONS.md) — which animations were used, and why
 
 The previous, heavier version (Express + PostgreSQL + admin panel + Google Sheets + AI
 assistant) is archived in `Desktop/Bionex-toliq-versiya-2026-10-14.tar.gz`.
-# Bionex
-# Bionex
