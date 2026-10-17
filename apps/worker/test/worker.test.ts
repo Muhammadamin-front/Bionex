@@ -192,10 +192,11 @@ describe('numbers and lists for the operators', () => {
 
     const list = telegram.messages.at(-1)!.text;
     expect(list.startsWith('📋 <b>Рўйхат: №1–№3</b> (3 та буюртма)')).toBe(true);
-    expect(list).toContain('1. Алишер Каримов — +998 90 312 45 41');
-    expect(list).toContain('2. Дилдора Ҳасанова — +998 93 444 55 66');
-    expect(list).toMatch(/2\. Дилдора.*⚠️/);
-    expect(list).toContain('3. Рустам Носиров — +998 97 777 88 99');
+    expect(list).toMatch(/<b>1\.<\/b> Алишер Каримов · \d\d:\d\d · ⏳ олинмаган\n📞 \+998 90 312 45 41/);
+    expect(list).toMatch(/<b>2\.<\/b> Дилдора Ҳасанова · .* ⚠️\n📞 \+998 93 444 55 66/);
+    expect(list).toMatch(/<b>3\.<\/b> Рустам Носиров · .*\n📞 \+998 97 777 88 99/);
+    // The phone stands alone on its line, so copying it never takes the time along.
+    expect(list.split('\n').filter((l) => l.startsWith('📞')).every((l) => /^📞 \+998 \d\d \d{3} \d\d \d\d$/.test(l))).toBe(true);
     // The next list starts again from the next order.
     await order({ phone: '+998 91 222 33 44' }, { ip: '203.0.113.34' });
     expect(telegram.messages.filter((m) => m.text.startsWith('📋'))).toHaveLength(1);
@@ -227,19 +228,22 @@ describe('bot status and commands in the group', () => {
     expect(leadMessages()[0]!.text).toContain('📋 Рўйхатда 1 та. Яна 9 та келса, рўйхатни юбораман');
   });
 
-  it('/royxat sends the collected orders right away, even fewer than 10', async () => {
+  it('/royxat shows all of today\'s orders with their status, every time it is pressed', async () => {
+    await command('/royxat');
+    expect(telegram.messages.at(-1)!.text).toBe('📋 Бугун ҳали буюртма йўқ.');
     await order({ fullName: 'Алишер Каримов', phone: '+998 90 312 45 62' }, { ip: '203.0.113.51' });
     await order({ fullName: 'Барно Олимова', phone: '+998 90 312 45 63' }, { ip: '203.0.113.52' });
     expect((await command('/royxat@bionexecobot')).status).toBe(200);
-    const list = telegram.messages.at(-1)!.text;
-    expect(list.startsWith('📋 <b>Рўйхат: №1–№2</b> (2 та буюртма)')).toBe(true);
-    expect(list).toContain('Барно Олимова');
-    // Collected orders were handed over: the next /royxat has nothing to send.
+    const first = telegram.messages.at(-1)!.text;
+    expect(first).toMatch(/^📋 <b>Бугунги буюртмалар \(\d\d\.\d\d\)<\/b> — 2 та\n⏳ Олинмаган: 2/);
+    expect(first).toContain('Алишер Каримов');
+    expect(first).toContain('📞 +998 90 312 45 63');
+    // Pressed again: the same orders again, nothing used up.
     await command('/royxat');
-    expect(telegram.messages.at(-1)!.text).toBe('📋 Рўйхатда ҳозир буюртма йўқ.');
-    // And counting starts again for the next list.
+    expect(telegram.messages.at(-1)!.text).toBe(first);
+    // And the 10-order counter is not reset by it.
     await order({ phone: '+998 90 312 45 64' }, { ip: '203.0.113.53' });
-    expect(leadMessages().at(-1)!.text).toContain('Рўйхатда 1 та. Яна 9 та');
+    expect(leadMessages().at(-1)!.text).toContain('Рўйхатда 3 та. Яна 7 та');
   });
 
   it('/holat answers that the bot is alive, with the numbers', async () => {
@@ -370,6 +374,12 @@ describe('order buttons, copyable phone and the daily report', () => {
     expect(report).toContain('⏳ Ҳеч ким олмаган: 1');
     expect(report).toContain('• Ойша — 1 та олди, 1 та сотди');
     expect(report).toContain('• Дилноза — 1 та олди, 0 та сотди');
+
+    await hook({ message: { message_id: 10, chat: { id: Number(CHAT) }, text: '/royxat' } });
+    const list = telegram.messages.at(-1)!.text;
+    expect(list).toMatch(/<b>1\.<\/b> Алишер Каримов · \d\d:\d\d · ✅ Сотилди \(Ойша\)/);
+    expect(list).toMatch(/<b>2\.<\/b> Барно Олимова · \d\d:\d\d · 🔁 Кўтармади \(Дилноза\)/);
+    expect(list).toMatch(/<b>3\.<\/b> Рустам Носиров · \d\d:\d\d · ⏳ олинмаган/);
 
     const before = telegram.messages.length;
     const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };

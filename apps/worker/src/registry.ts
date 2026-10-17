@@ -6,6 +6,7 @@ import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply }
 import {
   callTelegram,
   formatLead,
+  batchTitle,
   formatList,
   formatListStatus,
   formatRepeat,
@@ -15,9 +16,11 @@ import {
   sendTelegram,
   takeKeyboard,
   TelegramError,
+  todayTitle,
   webhookSecret,
   type InlineKeyboard,
   type LeadOutcome,
+  type ListItem,
   type TelegramConfig,
 } from './telegram';
 
@@ -28,7 +31,7 @@ const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Bump when the webhook needs new update types or commands. */
-const WEBHOOK_VERSION = 'v3';
+const WEBHOOK_VERSION = 'v4';
 
 /** Midnight in Tashkent (UTC+5, no daylight saving) for the day containing `now`. */
 function tashkentDayStart(now: number): number {
@@ -80,7 +83,7 @@ export interface OrderInput {
  *
  * Privacy: phone numbers and IPs are kept only as keyed hashes (secret generated here and
  * never leaves this object). A name and number are stored in clear only inside a message
- * that is still waiting for Telegram, and until their 10-order list is sent (at most 30 days).
+ * still waiting for Telegram, and for 7 days in list_items for the operators' /royxat.
  */
 export class LeadRegistry extends DurableObject<Env> {
   private readonly sql: SqlStorage;
@@ -146,6 +149,9 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!outboxColumns.includes('thread_id')) this.sql.exec('ALTER TABLE outbox ADD COLUMN thread_id INTEGER');
     const sessionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(bot_sessions)').toArray().map((c) => c.name);
     if (!sessionColumns.includes('test')) this.sql.exec('ALTER TABLE bot_sessions ADD COLUMN test INTEGER NOT NULL DEFAULT 0');
+    // Orders now stay listable after their 10-order list went out (for /royxat): mark, don't delete.
+    const listColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(list_items)').toArray().map((c) => c.name);
+    if (!listColumns.includes('listed')) this.sql.exec('ALTER TABLE list_items ADD COLUMN listed INTEGER NOT NULL DEFAULT 0');
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -243,8 +249,7 @@ export class LeadRegistry extends DurableObject<Env> {
    * arrives; the list is only a summary. 0 turns the lists off.
    */
   private addToList(leadId: number, input: OrderInput, now: number): { count: number; size: number; full: boolean } | null {
-    const size = this.listSize();
-    if (size === 0) return null;
+    // Kept for /royxat even when the 10-order lists are turned off.
     this.sql.exec(
       'INSERT INTO list_items (lead_id, name, phone, at, flagged) VALUES (?, ?, ?, ?, ?)',
       leadId,
@@ -253,6 +258,8 @@ export class LeadRegistry extends DurableObject<Env> {
       now,
       input.flags.length > 0 ? 1 : 0,
     );
+    const size = this.listSize();
+    if (size === 0) return null;
     const count = this.listCount();
     return { count, size, full: count >= size };
   }
@@ -262,31 +269,46 @@ export class LeadRegistry extends DurableObject<Env> {
     return size > 0 ? size : 0;
   }
 
+  /** Orders since the last 10-order list. */
   private listCount(): number {
-    return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM list_items').one().n;
+    return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM list_items WHERE listed = 0').one().n;
   }
 
-  /** Queues the collected orders (up to one list's worth) as one numbered list; returns how many. */
-  private sendList(now: number, thread: Thread = 'reports'): number {
-    const items = this.sql
-      .exec<{ lead_id: number; name: string; phone: string; at: number; flagged: number }>(
-        'SELECT lead_id, name, phone, at, flagged FROM list_items ORDER BY lead_id LIMIT ?',
-        Math.max(this.listSize(), 1),
+  /** Orders with their current status (who took it, the outcome), oldest first. */
+  private listItems(where: string, ...params: Array<number | string>): ListItem[] {
+    return this.sql
+      .exec<{ lead_id: number; name: string; phone: string; at: number; flagged: number; taker_name: string | null; outcome: string | null }>(
+        `SELECT li.lead_id, li.name, li.phone, li.at, li.flagged, ls.taker_name, ls.outcome
+           FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
+          WHERE ${where} ORDER BY li.lead_id`,
+        ...params,
       )
-      .toArray();
-    if (items.length === 0) return 0;
-    this.enqueue(
-      formatList(items.map((i) => ({ number: i.lead_id, fullName: i.name, phone: i.phone, createdAt: i.at, flagged: i.flagged === 1 }))),
-      { now, thread },
-    );
-    this.sql.exec('DELETE FROM list_items WHERE lead_id <= ?', items[items.length - 1]!.lead_id);
-    return items.length;
+      .toArray()
+      .map((i) => ({
+        number: i.lead_id,
+        fullName: i.name,
+        phone: i.phone,
+        createdAt: i.at,
+        flagged: i.flagged === 1,
+        takerName: i.taker_name,
+        outcome: i.outcome as LeadOutcome | null,
+      }));
   }
 
-  /** /royxat in the group: send what has been collected now, even if fewer than the list size. */
+  /** Every LEADS_PER_LIST new orders: queue them as one list, and mark them as sent. */
+  private sendList(now: number): void {
+    const items = this.listItems('li.listed = 0').slice(0, this.listSize());
+    if (items.length === 0) return;
+    for (const text of formatList(batchTitle(items), items)) this.enqueue(text, { now, thread: 'reports' });
+    this.sql.exec('UPDATE list_items SET listed = 1 WHERE lead_id <= ? AND listed = 0', items[items.length - 1]!.number);
+  }
+
+  /** /royxat in the group: all of today's orders with who has them and the outcome — every time. */
   async listNow(now: number, thread?: number): Promise<void> {
     const where: Thread = thread ?? 'reports';
-    if (this.sendList(now, where) === 0) this.enqueue(formatListStatus(0, this.listSize() || 1), { now, thread: where });
+    const items = this.listItems('li.at >= ?', tashkentDayStart(now));
+    if (items.length === 0) this.enqueue('📋 Бугун ҳали буюртма йўқ.', { now, thread: where });
+    else for (const text of formatList(todayTitle(now, items), items)) this.enqueue(text, { now, thread: where });
     await this.flush();
   }
 
@@ -428,7 +450,7 @@ export class LeadRegistry extends DurableObject<Env> {
       await callTelegram(cfg, 'setMyCommands', {
         scope: { type: 'chat', chat_id: cfg.chatId },
         commands: [
-          { command: 'royxat', description: 'Йиғилган буюртмалар рўйхатини ҳозир юбориш' },
+          { command: 'royxat', description: 'Бугунги барча буюртмалар: ким олди, натижаси' },
           { command: 'holat', description: 'Бот ишлаяптими, рўйхатда нечта буюртма бор' },
           { command: 'hisobot', description: 'Бугунги ҳисобот: нечта сотилди, ким нечта олди' },
         ],
@@ -640,7 +662,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM hits WHERE at < ?', now - DAY);
     this.sql.exec('DELETE FROM submissions WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
-    this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
   }

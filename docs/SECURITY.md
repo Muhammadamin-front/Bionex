@@ -56,8 +56,8 @@
 ## Privacy
 - ✅ IPs and phone numbers are stored only as HMAC hashes (secret generated inside the
   Durable Object), for 30 days.
-- ✅ Name and number are stored in clear only while a message waits for Telegram, and until
-  their 10-order list is sent (deleted after 30 days at the latest).
+- ✅ Name and number are stored in clear only while a message waits for Telegram, and for
+  7 days for the operators' `/royxat` list (then deleted).
 - ✅ Nothing personal is written to logs.
 - ✅ Meta Conversions API (only when **both** `META_PIXEL_ID` and `META_CAPI_TOKEN` are set):
   an accepted order sends Meta a one-way **SHA-256** of the phone number, first name, last name

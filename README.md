@@ -88,7 +88,9 @@ health check, and re-checks it daily):
 - every order has a **📞 Мен оламан** button. The first operator
   to press it gets the order ("📞 Дилноза олди — 14:07"); others are told who has it. Then
   **✅ Сотилди / 🔁 Кўтармади / ❌ Рад этди**, or **↩️ Қайтариш** to hand it back;
-- `/royxat` sends the orders collected so far as a list now, even fewer than 10;
+- `/royxat` shows all of today's orders, every time, each with its status (⏳ untaken, 📞 who has
+  it, ✅ / 🔁 / ❌ outcome); each order is two lines with the phone alone on the second, so
+  copying it never picks up the time;
 - `/holat` answers that the bot is alive, with today's count, the last order time and anything
   still waiting for Telegram;
 - **ordering in the bot itself:** anyone who opens the bot (t.me/<bot>) and presses Start is

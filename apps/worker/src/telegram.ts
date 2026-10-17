@@ -90,9 +90,9 @@ export function formatLead(lead: LeadMessage): string {
 
 /** The bot's running status under every order, so the group can see it is alive and counting. */
 export function formatListStatus(count: number, size: number): string {
-  if (count >= size) return `📋 Рўйхатда ${size} та бўлди — рўйхат пастда юборилди.`;
-  if (count === 0) return '📋 Рўйхатда ҳозир буюртма йўқ.';
-  return `📋 Рўйхатда ${count} та. Яна ${size - count} та келса, рўйхатни юбораман (ҳозир керак бўлса: /royxat).`;
+  if (count >= size) return `📋 ${size} та бўлди — рўйхат «📊 Ҳисобот»га юборилди. Бугунгилар: /royxat`;
+  if (count === 0) return '📋 Янги рўйхат учун ҳозир буюртма йўқ. Бугунгилар: /royxat';
+  return `📋 Рўйхатда ${count} та. Яна ${size - count} та келса, рўйхатни юбораман. Бугунгилар: /royxat`;
 }
 
 export function formatStatus(s: { listCount: number; listSize: number; today: number; lastLeadAt: number | null; queued: number }): string {
@@ -107,7 +107,7 @@ export function formatStatus(s: { listCount: number; listSize: number; today: nu
 
 export const HELP_TEXT = [
   '🤖 <b>Буйруқлар</b>',
-  '/royxat — йиғилган буюртмалар рўйхатини ҳозироқ юбориш',
+  '/royxat — бугунги барча буюртмалар: ким олди, натижаси',
   '/holat — бот ишлаяптими, рўйхатда нечта буюртма бор',
   '/hisobot — бугунги ҳисобот (ҳар куни 20:00 да ўзи ҳам келади)',
   '',
@@ -198,16 +198,53 @@ export async function callTelegram<T = unknown>(cfg: TelegramConfig, method: str
   return data.result as T;
 }
 
-/** One line per order, for operators to split the work ("you take 31–35, I take 36–40"). */
-export function formatList(items: Array<{ number: number; fullName: string; phone: string; createdAt: number; flagged: boolean }>): string {
-  const first = items[0]!.number;
-  const last = items[items.length - 1]!.number;
+export interface ListItem {
+  number: number;
+  fullName: string;
+  phone: string;
+  createdAt: number;
+  flagged: boolean;
+  takerName?: string | null;
+  outcome?: LeadOutcome | null;
+}
+
+const clock = (ms: number) =>
+  new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+
+const ITEMS_PER_MESSAGE = 25;
+
+/**
+ * Orders as a list for operators to share out. Each order takes two lines and the phone
+ * stands alone on the second one: next to a date, Telegram would read "…37 00 — 17.10" as
+ * one number, and copying it would copy the date too.
+ */
+export function formatList(title: string, items: ListItem[]): string[] {
+  const entry = (i: ListItem) => {
+    const state = !i.takerName
+      ? '⏳ олинмаган'
+      : i.outcome
+        ? `${OUTCOME_TEXT[i.outcome]} (${escapeHtml(i.takerName)})`
+        : `📞 ${escapeHtml(i.takerName)}`;
+    return `<b>${i.number}.</b> ${escapeHtml(i.fullName)} · ${clock(i.createdAt)} · ${state}${i.flagged ? ' ⚠️' : ''}\n📞 ${formatUzPhone(i.phone)}`;
+  };
+  const messages: string[] = [];
+  for (let start = 0; start < items.length; start += ITEMS_PER_MESSAGE) {
+    const part = items.slice(start, start + ITEMS_PER_MESSAGE).map(entry).join('\n\n');
+    messages.push(start === 0 ? `${title}\n\n${part}` : `📋 (давоми)\n\n${part}`);
+  }
+  return messages;
+}
+
+export function batchTitle(items: ListItem[]): string {
+  return `📋 <b>Рўйхат: №${items[0]!.number}–№${items[items.length - 1]!.number}</b> (${items.length} та буюртма)`;
+}
+
+export function todayTitle(now: number, items: ListItem[]): string {
+  const day = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' }).format(new Date(now));
+  const n = (f: (i: ListItem) => boolean) => items.filter(f).length;
   return [
-    `📋 <b>Рўйхат: №${first}–№${last}</b> (${items.length} та буюртма)`,
-    '',
-    ...items.map(
-      (i) => `${i.number}. ${escapeHtml(i.fullName)} — ${formatUzPhone(i.phone)} — ${tashkentTime(i.createdAt)}${i.flagged ? ' ⚠️' : ''}`,
-    ),
+    `📋 <b>Бугунги буюртмалар (${day})</b> — ${items.length} та`,
+    `⏳ Олинмаган: ${n((i) => !i.takerName)} · 📞 Жараёнда: ${n((i) => Boolean(i.takerName) && !i.outcome)} · ✅ Сотилди: ${n((i) => i.outcome === 'sold')}`,
   ].join('\n');
 }
 
