@@ -106,7 +106,8 @@ health check, and re-checks it daily):
   totals, conversion and a 14-day chart. Set it up once: @BotFather → your bot → Bot Settings →
   Configure Mini App → URL `https://<site>/panel`. Only members of the operators' group get data
   (Telegram-signed initData + `getChatMember`). Marking an order spam flags later orders from
-  the same source "⚠️ аввал спам белгиланган";
+  the same source "⚠️ аввал спам белгиланган". A group member can also open it privately: send
+  `/panel` to the bot in a private chat (others get "only for operators");
 - `/hisobot` — the day's report (sold, no answer, rejected, untaken, per operator); it also
   arrives by itself every day at 20:00 Tashkent time (cron in `wrangler.jsonc`).
 

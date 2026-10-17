@@ -2,7 +2,7 @@ import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorC
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
 import { metaConfig, sendMetaLead } from './meta';
-import { panelApi, panelPage } from './panel';
+import { isGroupMember, panelApi, panelPage } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
@@ -56,7 +56,7 @@ export default {
     if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
-    if (url.pathname === '/api/telegram/hook' && request.method === 'POST') return telegramCommand(request, env);
+    if (url.pathname === '/api/telegram/hook' && request.method === 'POST') return telegramCommand(request, env, url.origin);
 
     if (url.pathname === '/api/health' && request.method === 'GET') {
       // For a quick check after deploying. Says only whether settings exist, never their values.
@@ -200,7 +200,7 @@ export default {
  * /royxat sends the collected orders now, /holat reports that the bot is alive.
  * Accepted only with the secret header Telegram was given, and only from our own group.
  */
-async function telegramCommand(request: Request, env: Env): Promise<Response> {
+async function telegramCommand(request: Request, env: Env, origin: string): Promise<Response> {
   const ok = new Response('ok');
   if (!env.TELEGRAM_BOT_TOKEN || request.headers.get('x-telegram-bot-api-secret-token') !== (await webhookSecret(env.TELEGRAM_BOT_TOKEN))) {
     return new Response('forbidden', { status: 403 });
@@ -214,7 +214,7 @@ async function telegramCommand(request: Request, env: Env): Promise<Response> {
   if (!message?.chat) return ok;
   // A customer writing to the bot directly: the ordering conversation.
   if (message.chat.type === 'private') {
-    await customerChat(message, env).catch((err: unknown) => console.error('Bot conversation failed', (err as Error)?.message));
+    await customerChat(message, env, origin).catch((err: unknown) => console.error('Bot conversation failed', (err as Error)?.message));
     return ok;
   }
   if (String(message.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return ok;
@@ -328,8 +328,21 @@ async function sendPanelButton(env: Env, chatId: number, thread?: number): Promi
 }
 
 /** A customer ordering in a private chat with the bot (see bot.ts for the conversation). */
-async function customerChat(message: TelegramMessage, env: Env): Promise<void> {
+async function customerChat(message: TelegramMessage, env: Env, origin: string): Promise<void> {
   if (!message.from || !message.chat?.id) return;
+  const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
+  // An operator can open the panel privately, without posting in the operators' group.
+  // (web_app buttons work in private chats, so this needs no BotFather setup.)
+  if (/^\/panel\b/i.test(message.text?.trim() ?? '')) {
+    const member = await isGroupMember(cfg, message.from.id);
+    await callTelegram(cfg, 'sendMessage', {
+      chat_id: message.chat.id,
+      text: member ? '📊 <b>Операторлар панели</b>' : 'Бу буйруқ фақат операторлар учун.',
+      parse_mode: 'HTML',
+      ...(member ? { reply_markup: { inline_keyboard: [[{ text: '📊 Панелни очиш', web_app: { url: `${origin}/panel` } }]] } } : {}),
+    });
+    return;
+  }
   const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
   const reply = await registry.botMessage({
     userId: message.from.id,
@@ -338,7 +351,6 @@ async function customerChat(message: TelegramMessage, env: Env): Promise<void> {
     contact: message.contact ? { phone: message.contact.phone_number, ownerId: message.contact.user_id } : undefined,
     now: Date.now(),
   });
-  const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
   await callTelegram(cfg, 'sendMessage', { chat_id: message.chat.id, text: reply.text, parse_mode: 'HTML', reply_markup: reply.keyboard });
 }
 

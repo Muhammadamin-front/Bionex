@@ -601,6 +601,19 @@ describe("the operators' Mini App panel", () => {
     expect(telegram.calls.some((c) => c.method === 'pinChatMessage')).toBe(true);
   });
 
+  it('/panel in a private chat gives a group member the panel button, and nobody else', async () => {
+    const dm = (userId: number) =>
+      hook({ message: { message_id: 5, chat: { id: userId, type: 'private' }, from: { id: userId, first_name: 'X' }, text: '/panel' } });
+    await dm(11);
+    const mine = telegram.messages.at(-1) as unknown as { chat_id: number; reply_markup: { inline_keyboard: Array<Array<{ web_app: { url: string } }>> } };
+    expect(mine.chat_id).toBe(11);
+    expect(mine.reply_markup.inline_keyboard[0]![0]!.web_app.url).toBe(`${SITE}/panel`);
+    await dm(555);
+    const other = telegram.messages.at(-1) as unknown as { text: string; reply_markup?: unknown };
+    expect(other.text).toBe('Бу буйруқ фақат операторлар учун.');
+    expect(other.reply_markup).toBeUndefined();
+  });
+
   async function hook(update: unknown) {
     const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`zeynara-webhook:${TOKEN}`));
     return mf.dispatchFetch(`${SITE}/api/telegram/hook`, {

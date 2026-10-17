@@ -54,7 +54,7 @@ export async function verifyInitData(initData: string, botToken: string, nowSeco
 /** Membership of the operators' group, remembered for 5 minutes per Worker instance. */
 const members = new Map<number, { ok: boolean; until: number }>();
 
-async function isGroupMember(cfg: TelegramConfig, userId: number): Promise<boolean> {
+export async function isGroupMember(cfg: TelegramConfig, userId: number): Promise<boolean> {
   const cached = members.get(userId);
   if (cached && cached.until > Date.now()) return cached.ok;
   let ok = false;
