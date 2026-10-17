@@ -14,7 +14,10 @@
 
 ## Order form abuse
 - ✅ Turnstile checked with Cloudflare: missing, invalid, expired, reused, wrong-action,
-  wrong-site and wrong-attempt (cData) tokens are refused.
+  wrong-site and wrong-attempt (cData) tokens never pass. Such an order is **not refused** —
+  some real phones cannot finish the check — but arrives marked
+  "⚠️ «бот эмасман» текшируви ўтмади", is never sent to Meta, and is still subject to every
+  limit below. The form waits for the check at most ~14 s, so nobody is stuck on it.
 - ✅ Strict Zod validation (unknown keys refused, 8 KB limit, phone normalised to +998…,
   name character rules), the same rules as in the browser.
 - ✅ Per IP: 3 order attempts per hour, failed ones included (`IP_ORDERS_PER_HOUR`); per phone
@@ -55,6 +58,7 @@
 - ✅ "Accepted" only after the order is written to durable storage (the Durable Object).
 - ✅ If Telegram is unreachable, messages wait and are retried (30 s … hourly, up to 7 days);
   `/api/health` shows how many are waiting.
+- ✅ A failed or unfinished Turnstile check never blocks an order (it arrives marked ⚠️).
 - ✅ Turnstile misconfiguration (wrong secret, test key, wrong address) warns the group.
 - ✅ Any unexpected error answers "try again" (plus "or call …" when `site.phone` is set) — never a false success.
 
@@ -65,7 +69,7 @@
   7 days for the operators' `/royxat` list (then deleted).
 - ✅ Nothing personal is written to logs.
 - ✅ Meta Conversions API (only when **both** `META_PIXEL_ID` and `META_CAPI_TOKEN` are set):
-  an accepted order sends Meta a one-way **SHA-256** of the phone number, first name, last name
+  an accepted order that passed Turnstile sends Meta a one-way **SHA-256** of the phone number, first name, last name
   and `uz`, plus the IP address, the User-Agent and the `_fbp`/`_fbc` cookies. Nothing of this
   is stored anywhere — it is computed for that one request. The access token travels in the
   request body, never in the URL. Delete either secret and the whole feature is off

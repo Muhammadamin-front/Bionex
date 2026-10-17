@@ -42,9 +42,18 @@ For every order (`apps/worker/src/turnstile.ts`):
 - `hostname` is the address the request came to (no setting needed; works for a new domain too);
 - the visitor's IP is sent as `remoteip`.
 
-A wrong secret, a test site key or an address missing from the widget would refuse every
-order: the Worker logs it and warns the Telegram group (at most hourly).
+A wrong secret, a test site key or an address missing from the widget would fail the check
+for every order: the Worker logs it and warns the Telegram group (at most hourly).
 
-## 5. If Cloudflare's check is unreachable
+## 5. If the check cannot finish
 
-The order is refused with "try again or call" (never silently accepted unchecked).
+Some phones never finish Turnstile (in-app browsers, VPNs, old devices, filtered networks).
+A customer must never be stuck on "Текширилмоқда", so:
+
+- the form waits for the check at most ~14 s, then sends the order anyway;
+- the Worker **accepts** an order whose token is missing, invalid or unverifiable (Cloudflare
+  unreachable), and marks it for the operators:
+  `⚠️ Текширинг: «бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)`;
+- such orders are **not** sent to Meta's Conversions API, so bots cannot train the ads;
+- every other protection still applies: foreign `Origin`, IP and phone limits, the daily cap
+  per IP, repeats, honeypot, made-up numbers and the operators' 🚫 Спам button.

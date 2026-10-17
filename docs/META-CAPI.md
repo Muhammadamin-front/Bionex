@@ -34,7 +34,10 @@ Both copies carry the same `event_id`, so Meta counts **one** Lead, never two.
 
 ## When it fires
 
-Only for `status === 'accepted'` — exactly like the browser Pixel.
+Only for `status === 'accepted'` — exactly like the browser Pixel — and only when Turnstile
+passed. An order that arrives marked "⚠️ «бот эмасман» текшируви ўтмади" (see
+[TURNSTILE.md](TURNSTILE.md#5-if-the-check-cannot-finish)) is not sent from the server, so
+bots cannot feed Meta's optimisation.
 
 A repeat of the same phone number inside `DUPLICATE_WINDOW_HOURS` answers `duplicate`: the
 customer still sees a friendly message and the operators still get a 🔁 note, but **no Lead

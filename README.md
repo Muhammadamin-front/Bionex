@@ -24,7 +24,10 @@ Visitor ─► Cloudflare Worker ──► website files (apps/web/dist)
 2. The Worker refuses posts from other websites, malformed or oversized bodies, and more than
    3 attempts per IP per hour (`IP_ORDERS_PER_HOUR`, failed ones count) or 5 per phone number per hour.
 3. **Turnstile** is checked with Cloudflare: the token must be fresh, for this form, for this
-   exact order attempt and for this site's address.
+   exact order attempt and for this site's address. If the check fails or never finishes
+   (the form waits at most ~14 s), the order is still accepted but marked
+   "⚠️ «бот эмасман» текшируви ўтмади" and is not sent to Meta — a real customer on an old
+   phone is never lost.
 4. The **LeadRegistry** decides, one order at a time (so two simultaneous clicks never make
    two orders):
    - same number within 24 h → "already received", and a 🔁 reply under the first message so
@@ -38,8 +41,8 @@ Visitor ─► Cloudflare Worker ──► website files (apps/web/dist)
 5. The customer sees "accepted" only after the order is recorded. If Telegram is down, the
    message waits in the registry and is retried automatically (30 s … hourly, up to 7 days).
 6. A filled hidden field (bot) or a made-up looking number is still delivered, marked ⚠️.
-7. If Turnstile is misconfigured (wrong secret, test key, wrong address) every order would be
-   refused — so the group gets a ⚠️ warning (at most once an hour).
+7. If Turnstile is misconfigured (wrong secret, test key, wrong address) every order would
+   arrive marked ⚠️ — so the group also gets a warning (at most once an hour).
 
 Privacy: IPs and phone numbers are kept only as keyed hashes for 30 days (for repeats and
 limits); a name and number are stored in clear only while a message waits for Telegram.
