@@ -541,12 +541,19 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
         <a
           href="#forma"
           onClick={(e) => {
-            // Next to the first form: use that one instead of jumping to the bottom of the page.
-            const heroName = quickFormOnScreen ? document.querySelector<HTMLInputElement>('#tez-buyurtma form input[name=name]') : null;
-            if (!heroName) return;
+            // The nearest form, not the last one: until the visitor has scrolled past the first
+            // form, go there. The bottom form is ~14 screens down on a phone, and a smooth
+            // scroll that long stops halfway as soon as a finger touches the screen.
+            const quick = document.getElementById('tez-buyurtma');
+            if (!quick || quick.getBoundingClientRect().bottom <= 0) return;
             e.preventDefault();
-            heroName.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            heroName.focus({ preventScroll: true });
+            const heroName = quickFormOnScreen ? quick.querySelector<HTMLInputElement>('form input[name=name]') : null;
+            if (heroName) {
+              heroName.scrollIntoView({ block: 'center', behavior: 'smooth' });
+              heroName.focus({ preventScroll: true });
+            } else {
+              quick.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }
           }}
           tabIndex={visible ? 0 : -1}
           className="inline-flex h-16 min-w-0 flex-1 items-center justify-center rounded-2xl bg-forest px-4 font-display text-[1.05rem] font-bold text-white shadow-[0_10px_24px_-10px_rgba(13,58,39,0.6)] active:scale-[0.98]"
