@@ -283,7 +283,8 @@ async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env
     await callTelegram(cfg, 'answerCallbackQuery', { callback_query_id: q.id, text, show_alert: false });
   };
   const msg = q.message;
-  const m = /^(t|r|s):(\d+)(?::(sold|noanswer|rejected))?$/.exec(q.data ?? '');
+  // Must list every outcome in outcomeKeyboard(): one missing here is a button that does nothing.
+  const m = /^(t|r|s):(\d+)(?::(sold|noanswer|rejected|spam))?$/.exec(q.data ?? '');
   if (!msg || !m || String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return toast('Бу тугма ишламайди.');
 
   const leadId = Number(m[2]);

@@ -319,6 +319,17 @@ describe('order buttons, copyable phone and the daily report', () => {
     shownText = '🆕 Янги буюртма №1\n👤 Ойша Тошева\n📞 +998 90 312 45 67';
   });
 
+  it('the group 🚫 Спам button marks the order and flags the next one from the same source', async () => {
+    await order({ fullName: 'Ёлғон Исм', phone: '+998 90 312 45 96' }, { ip: '198.51.100.98' });
+    await press('t:1', ali);
+    shownText = lastEdit()!.text;
+    await press('s:1:spam', ali);
+    expect(lastToast()).not.toBe('Бу тугма ишламайди.');
+    expect(lastEdit()!.text).toContain('🚫');
+    await order({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 97' }, { ip: '198.51.100.98' });
+    expect(leadMessages().at(-1)!.text).toContain('бу манбадан аввал спам белгиланган');
+  });
+
   it('puts a tappable phone and a "take" button under every order', async () => {
     await order({ phone: '+998 90 312 45 67' });
     const msg = leadMessages()[0]!;
