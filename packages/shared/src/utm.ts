@@ -5,7 +5,10 @@
  * rejected: an odd utm_content value must never cost us a real order.
  */
 
-export const UTM_KEYS = ['source', 'medium', 'campaign', 'content'] as const;
+// `term` carries the ad set name ({{adset.name}}) and `content` the ad name ({{ad.name}}).
+// Both are kept because the campaign name alone stops identifying an ad the moment one
+// campaign is duplicated from another: the copy keeps the original's ad set and ad names.
+export const UTM_KEYS = ['source', 'medium', 'campaign', 'term', 'content'] as const;
 export type UtmKey = (typeof UTM_KEYS)[number];
 export type Utm = Partial<Record<UtmKey, string>>;
 

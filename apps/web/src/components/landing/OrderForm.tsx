@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
-import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
+import { trackInitiateCheckout } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
@@ -69,8 +69,7 @@ export function OrderForm({
   const honeypotRef = useRef<HTMLInputElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
   const widgetBox = useRef<HTMLDivElement>(null);
-  /** The visible check box needs 300 px; narrower forms get Cloudflare's square compact widget. */
-  const [compactWidget, setCompactWidget] = useState(false);
+  /** The wide check box needs 300 px; narrower forms get Cloudflare's square compact widget. */
   const compactRef = useRef(false);
   const submittedHere = useRef(false);
 
@@ -107,8 +106,11 @@ export function OrderForm({
       sitekey: SITE_KEY,
       action: TURNSTILE_ACTION,
       cData: submissionId, // the server checks the token was issued for this exact form
-      // Always shown, so every visitor sees the site is protected; real people pass without clicking.
-      appearance: 'always',
+      // Shown only when Cloudflare actually wants a check. Almost nobody is asked, and the
+      // widget took up the width of the form between the phone field and the order button:
+      // on a phone that is the last thing seen before pressing it, and it reads like one more
+      // hoop. Hidden, an order is two fields; a visitor who does get a check still sees it.
+      appearance: 'interaction-only',
       // 'flexible' is at least 300 px wide and would push narrow phones into zoom-out.
       size: compactRef.current ? 'compact' : 'flexible',
       language: turnstileLanguage(),
@@ -224,11 +226,10 @@ export function OrderForm({
     setCaretTick((t) => t + 1); // re-render even when the text did not change
   }
 
-  // Decided before the first paint, so the reserved space is right from the start.
+  // Which widget size to ask for, if a visitor is ever shown one. Measured on the form, not
+  // on the mount point: that one is hidden while empty, so it would always measure as narrow.
   useLayoutEffect(() => {
-    const narrow = (widgetBox.current?.clientWidth ?? 400) < 300;
-    compactRef.current = narrow;
-    setCompactWidget(narrow);
+    compactRef.current = (formRef.current?.clientWidth ?? 400) < 300;
   }, []);
 
   // Runs synchronously right after React writes the new value, before the next keystroke
@@ -295,8 +296,9 @@ export function OrderForm({
         utm,
       });
       unansweredPayload.current = null;
-      // Only a new order is a conversion: a resubmission must not be counted twice in ads.
-      if (response.status === 'accepted') trackLead(verification.current!.submissionId);
+      // No Lead is reported from here. The Worker reports the order to Meta itself, and only
+      // after an operator has rung the customer, so the ads learn from people who really
+      // answer the phone rather than from everyone who can type a phone number.
       submittedHere.current = true;
       setBusy(false);
       // The heading already says the order was received; for a new order the body only
@@ -348,7 +350,7 @@ export function OrderForm({
           <path className="check-draw" d="M15 27l7 7 15-16" fill="none" stroke="var(--color-ink)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <h3 ref={successRef} tabIndex={-1} className="mt-5 text-2xl font-bold tracking-tight outline-none">
-          Буюртмангиз қабул қилинди
+          Сўровингиз қабул қилинди
         </h3>
         <p className="mx-auto mt-2 max-w-sm text-lg text-ink-2" role="status">
           {completed.message}
@@ -359,8 +361,8 @@ export function OrderForm({
         <ol className="mx-auto mt-6 max-w-sm space-y-3 border-t border-line pt-5 text-left">
           {[
             'Телефонингизни ёнингизда сақланг: оператор 15 дақиқа ичида қўнғироқ қилади.',
-            'Оператор саволларингизга жавоб беради ва манзилингизни аниқлайди.',
-            'Маҳсулот 1–3 кунда етказилади. Тўловни олганингизда қиласиз.',
+            'Оператор саволларингизга жавоб беради ва бепул маслаҳат беради.',
+            'Маҳсулотни олишга қарор қилсангиз, 1–3 кунда етказилади. Тўловни олганингизда қиласиз.',
           ].map((t, i) => (
             <li key={t} className="flex gap-3 text-[1.02rem] leading-snug">
               <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-forest font-display text-base font-extrabold text-accent" aria-hidden="true">
@@ -394,7 +396,7 @@ export function OrderForm({
     >
       {compact && (
         <p className="mb-4 font-display text-xl font-extrabold leading-snug">
-          Буюртма қолдиринг. <span className="text-brand">Тўлов маҳсулотни олганда.</span>
+          Рақамингизни қолдиринг. <span className="text-brand">Консультация бепул.</span>
         </p>
       )}
       <div className={cn(compact ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-5')}>
@@ -479,11 +481,10 @@ export function OrderForm({
           <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" />
         </div>
 
-        {/* Turnstile mounts here. Its height is reserved up front so the form does not jump when it appears. */}
-        <div
-          ref={widgetBox}
-          className={cn('flex justify-center sm:col-span-2', compactWidget ? 'min-h-[147px]' : 'min-h-[72px]')}
-        />
+        {/* Turnstile mounts here, and with appearance 'interaction-only' it usually stays empty
+            and takes no height at all. No space is reserved for it: reserving 72–147 px of the
+            form for something almost no visitor is shown cost more orders than the rare jump. */}
+        <div ref={widgetBox} className="flex justify-center empty:hidden sm:col-span-2" />
 
         {formError && (
           <div role="alert" className="rounded-2xl bg-danger-bg px-4 py-3 text-base font-semibold text-danger sm:col-span-2">
@@ -500,7 +501,7 @@ export function OrderForm({
               {waitingForCheck ? 'Текширилмоқда…' : 'Юборилмоқда…'}
             </>
           ) : (
-            'Буюртма бериш'
+            'Батафсил маълумот олиш'
           )}
         </AntiMetalButton>
 
@@ -525,7 +526,7 @@ export function OrderForm({
         )}
 
         <p id={`${id}-privacy`} className="text-center text-[0.95rem] leading-relaxed text-muted sm:col-span-2">
-          Исмингиз ва рақамингиз фақат буюртмани расмийлаштириш учун ишлатилади.
+          Исмингиз ва рақамингиз фақат сиз билан боғланиш учун ишлатилади.
         </p>
       </div>
     </form>

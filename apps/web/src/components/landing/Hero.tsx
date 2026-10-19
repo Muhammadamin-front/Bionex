@@ -68,7 +68,7 @@ export function Header() {
           href="#tez-buyurtma"
           className="inline-flex h-12 items-center rounded-full bg-accent px-4 font-display font-bold text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)] transition-colors hover:bg-accent-2 sm:px-6"
         >
-          Буюртма
+          Консультация
         </a>
       </div>
     </header>

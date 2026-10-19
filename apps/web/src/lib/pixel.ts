@@ -24,6 +24,9 @@ const PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID ?? '';
 
 export function initPixel(): void {
   if (!PIXEL_ID || window.fbq) return;
+  // Never from a developer machine. A dev build that happens to see a production id would
+  // otherwise add localhost traffic to the dataset, which Meta then has to learn to ignore.
+  if (import.meta.env.DEV || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return;
   // Queue calls immediately; the real script replaces this stub when it arrives.
   const fbq = function (...args: unknown[]) {
     if (fbq.callMethod) fbq.callMethod(...args);
@@ -63,7 +66,8 @@ export function trackInitiateCheckout(): void {
   window.fbq?.('track', 'InitiateCheckout', { content_name: 'Zeynara' });
 }
 
-/** Only after the server confirmed the lead was stored. eventID allows Conversions-API de-duplication later. */
-export function trackLead(eventId: string): void {
-  window.fbq?.('track', 'Lead', { content_name: 'Zeynara', content_category: 'Health Supplement' }, { eventID: eventId });
-}
+// There is deliberately no `Lead` here. A filled-in form is not a customer: `Lead` is sent by
+// the Worker's Conversions API call, and only once an operator has rung the customer, so the
+// ads learn from people who really answer the phone. A browser-side `Lead` would fire for every
+// form — including the ones an operator later marks spam — and no amount of de-duplication can
+// take such an event back.

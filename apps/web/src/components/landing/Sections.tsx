@@ -506,7 +506,7 @@ export function Footer() {
             {[
               ['#mahsulot', 'Маҳсулот'],
               ['#alomatlar', 'Аломатлар'],
-              ['#forma', 'Буюртма бериш'],
+              ['#forma', 'Бепул консультация'],
             ].map(([href, label]) => (
               <a key={href} href={href} className="inline-flex min-h-11 items-center rounded underline-offset-4 hover:text-white hover:underline">
                 {label}
@@ -558,7 +558,7 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
           tabIndex={visible ? 0 : -1}
           className="inline-flex h-16 min-w-0 flex-1 items-center justify-center rounded-2xl bg-forest px-4 font-display text-[1.05rem] font-bold text-white shadow-[0_10px_24px_-10px_rgba(13,58,39,0.6)] active:scale-[0.98]"
         >
-          Буюртма бериш
+          Бепул консультация
         </a>
       </div>
     </div>

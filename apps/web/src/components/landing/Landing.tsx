@@ -3,6 +3,7 @@ import { initPixel } from '../../lib/pixel';
 import { captureUtm } from '../../lib/utm';
 import { Hero, Promises, QuickOrder } from './Hero';
 import type { OrderResult } from './OrderForm';
+import { OrderModal } from './OrderModal';
 import {
   About,
   Expert,
@@ -63,10 +64,12 @@ export function Landing() {
         Буюртма формасига ўтиш
       </a>
       <main>
-        {/* The visitor's path: see the product → check their symptoms → order. */}
+        {/* The visitor's path. Most arrive from the Instagram video, which has already named
+            the illness and the product, so they are ready to order: the form comes first and
+            the symptom check stays right below it for whoever still needs convincing. */}
         <Hero />
-        <Symptoms />
         <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+        <Symptoms />
         <Promises />
         <Risks />
         <Expert />
@@ -81,6 +84,8 @@ export function Landing() {
       <Footer />
       {/* Always on screen (except while typing), as the owner asked. */}
       <StickyCta visible={!typing} quickFormOnScreen={quickVisible && !order} />
+      {/* Over everything: the form meets the visitor instead of waiting to be scrolled to. */}
+      <OrderModal utm={utm} order={order} onOrdered={setOrder} />
     </>
   );
 }
