@@ -3,6 +3,7 @@ import { normalizeName } from '@bionex/shared/name';
 import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
+import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
 import {
   callTelegram,
   formatLead,
@@ -31,6 +32,21 @@ const DAY = 24 * HOUR;
 const PHONE_REQUESTS_PER_HOUR = 5;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
+/** Meta's Conversions API refuses events older than this, so unmarked orders expire with it. */
+const META_WINDOW = 7 * DAY;
+/**
+ * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
+ * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
+ * reported — Meta has no field for "this was fake", and withholding the event is the only way
+ * to say it.
+ */
+const META_OUTCOMES: ReadonlySet<LeadOutcome> = new Set<LeadOutcome>(['sold', 'rejected']);
+/**
+ * Outcomes that are not the end of the story: nobody picked up, or the customer asked to be
+ * rung later. The order keeps its place in `meta_pending` so that the real outcome, whenever
+ * the operator presses it, is still the one Meta hears about.
+ */
+const META_WAIT: ReadonlySet<LeadOutcome> = new Set<LeadOutcome>(['noanswer', 'callback']);
 /** Bump when the webhook needs new update types or commands. */
 const WEBHOOK_VERSION = 'v5';
 
@@ -100,6 +116,12 @@ export interface OrderInput {
   now: number;
   /** Ordered through the Telegram bot (the number shared as a contact, or typed). */
   via?: 'bot-contact' | 'bot-typed';
+  /**
+   * What Meta needs to match this customer, collected during the order's own request (see
+   * meta.ts). Kept here unsent until an operator says whether the person is real; absent for
+   * bot orders and when the Conversions API is not configured.
+   */
+  meta?: { userData: MetaUserData; sourceUrl: string };
 }
 
 /**
@@ -113,6 +135,10 @@ export interface OrderInput {
  * Privacy: phone numbers and IPs are kept only as keyed hashes (secret generated here and
  * never leaves this object). A name and number are stored in clear only inside a message
  * still waiting for Telegram, and for 7 days in list_items for the operators' /royxat.
+ * One exception, meta_pending: an order waiting to be marked keeps the match data Meta's
+ * Conversions API needs — the phone and name already one-way hashed, but the IP, the user
+ * agent and Meta's _fbp / _fbc cookies as they were. It is deleted the moment the operator
+ * presses an outcome, and in any case after 7 days (all Meta would still accept).
  */
 export class LeadRegistry extends DurableObject<Env> {
   private readonly sql: SqlStorage;
@@ -187,6 +213,16 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec(
       'CREATE TABLE IF NOT EXISTS spam_sources (lead_id INTEGER PRIMARY KEY, ip_hash TEXT NOT NULL, at INTEGER NOT NULL)',
     );
+    // Orders whose Meta Lead is waiting for an operator to confirm the person is real.
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS meta_pending (
+        lead_id INTEGER PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        user_data TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        at INTEGER NOT NULL
+      );
+    `);
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -244,6 +280,18 @@ export class LeadRegistry extends DurableObject<Env> {
       .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, at) VALUES (?, ?, ?) RETURNING id', phoneHash, ipHash, now)
       .one().id;
     this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
+    // Meta is told nothing yet: a name and a number in a form prove nothing. Held until an
+    // operator rings the customer and presses an outcome (see button()).
+    if (input.meta) {
+      this.sql.exec(
+        'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at) VALUES (?, ?, ?, ?, ?)',
+        leadId,
+        input.submissionId,
+        JSON.stringify(input.meta.userData),
+        input.meta.sourceUrl,
+        now,
+      );
+    }
     const list = this.addToList(leadId, input, now);
     const text = formatLead({
       number: leadId,
@@ -437,6 +485,7 @@ export class LeadRegistry extends DurableObject<Env> {
         input.leadId,
       );
     }
+    this.reportToMeta(input.leadId, input.action, input.now);
     return {
       changed: true,
       toast: input.action === 'spam' ? 'Спам деб белгиланди. Бу манбадан келадиган кейинги буюртмалар ⚠️ билан келади.' : 'Белгиланди.',
@@ -444,6 +493,64 @@ export class LeadRegistry extends DurableObject<Env> {
       keyboard: 'outcome',
       ...message(),
     };
+  }
+
+  /**
+   * The order's Lead event to Meta, once an operator has confirmed there is a real person on
+   * the other end. This is what the ads learn from, so it decides who the ads go looking for:
+   * reporting every filled-in form taught Meta to find people who wanted free advice, not
+   * customers. "Кўтармади" and "⏰ Кейинроқ" leave the order waiting (the operator will ring
+   * again and press something else); "Спам" leaves nothing to report and drops it.
+   *
+   * "Сотилди" also sends a Purchase carrying the order's worth, when META_ORDER_VALUE says
+   * what that is. Lead says "a real person"; Purchase says "a paying one" — and with both in
+   * the dataset the optimisation can be moved onto the second once there is enough of it.
+   *
+   * Sent once per order and only forwards: the row is deleted as it goes, so pressing the
+   * button again, or a later outcome, cannot produce a second Lead. Failures are logged and
+   * the Lead is lost — never retried, and never able to delay the operator's answer.
+   */
+  private reportToMeta(leadId: number, outcome: LeadOutcome, now: number): void {
+    if (META_WAIT.has(outcome)) return;
+    const row = this.sql
+      .exec<{ event_id: string; user_data: string; source_url: string; at: number }>(
+        'SELECT event_id, user_data, source_url, at FROM meta_pending WHERE lead_id = ?',
+        leadId,
+      )
+      .toArray()[0];
+    if (!row) return;
+    this.sql.exec('DELETE FROM meta_pending WHERE lead_id = ?', leadId);
+    if (!META_OUTCOMES.has(outcome)) return;
+    const cfg = metaConfig(this.env);
+    // The secrets were removed since the order arrived: nothing to send to.
+    if (!cfg) return;
+    // Meta refuses anything older than 7 days; such an order is only reported in the numbers.
+    if (now - row.at > META_WINDOW) {
+      console.error(`Order ${leadId} was marked too late to report to Meta (${Math.round((now - row.at) / DAY)} days)`);
+      return;
+    }
+    let userData: MetaUserData;
+    try {
+      userData = JSON.parse(row.user_data) as MetaUserData;
+    } catch {
+      return;
+    }
+    // The moment the customer ordered, not the moment the operator pressed the button.
+    const common = { eventId: row.event_id, userData, eventTime: row.at, sourceUrl: row.source_url };
+    // Leaves after the operator's answer, never in front of it.
+    this.ctx.waitUntil(sendMetaEvent(cfg, { ...common, eventName: 'Lead' }));
+    if (outcome === 'sold' && cfg.orderValue !== undefined) {
+      // A different event_id, so Meta's de-duplication never mistakes the two for one event.
+      this.ctx.waitUntil(
+        sendMetaEvent(cfg, {
+          ...common,
+          eventName: 'Purchase',
+          eventId: `${row.event_id}-purchase`,
+          value: cfg.orderValue,
+          currency: cfg.currency,
+        }),
+      );
+    }
   }
 
   /** The operators' panel: orders of the last `days` days (names and numbers are kept 7 days) and 14 days of totals. */
@@ -512,12 +619,17 @@ export class LeadRegistry extends DurableObject<Env> {
       operators.set(r.taker_name, o);
     }
     const repeats = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM leads WHERE at >= ? AND repeats > 1', dayStart).one().n;
+    // Orders of any day still waiting for an outcome: until one is pressed, the ads are not
+    // told about them, so this is the number the operators are costing in cheaper leads.
+    const unreported = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM meta_pending').one().n;
     this.enqueue(
       formatReport({
         date: now,
         total: rows.length,
+        unreported,
         sold: count((r) => r.outcome === 'sold'),
         noanswer: count((r) => r.outcome === 'noanswer'),
+        callback: count((r) => r.outcome === 'callback'),
         rejected: count((r) => r.outcome === 'rejected'),
         spam: count((r) => r.outcome === 'spam'),
         inProgress: count((r) => r.taker_name !== null && r.outcome === null),
@@ -786,6 +898,8 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM spam_sources WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
+    // Never marked, and now too old for Meta to accept: there is nothing left to send.
+    this.sql.exec('DELETE FROM meta_pending WHERE at < ?', now - META_WINDOW);
   }
 
   /** Keyed hash (HMAC-SHA-256) with a random secret created on first use and kept here. */

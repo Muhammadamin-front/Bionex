@@ -105,6 +105,11 @@ export interface ApiError {
   };
 }
 
+/**
+ * Deliberately says nothing about Meta. Reporting an order is the Worker's job and happens
+ * only once an operator has rung the customer, so the browser has no part to play and is
+ * never asked to send a `Lead` of its own.
+ */
 export interface LeadSubmitResponse {
   status: 'accepted' | 'duplicate';
   message: string;

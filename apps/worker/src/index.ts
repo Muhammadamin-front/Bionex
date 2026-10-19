@@ -1,7 +1,7 @@
 import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorCode, type LeadSubmitResponse } from '@bionex/shared/lead';
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
-import { metaConfig, sendMetaLead } from './meta';
+import { buildUserData, metaConfig } from './meta';
 import { isGroupMember, panelApi, panelPage } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
@@ -67,6 +67,10 @@ export default {
         ok: true,
         turnstileSecret: Boolean(env.TURNSTILE_SECRET_KEY),
         telegram: env.TELEGRAM_DRY_RUN === '1' ? 'dry-run' : Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID),
+        /** Whether orders are reported to Meta from here at all (both the pixel id and the token). */
+        meta: Boolean(metaConfig(env)),
+        /** Whether a sale also sends Purchase with a value; without it Meta sees the sale but no revenue. */
+        metaOrderValue: Boolean(env.META_ORDER_VALUE),
         /** Orders waiting because Telegram did not accept them yet; they are retried automatically. */
         waitingForTelegram: queued,
       });
@@ -105,6 +109,8 @@ export default {
     const ip = request.headers.get('cf-connecting-ip') ?? '0.0.0.0';
     const now = Date.now();
     const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+    // Set up to report orders from here (step 4)? Then the browser's pixel stays quiet.
+    const meta = metaConfig(env);
 
     try {
       // 1. Already answered (the customer's phone lost our reply and retried)? Same answer again.
@@ -154,7 +160,25 @@ export default {
       if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
       if (!check.ok) flags.push('no_captcha');
 
-      // 4. New, repeat, or refused — decided and recorded in one place, one order at a time.
+      // 4. What Meta would need to match this customer, collected now because the IP, the
+      //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is
+      //    sent yet: the order is reported to Meta only once an operator has rung the
+      //    customer and pressed an outcome, so the ads learn from real people instead of from
+      //    everyone who can type a phone number. See meta.ts and registry.ts `reportToMeta`.
+      const match = meta
+        ? {
+            userData: await buildUserData({
+              phone: data.phone,
+              fullName: data.fullName,
+              ip,
+              userAgent: request.headers.get('user-agent'),
+              cookie: request.headers.get('cookie'),
+            }),
+            sourceUrl: request.headers.get('referer') || url.origin,
+          }
+        : undefined;
+
+      // 5. New, repeat, or refused — decided and recorded in one place, one order at a time.
       const result = await registry.accept({
         submissionId: data.submissionId,
         ip,
@@ -163,29 +187,14 @@ export default {
         utm: data.utm,
         flags,
         now,
+        meta: match,
       });
       if (result.status === 'ip_limited') return fail(429, 'rate_limited', MESSAGES.ipDailyLimit);
       ctx.waitUntil(registry.ensureWebhook(url.origin));
 
-      // 5. Tell Meta about the order from here too, so ad optimisation still sees it when the
-      //    browser's pixel was blocked. Only genuinely new orders, exactly like the pixel —
-      //    a repeat must not become a second Lead. Runs after the answer; never delays it.
-      const meta = metaConfig(env);
-      // Not for unchecked orders: a bot's order must not teach the ads whom to look for.
-      if (meta && result.status === 'accepted' && check.ok) {
-        ctx.waitUntil(
-          sendMetaLead(meta, {
-            submissionId: data.submissionId,
-            phone: data.phone,
-            fullName: data.fullName,
-            ip,
-            userAgent: request.headers.get('user-agent'),
-            cookie: request.headers.get('cookie'),
-            sourceUrl: request.headers.get('referer') || url.origin,
-            now,
-          }),
-        );
-      }
+      // Nothing is reported to Meta here, and the browser is never asked to either: `Lead` is
+      // sent from `reportToMeta` once an operator has rung the customer. One order is one
+      // event, and an order nobody could reach stays unreported.
       return answer(result.status);
     } catch (err) {
       // Never "accepted" unless it was recorded: anything unexpected is a clear "try again / call".
@@ -284,7 +293,7 @@ async function orderButton(q: NonNullable<TelegramUpdate['callback_query']>, env
   };
   const msg = q.message;
   // Must list every outcome in outcomeKeyboard(): one missing here is a button that does nothing.
-  const m = /^(t|r|s):(\d+)(?::(sold|noanswer|rejected|spam))?$/.exec(q.data ?? '');
+  const m = /^(t|r|s):(\d+)(?::(sold|noanswer|callback|rejected|spam))?$/.exec(q.data ?? '');
   if (!msg || !m || String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return toast('Бу тугма ишламайди.');
 
   const leadId = Number(m[2]);

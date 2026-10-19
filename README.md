@@ -73,6 +73,8 @@ key, `TELEGRAM_DRY_RUN=1`). Production values: see [docs/DEPLOYMENT.md](docs/DEP
 | | `TELEGRAM_CHAT_ID` | the private group or channel id (`npm run telegram:setup` finds it) |
 | | `META_PIXEL_ID` | same id as `VITE_META_PIXEL_ID`; optional, **both or neither** |
 | | `META_CAPI_TOKEN` | Conversions API access token ([docs/META-CAPI.md](docs/META-CAPI.md)) |
+| | `META_ORDER_VALUE` | what one sold order is worth; set it and ✅ Сотилди also sends `Purchase` |
+| | `META_CURRENCY` | currency for the above, default `UZS` |
 | `apps/worker/wrangler.jsonc` | `IP_ORDERS_PER_HOUR` | order attempts per IP per hour, default 3 |
 | | `LEADS_PER_IP_PER_DAY` | different numbers per IP per day, default 3 |
 | | `DUPLICATE_WINDOW_HOURS` | default 24 |
@@ -86,13 +88,16 @@ health check, and re-checks it daily):
 - with **Topics** turned on in the group (and the bot's "Manage topics" admin right), the bot
   creates "🆕 Буюртмалар" (orders only) and "📊 Ҳисобот" (lists, reports, warnings), so orders
   never mix with the operators' chat. Without topics everything goes to the group as before;
-- the source shows in words ("📣 Instagram"), never as ad ids; the phone is plain text, so a tap
-  offers Call / Copy;
+- the source shows in words ("📣 Facebook · Qon bosimi Old · old-video") — campaign, ad set and
+  ad, never ad ids, so two campaigns running at once cannot be confused; the phone is plain
+  text, so a tap offers Call / Copy;
 - every order has a **📞 Мен оламан** button. The first operator
   to press it gets the order ("📞 Дилноза олди — 14:07"); others are told who has it. Then
-  **✅ Сотилди / 🔁 Кўтармади / ❌ Рад этди**, or **↩️ Қайтариш** to hand it back;
+  **✅ Сотилди / ❌ Рад этди / 🔁 Кўтармади / ⏰ Кейинроқ**, or **↩️ Қайтариш** to hand it back.
+  ⏰ Кейинроқ is for the customer who answered but asked to be rung later: the order stays on
+  the list and Meta is told nothing until a real outcome is pressed;
 - `/royxat` shows all of today's orders, every time, each with its status (⏳ untaken, 📞 who has
-  it, ✅ / 🔁 / ❌ outcome); each order is two lines with the phone alone on the second, so
+  it, ✅ / ❌ / 🔁 / ⏰ outcome); each order is two lines with the phone alone on the second, so
   copying it never picks up the time;
 - `/holat` answers that the bot is alive, with today's count, the last order time and anything
   still waiting for Telegram;

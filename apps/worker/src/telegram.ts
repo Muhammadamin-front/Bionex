@@ -18,7 +18,20 @@ export interface LeadMessage {
   via?: 'bot-contact' | 'bot-typed';
 }
 
-/** Where the visitor came from, in words an operator understands (ad ids are left out). */
+/** Numeric ad ids ("120253199231260134") name nothing an operator can act on. */
+const isAdId = (value: string | undefined): boolean => !value || /^\d{6,}$/.test(value);
+
+/** Campaign names run long; the operator only needs enough of one to tell two ads apart. */
+const shorten = (value: string, max = 42): string => (value.length <= max ? value : `${value.slice(0, max - 1).trimEnd()}…`);
+
+/**
+ * Where the visitor came from, in words an operator understands (ad ids are left out).
+ *
+ * Campaign, then ad set, then ad — because with two campaigns running at once the operator
+ * has to know which one produced the call, and a report that says only "Facebook" cannot
+ * tell them apart. Repeats are dropped: a campaign duplicated from another keeps the
+ * original's ad set and ad names, so those three fields are often the same string twice.
+ */
 export function sourceLabel(utm: Record<string, string | undefined>): string | null {
   const src = (utm.source ?? '').toLowerCase();
   const known: Record<string, string> = {
@@ -33,9 +46,13 @@ export function sourceLabel(utm: Record<string, string | undefined>): string | n
   };
   const name = known[src] ?? (utm.source || null);
   if (!name) return null;
-  // Campaign names help; numeric ad ids ("120253199231260134") only clutter the message.
-  const campaign = utm.campaign && !/^\d{6,}$/.test(utm.campaign) ? utm.campaign : null;
-  return campaign ? `${name} · ${campaign}` : name;
+  const parts: string[] = [];
+  for (const value of [utm.campaign, utm.term, utm.content]) {
+    if (isAdId(value)) continue;
+    const text = shorten(value!);
+    if (!parts.includes(text)) parts.push(text);
+  }
+  return [name, ...parts].join(' · ');
 }
 
 export interface TelegramConfig {
@@ -114,12 +131,18 @@ export const HELP_TEXT = [
   '/hisobot — бугунги ҳисобот (ҳар куни 20:00 да ўзи ҳам келади)',
   '/panel — операторлар панели: барча буюртмалар, статистика, спам',
   '',
-  'Ҳар буюртма остида: «📞 Мен оламан» → қўнғироқдан кейин «✅ Сотилди», «🔁 Кўтармади» ёки «❌ Рад этди».',
+  'Ҳар буюртма остида: «📞 Мен оламан» → қўнғироқдан кейин «✅ Сотилди», «❌ Рад этди», «🔁 Кўтармади» ёки «⏰ Кейинроқ».',
+  '⏰ Кейинроқ — мижоз гаплашди, лекин «ҳозир вақтим йўқ» деди. Кейин қайта қўнғироқ қилиб, натижани белгилаб қўйинг.',
 ].join('\n');
 
 // ── Buttons under every order ─────────────────────────────────────────────
 
-export type LeadOutcome = 'sold' | 'noanswer' | 'rejected' | 'spam';
+/**
+ * What the call came to. `callback` is the customer who answered and asked to be rung later
+ * ("ҳозир вақтим йўқ") — a real person, but not yet a decision, so it is kept apart from
+ * `noanswer` (nobody picked up) and from `rejected` (answered and said no).
+ */
+export type LeadOutcome = 'sold' | 'noanswer' | 'callback' | 'rejected' | 'spam';
 export type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> };
 
 /** callback_data is at most 64 bytes: "t:37" take, "r:37" release, "s:37:sold" outcome. */
@@ -127,13 +150,20 @@ export function takeKeyboard(leadId: number): InlineKeyboard {
   return { inline_keyboard: [[{ text: '📞 Мен оламан', callback_data: `t:${leadId}` }]] };
 }
 
+/**
+ * Two buttons per row: an operator presses these one-handed while still holding the phone,
+ * and the pair that means "ring again" sits together so neither is hit by mistake.
+ */
 export function outcomeKeyboard(leadId: number): InlineKeyboard {
   return {
     inline_keyboard: [
       [
         { text: '✅ Сотилди', callback_data: `s:${leadId}:sold` },
-        { text: '🔁 Кўтармади', callback_data: `s:${leadId}:noanswer` },
         { text: '❌ Рад этди', callback_data: `s:${leadId}:rejected` },
+      ],
+      [
+        { text: '🔁 Кўтармади', callback_data: `s:${leadId}:noanswer` },
+        { text: '⏰ Кейинроқ', callback_data: `s:${leadId}:callback` },
       ],
       [
         { text: '↩️ Қайтариш', callback_data: `r:${leadId}` },
@@ -146,6 +176,7 @@ export function outcomeKeyboard(leadId: number): InlineKeyboard {
 export const OUTCOME_TEXT: Record<LeadOutcome, string> = {
   sold: '✅ Сотилди',
   noanswer: '🔁 Кўтармади',
+  callback: '⏰ Кейинроқ сўради',
   rejected: '❌ Рад этди',
   spam: '🚫 Спам',
 };
@@ -169,28 +200,43 @@ export interface DayReport {
   total: number;
   sold: number;
   noanswer: number;
+  callback: number;
   rejected: number;
   spam: number;
   inProgress: number;
   untaken: number;
   repeats: number;
+  /** Orders, of any day, still without an outcome — so Meta has not been told about them. */
+  unreported: number;
   operators: Array<{ name: string; taken: number; sold: number }>;
 }
 
+/**
+ * Orders still without an outcome. Meta is told about an order only once an operator has
+ * pressed one, so every unpressed button is an ad that keeps looking for the wrong people —
+ * worth a line in the report, in the words that say why it matters.
+ */
+const unreportedLine = (n: number) => `📣 Натижаси белгиланмаган: ${n} та — буларни реклама ҳисобга олмайди.`;
+
 export function formatReport(r: DayReport): string {
   const day = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' }).format(new Date(r.date));
-  if (r.total === 0) return `📊 <b>Ҳисобот (${day})</b>\nБугун янги буюртма бўлмади. Бот ишлаяпти ✅`;
+  if (r.total === 0) {
+    const idle = `📊 <b>Ҳисобот (${day})</b>\nБугун янги буюртма бўлмади. Бот ишлаяпти ✅`;
+    return r.unreported > 0 ? `${idle}\n${unreportedLine(r.unreported)}` : idle;
+  }
   const lines = [
     `📊 <b>Ҳисобот (${day})</b>`,
     `🆕 Янги буюртмалар: ${r.total}`,
     `✅ Сотилди: ${r.sold}`,
-    `🔁 Кўтармади: ${r.noanswer}`,
     `❌ Рад этди: ${r.rejected}`,
+    `🔁 Кўтармади: ${r.noanswer}`,
+    ...(r.callback > 0 ? [`⏰ Кейинроқ сўради: ${r.callback} — қайта қўнғироқ қилиш керак.`] : []),
     ...(r.spam > 0 ? [`🚫 Спам: ${r.spam}`] : []),
     `📞 Олинган, натижа йўқ: ${r.inProgress}`,
     `⏳ Ҳеч ким олмаган: ${r.untaken}`,
   ];
   if (r.repeats > 0) lines.push(`🔁 Такрор юборганлар: ${r.repeats}`);
+  if (r.unreported > 0) lines.push(unreportedLine(r.unreported));
   if (r.operators.length > 0) {
     lines.push('', '<b>Операторлар:</b>', ...r.operators.map((o) => `• ${escapeHtml(o.name)} — ${o.taken} та олди, ${o.sold} та сотди`));
   }

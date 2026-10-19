@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { site } from '../../web/src/config/product';
 
@@ -126,7 +127,9 @@ function expectCallHint(message: string, withoutPhone: RegExp) {
 
 beforeAll(async () => {
   const out = await build({
-    entryPoints: [new URL('../src/index.ts', import.meta.url).pathname],
+    // fileURLToPath, not .pathname: a folder with a space in its name arrives as %20 from
+    // .pathname and esbuild then cannot find the file.
+    entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url).href)],
     bundle: true,
     format: 'esm',
     platform: 'neutral',
@@ -344,7 +347,14 @@ describe('order buttons, copyable phone and the daily report', () => {
     let edit = lastEdit()!;
     expect(edit.text).toMatch(/━━━━━━━━━━\n📞 Ойша олди — \d\d\.\d\d, \d\d:\d\d$/);
     expect(edit.entities).toEqual([{ type: 'bold', offset: 0, length: 18 }]);
-    expect(edit.reply_markup.inline_keyboard.flat().map((b) => b.callback_data)).toEqual(['s:1:sold', 's:1:noanswer', 's:1:rejected', 'r:1', 's:1:spam']);
+    expect(edit.reply_markup.inline_keyboard.flat().map((b) => b.callback_data)).toEqual([
+      's:1:sold',
+      's:1:rejected',
+      's:1:noanswer',
+      's:1:callback',
+      'r:1',
+      's:1:spam',
+    ]);
     expect(lastToast()).toMatch(/Сиз олдингиз/);
 
     shownText = edit.text;
@@ -499,6 +509,16 @@ describe('group topics and the source line', () => {
     const text = leadMessages()[0]!.text;
     expect(text).toContain('📣 Instagram');
     expect(text).not.toContain('120253199231260134');
+  });
+
+  it('names the ad set and the ad, so two live campaigns cannot be confused', async () => {
+    await order({ utm: { source: 'facebook', campaign: 'Qon bosimi Old', term: 'UZ 30-55', content: 'old-video' } });
+    expect(leadMessages()[0]!.text).toContain('📣 Facebook · Qon bosimi Old · UZ 30-55 · old-video');
+  });
+
+  it('says a repeated name once: a duplicated campaign keeps the original ad set and ad names', async () => {
+    await order({ utm: { source: 'facebook', campaign: 'Qon bosimi', term: 'Qon bosimi', content: 'Qon bosimi' } });
+    expect(leadMessages()[0]!.text).toMatch(/📣 Facebook · Qon bosimi(\n|$)/);
   });
 
   it('with Topics on, orders go to "🆕 Буюртмалар" and lists/reports to "📊 Ҳисобот"', async () => {
@@ -716,17 +736,6 @@ describe('spam protection', () => {
     expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
   });
 
-  it('keeps unchecked orders away from Meta, so bots do not train the ads', async () => {
-    await mf.dispose();
-    mf = start({ META_PIXEL_ID: '1109358048693673', META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock' });
-    meta.events = [];
-    await order({ turnstileToken: 'bad', phone: '+998 90 312 45 26' }, { ip: '198.51.100.12' });
-    await order({ phone: '+998 90 312 45 27' }, { ip: '198.51.100.13' });
-    for (let i = 0; i < 50 && meta.events.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
-    await new Promise((r) => setTimeout(r, 100));
-    expect(meta.events).toHaveLength(1);
-  });
-
   it('warns the group once when the Turnstile secret is wrong', async () => {
     await order({ turnstileToken: 'wrong-secret' });
     await order({ turnstileToken: 'wrong-secret' }, { ip: '198.51.100.11' });
@@ -756,7 +765,7 @@ describe('configuration', () => {
 
   it('reports which settings exist without revealing them', async () => {
     const body = await (await mf.dispatchFetch(`${SITE}/api/health`)).text();
-    expect(JSON.parse(body)).toMatchObject({ ok: true, turnstileSecret: true, telegram: true, waitingForTelegram: 0 });
+    expect(JSON.parse(body)).toMatchObject({ ok: true, turnstileSecret: true, telegram: true, waitingForTelegram: 0, meta: false });
     expect(body).not.toContain('test-token');
   });
 
@@ -766,14 +775,46 @@ describe('configuration', () => {
   });
 });
 
-describe('the Lead event sent to Meta from the server', () => {
+/**
+ * What the ads are taught, and when. The old behaviour reported every filled-in form, and on
+ * this product most of them were people after free advice and children pressing buttons — so
+ * Meta learned to find more of them. Nothing goes to Meta now until an operator has rung the
+ * customer and said what happened.
+ */
+describe('the Lead event sent to Meta once an operator confirms the order', () => {
   const PIXEL = '1109358048693673';
   const withMeta = (extra: Record<string, string> = {}) =>
     start({ META_PIXEL_ID: PIXEL, META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock', ...extra });
 
-  /** The event leaves after the customer's answer (ctx.waitUntil), so give it a moment. */
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const hook = async (update: unknown) =>
+    mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+      body: JSON.stringify({ update_id: 1, ...(update as object) }),
+    });
+  /** An operator pressing a button under an order in the group. */
+  const press = (data: string) =>
+    hook({
+      callback_query: {
+        id: `cb${Math.random()}`,
+        from: { id: 11, first_name: 'Ойша' },
+        data,
+        message: { message_id: 1001, chat: { id: Number(CHAT) }, text: '🆕 Янги буюртма\n👤 Ойша Тошева' },
+      },
+    });
+
+  /** The event leaves after the operator's answer (waitUntil), so give it a moment. */
   const settled = async (n = 1) => {
     for (let i = 0; i < 50 && meta.events.length < n; i++) await new Promise((r) => setTimeout(r, 10));
+    return meta.events;
+  };
+  /** Proof that nothing was sent: waiting the same time an event would have needed. */
+  const quiet = async () => {
+    await new Promise((r) => setTimeout(r, 150));
     return meta.events;
   };
 
@@ -788,24 +829,129 @@ describe('the Lead event sent to Meta from the server', () => {
       await mf.dispose();
       mf = start({ META_API_BASE: 'https://graph.mock', ...bindings });
       expect((await order()).status).toBe(201);
-      await new Promise((r) => setTimeout(r, 50));
-      expect(meta.events).toHaveLength(0);
+      await press('s:1:sold');
+      expect(await quiet()).toHaveLength(0);
+      expect(await (await mf.dispatchFetch(`${SITE}/api/health`)).json()).toMatchObject({ meta: false });
     }
   });
 
-  it('sends one Lead for a new order, keyed to the same id the browser pixel uses', async () => {
+  it('says in the health check that reporting is on, so a missing secret is visible after deploying', async () => {
+    expect(await (await mf.dispatchFetch(`${SITE}/api/health`)).json()).toMatchObject({ meta: true });
+  });
+
+  it('tells Meta nothing when the order arrives: a filled-in form is not a customer yet', async () => {
+    expect((await order()).status).toBe(201);
+    expect(leadMessages()).toHaveLength(1); // the operators hear about it immediately
+    expect(await quiet()).toHaveLength(0); // Meta does not
+  });
+
+  it('never invites the browser to report the order, so one order cannot become two events', async () => {
+    expect(await (await order()).json()).not.toHaveProperty('track');
+    // Not even without credentials: an unqualified Lead is worse for the ads than no Lead.
+    await mf.dispose();
+    mf = start(); // no META_* secrets at all
+    expect(await (await order()).json()).not.toHaveProperty('track');
+  });
+
+  it('sends one Lead when the sale is marked, keyed to the order the browser knows', async () => {
     const submissionId = sid();
     expect((await order({ submissionId })).status).toBe(201);
+    await press('s:1:sold');
     const [event] = await settled();
     expect(event).toMatchObject({ event_name: 'Lead', action_source: 'website', event_id: submissionId });
-    expect(event!.event_time).toBeCloseTo(Math.floor(Date.now() / 1000), -1);
     expect(meta.bodies[0]!.access_token).toBe('EAA-test-token');
-    // Sent to the right dataset, and the token never travels in the URL.
+    // One dataset, one event, and the token never travels in the URL.
     expect(meta.bodies).toHaveLength(1);
+  });
+
+  it('reports the moment the customer ordered, not the moment the operator pressed', async () => {
+    const ordered = Math.floor(Date.now() / 1000);
+    await order();
+    await new Promise((r) => setTimeout(r, 1100)); // the operator calls back later
+    await press('s:1:sold');
+    const [event] = await settled();
+    expect(event!.event_time).toBe(ordered);
+  });
+
+  it('reports a customer who said no: a real person, which is what the ads must look for', async () => {
+    await order();
+    await press('s:1:rejected');
+    expect(await settled()).toHaveLength(1);
+  });
+
+  it('never reports an order marked spam — that is the whole point', async () => {
+    await order();
+    await press('s:1:spam');
+    expect(await quiet()).toHaveLength(0);
+  });
+
+  it('keeps an unanswered order waiting, and reports it when the call finally connects', async () => {
+    await order();
+    await press('s:1:noanswer');
+    expect(await quiet()).toHaveLength(0);
+    await press('s:1:sold');
+    expect(await settled()).toHaveLength(1);
+  });
+
+  it('keeps a "ring me later" order waiting: the customer answered but has not decided', async () => {
+    await order();
+    await press('s:1:callback');
+    expect(await quiet()).toHaveLength(0);
+    await press('s:1:sold');
+    expect(await settled()).toHaveLength(1);
+  });
+
+  it('sends a Purchase beside the Lead when a sold order has a value, under its own event id', async () => {
+    await mf.dispose();
+    mf = withMeta({ META_ORDER_VALUE: '349000' });
+    const submissionId = sid();
+    await order({ submissionId });
+    await press('s:1:sold');
+    const events = await settled(2);
+    expect(events).toHaveLength(2);
+    const purchase = events.find((e) => e.event_name === 'Purchase')!;
+    expect(purchase.event_id).toBe(`${submissionId}-purchase`);
+    expect(purchase.custom_data).toMatchObject({ value: 349000, currency: 'UZS' });
+    // The Lead is still the plain submission id, so the browser copy could never double it.
+    expect(events.find((e) => e.event_name === 'Lead')!.event_id).toBe(submissionId);
+  });
+
+  it('sends no Purchase for a customer who said no — answering the phone is not buying', async () => {
+    await mf.dispose();
+    mf = withMeta({ META_ORDER_VALUE: '349000' });
+    await order();
+    await press('s:1:rejected');
+    expect((await quiet()).map((e) => e.event_name)).toEqual(['Lead']);
+  });
+
+  it('sends no Purchase at all without a value: a made-up figure is worse than none', async () => {
+    await order();
+    await press('s:1:sold');
+    expect((await quiet()).map((e) => e.event_name)).toEqual(['Lead']);
+  });
+
+  it('reports an order once, however many times the buttons are pressed', async () => {
+    await order();
+    await press('s:1:sold');
+    await settled();
+    await press('s:1:rejected');
+    await press('r:1');
+    await press('s:1:sold');
+    expect(await quiet()).toHaveLength(1);
+  });
+
+  it('reports an order whose security check never finished, once an operator vouches for it', async () => {
+    // Turnstile not finishing is normal on old phones and in in-app browsers; the operator
+    // who spoke to the customer is a better judge of a real person than the widget.
+    await order({ turnstileToken: 'bad' });
+    expect(leadMessages()[0]!.text).toContain('«бот эмасман» текшируви ўтмади');
+    await press('s:1:sold');
+    expect(await settled()).toHaveLength(1);
   });
 
   it('identifies the customer only by one-way hashes, never the number itself', async () => {
     await order({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67' });
+    await press('s:1:sold');
     const [event] = await settled();
     const sent = JSON.stringify(event);
     expect(sent).not.toContain('998903124567');
@@ -818,7 +964,7 @@ describe('the Lead event sent to Meta from the server', () => {
     expect(event!.user_data.fn).toBe(await sha256('ойша'));
   });
 
-  it('passes on the Meta cookies and the visitor details that make the match work', async () => {
+  it('keeps the visitor details from the order itself, not from the operator pressing a button', async () => {
     await order(
       {},
       {
@@ -827,6 +973,7 @@ describe('the Lead event sent to Meta from the server', () => {
         cookie: '_ga=GA1.1.x; _fbp=fb.1.1760000000000.1234567890; _fbc=fb.1.1760000000000.IwAR-click-id',
       },
     );
+    await press('s:1:sold');
     const [event] = await settled();
     expect(event!.user_data).toMatchObject({
       client_ip_address: '203.0.113.77',
@@ -838,19 +985,30 @@ describe('the Lead event sent to Meta from the server', () => {
 
   it('does not count a repeat of the same number as a second Lead', async () => {
     await order({ phone: '+998 90 312 45 68' });
-    await settled();
     const repeat = await order({ phone: '+998 90 312 45 68' });
     expect(await repeat.json()).toMatchObject({ status: 'duplicate' });
-    await new Promise((r) => setTimeout(r, 50));
-    expect(meta.events).toHaveLength(1);
+    await press('s:1:sold');
+    expect(await settled()).toHaveLength(1);
+    expect(await quiet()).toHaveLength(1);
   });
 
-  it('still accepts the order when Meta is unreachable', async () => {
+  it('saves the outcome and keeps the group in step even when Meta is unreachable', async () => {
     await mf.dispose();
     mf = withMeta({ META_API_BASE: 'https://graph-down.mock' });
-    const res = await order();
-    expect(res.status).toBe(201);
-    expect(leadMessages()).toHaveLength(1);
+    expect((await order()).status).toBe(201);
+    await press('s:1:sold');
+    await new Promise((r) => setTimeout(r, 150));
+    const edit = telegram.calls.filter((c) => c.method === 'editMessageText').at(-1)!.body as { text: string };
+    expect(edit.text).toMatch(/✅ Сотилди — Ойша/);
+  });
+
+  it('counts the orders nobody has marked in the daily report, since the ads ignore those', async () => {
+    await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' });
+    await order({ phone: '+998 90 312 45 82' }, { ip: '203.0.113.82' });
+    await press('s:1:sold');
+    await settled();
+    await hook({ message: { message_id: 9, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/hisobot' } });
+    expect(telegram.messages.at(-1)!.text).toContain('📣 Натижаси белгиланмаган: 1 та');
   });
 });
 

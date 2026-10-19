@@ -44,7 +44,7 @@
   .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg2); color: var(--hint); }
   .badge { margin-left: auto; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; color: #fff; }
   .b-wait { background: var(--wait); } .b-work { background: var(--warn); } .b-sold { background: var(--ok); }
-  .b-noanswer { background: #0369a1; } .b-rejected { background: var(--bad); } .b-spam { background: var(--spam); }
+  .b-noanswer { background: #0369a1; } .b-callback { background: #7c5800; } .b-rejected { background: var(--bad); } .b-spam { background: var(--spam); }
   .name { font-size: 16px; font-weight: 600; margin-top: 6px; }
   .flag { color: var(--warn); font-size: 12px; margin-top: 2px; }
   .phone { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -99,9 +99,11 @@
 
   var STATUS = {
     wait: ['⏳ Олинмаган', 'b-wait'], work: ['📞 Жараёнда', 'b-work'], sold: ['✅ Сотилди', 'b-sold'],
-    noanswer: ['🔁 Кўтармади', 'b-noanswer'], rejected: ['❌ Рад этди', 'b-rejected'], spam: ['🚫 Спам', 'b-spam']
+    noanswer: ['🔁 Кўтармади', 'b-noanswer'], callback: ['⏰ Кейинроқ', 'b-callback'],
+    rejected: ['❌ Рад этди', 'b-rejected'], spam: ['🚫 Спам', 'b-spam']
   };
-  var TABS = [['all', 'Ҳаммаси'], ['wait', '⏳ Олинмаган'], ['mine', '👤 Менда'], ['sold', '✅ Сотилди'], ['noanswer', '🔁 Кўтармади'], ['rejected', '❌ Рад'], ['spam', '🚫 Спам / шубҳали']];
+  // "⏰ Кейинроқ" gets its own tab: it is the one status that is a to-do list, not a result.
+  var TABS = [['all', 'Ҳаммаси'], ['wait', '⏳ Олинмаган'], ['mine', '👤 Менда'], ['callback', '⏰ Кейинроқ'], ['sold', '✅ Сотилди'], ['noanswer', '🔁 Кўтармади'], ['rejected', '❌ Рад'], ['spam', '🚫 Спам / шубҳали']];
   var state = { days: 1, tab: 'all', q: '', data: null, busy: false, open: {} };
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -158,7 +160,7 @@
       var s = statusOf(l);
       if (state.tab === 'mine' && l.takerId !== me) return false;
       if (state.tab === 'spam' && !(s === 'spam' || l.flagged)) return false;
-      if (['wait', 'sold', 'noanswer', 'rejected'].indexOf(state.tab) >= 0 && s !== state.tab) return false;
+      if (['wait', 'sold', 'noanswer', 'callback', 'rejected'].indexOf(state.tab) >= 0 && s !== state.tab) return false;
       if (q && l.name.toLowerCase().indexOf(q) < 0 && !(digits && l.phone.indexOf(digits) >= 0) && String(l.number) !== q.replace('№', '')) return false;
       return true;
     });
@@ -224,8 +226,10 @@
 
       var acts = el('div', 'acts'), mine = l.takerId === me;
       function btn(text, cls, action) { var b = el('button', cls, text); b.onclick = function () { act(l, action); }; acts.appendChild(b); }
-      // A finished order (sold, rejected, spam) stays calm: one small button opens the choices again.
-      var closed = l.outcome && l.outcome !== 'noanswer';
+      // A finished order (sold, rejected, spam) stays calm: one small button opens the choices
+      // again. "Кўтармади" and "Кейинроқ" are not finished — both still owe a second call, so
+      // they keep their buttons out where the operator can press one without a detour.
+      var closed = l.outcome && l.outcome !== 'noanswer' && l.outcome !== 'callback';
       if (!l.takerId) { btn('📞 Мен оламан', 'primary', 'take'); btn('🚫 Спам', 'small', 'spam'); }
       else if (mine && closed && !state.open[l.number]) {
         var edit = el('button', 'small', '✏️ Ўзгартириш');
@@ -233,7 +237,8 @@
         acts.appendChild(edit);
       }
       else if (mine) {
-        btn('✅ Сотилди', 'sold', 'sold'); btn('🔁 Кўтармади', '', 'noanswer'); btn('❌ Рад', '', 'rejected');
+        btn('✅ Сотилди', 'sold', 'sold'); btn('❌ Рад', '', 'rejected');
+        btn('🔁 Кўтармади', '', 'noanswer'); btn('⏰ Кейинроқ', '', 'callback');
         btn('🚫 Спам', 'small', 'spam'); btn('↩️ Қайтариш', 'small', 'release');
       } else btn('↩️ Қайтариш (' + l.takerName + ')', 'small', 'release');
       card.appendChild(acts); box.appendChild(card);

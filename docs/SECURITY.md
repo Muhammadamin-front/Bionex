@@ -16,14 +16,17 @@
 - ✅ Turnstile checked with Cloudflare: missing, invalid, expired, reused, wrong-action,
   wrong-site and wrong-attempt (cData) tokens never pass. Such an order is **not refused** —
   some real phones cannot finish the check — but arrives marked
-  "⚠️ «бот эмасман» текшируви ўтмади", is never sent to Meta, and is still subject to every
-  limit below. The form waits for the check at most ~14 s, so nobody is stuck on it.
+  "⚠️ «бот эмасман» текшируви ўтмади" and is still subject to every limit below. The form waits
+  for the check at most ~14 s, so nobody is stuck on it. The mark no longer decides what Meta
+  hears: the operator's outcome button does (see [META-CAPI.md](META-CAPI.md)).
 - ✅ Strict Zod validation (unknown keys refused, 8 KB limit, phone normalised to +998…,
   name character rules), the same rules as in the browser.
 - ✅ Per IP: 3 order attempts per hour, failed ones included (`IP_ORDERS_PER_HOUR`); per phone
   number: 5 per hour (HTTP 429, with the phone number to call).
-- ☐ Mobile operators put many customers behind one IP: if real customers say the site told them
-  "too many attempts", raise `IP_ORDERS_PER_HOUR` in `apps/worker/wrangler.jsonc` and `npm run deploy`.
+- ⚠️ `IP_ORDERS_PER_HOUR` is deliberately low: the fake orders here are sent **by hand** by one
+  hostile ex-employee, and this is the only cap that costs him something per attempt. Mobile
+  operators do put many customers behind one IP, so it will occasionally tell a real customer
+  "too many attempts" — read [SPAM.md](SPAM.md) before raising it.
 - ✅ One IP may order for at most `LEADS_PER_IP_PER_DAY` (3) different numbers a day; the
   rest are told to call. Re-sending one's own number does not count toward this daily cap.
 - ✅ Repeats of a number within 24 h become one order plus a 🔁 note — decided inside one
@@ -31,6 +34,8 @@
 - ✅ Honeypot and made-up looking numbers are **flags** (⚠️ in the message), not blocks.
 - ✅ Every message shows a short source id (`#a1b2c3`) and how many numbers that source sent
   today, so operators can spot someone typing strangers' numbers.
+- ✅ 🚫 Спам remembers the order's network (hashed, 30 days): later orders from it arrive marked
+  "⚠️ бу манбадан аввал спам белгиланган", and no order marked spam is ever reported to Meta.
 - ✅ Posts from other websites (foreign `Origin`) are refused.
 - ✅ Group commands and order buttons (`/api/telegram/hook`) are accepted only with the secret
   header Telegram was given (derived from the bot token) and only from `TELEGRAM_CHAT_ID`;
@@ -69,10 +74,13 @@
   7 days for the operators' `/royxat` list (then deleted).
 - ✅ Nothing personal is written to logs.
 - ✅ Meta Conversions API (only when **both** `META_PIXEL_ID` and `META_CAPI_TOKEN` are set):
-  an accepted order that passed Turnstile sends Meta a one-way **SHA-256** of the phone number, first name, last name
-  and `uz`, plus the IP address, the User-Agent and the `_fbp`/`_fbc` cookies. Nothing of this
-  is stored anywhere — it is computed for that one request. The access token travels in the
-  request body, never in the URL. Delete either secret and the whole feature is off
+  once an operator has rung the customer and pressed ✅ or ❌, Meta is sent a one-way
+  **SHA-256** of the phone number, first name, last name and `uz`, plus the IP address, the
+  User-Agent and the `_fbp`/`_fbc` cookies. The hashes are computed during the order's own
+  request and held in `meta_pending` (with the raw IP, User-Agent and those two cookies) until
+  the button is pressed, and at most 7 days — the longest event age Meta accepts. The row is
+  deleted as the event goes out, or pruned unsent. The access token travels in the request
+  body, never in the URL. Delete either secret and the whole feature is off
   (see [META-CAPI.md](META-CAPI.md)).
 - ☐ Delete old order messages from the group when they are no longer needed.
 - ☐ Telegram and Cloudflare store data outside Uzbekistan; ask a lawyer about the

@@ -25,7 +25,10 @@
   "triggers": { "crons": ["0 15 * * *"] },
 
   "vars": {
-    // Order attempts one IP may make per hour (failed ones count too).
+    // Order attempts one IP may make per hour (failed ones count too). Deliberately low: the
+    // spam on this site is sent by hand by one hostile person, and this is the cap that makes
+    // him pay for every attempt. Do not raise it to give customers more retries — see
+    // docs/SPAM.md.
     "IP_ORDERS_PER_HOUR": "3",
     // How many different phone numbers one IP may order for per day.
     "LEADS_PER_IP_PER_DAY": "3",

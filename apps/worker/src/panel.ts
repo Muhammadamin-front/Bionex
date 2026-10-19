@@ -12,7 +12,7 @@ import { callTelegram, escapeHtml, outcomeKeyboard, STATUS_MARK, takeKeyboard, t
  */
 
 const MAX_AGE_SECONDS = 24 * 3600;
-const ACTIONS = new Set(['take', 'release', 'sold', 'noanswer', 'rejected', 'spam']);
+const ACTIONS = new Set(['take', 'release', 'sold', 'noanswer', 'callback', 'rejected', 'spam']);
 
 export interface PanelUser {
   id: number;

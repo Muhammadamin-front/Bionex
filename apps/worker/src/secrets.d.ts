@@ -13,6 +13,14 @@ interface WorkerSecrets {
    */
   META_PIXEL_ID?: string;
   META_CAPI_TOKEN?: string;
+  /**
+   * What one sold order is worth, as a plain number ("349000"), and its currency (default
+   * "UZS"). Set it and "✅ Сотилди" also sends a Purchase event carrying that value, which is
+   * what lets the ads eventually optimise for revenue instead of for confirmed leads. Leave
+   * it unset and no Purchase is sent — better than feeding Meta a made-up figure.
+   */
+  META_ORDER_VALUE?: string;
+  META_CURRENCY?: string;
   /** Events Manager → Test events: sends there instead of counting (remove when done). */
   META_TEST_EVENT_CODE?: string;
   /** Test overrides for the outside services. */

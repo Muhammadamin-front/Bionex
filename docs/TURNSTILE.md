@@ -54,6 +54,20 @@ A customer must never be stuck on "Текширилмоқда", so:
 - the Worker **accepts** an order whose token is missing, invalid or unverifiable (Cloudflare
   unreachable), and marks it for the operators:
   `⚠️ Текширинг: «бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)`;
-- such orders are **not** sent to Meta's Conversions API, so bots cannot train the ads;
+- the mark no longer decides what Meta hears. It used to keep such orders out of the
+  Conversions API; now the operator's outcome button decides, and an order marked ⚠️ is
+  reported like any other once an operator has spoken to the customer
+  ([META-CAPI.md](META-CAPI.md)). On the phones this mark actually appears on — old devices and
+  Instagram's in-app browser — the person is usually a real customer, and the operator is the
+  better judge than the check;
 - every other protection still applies: foreign `Origin`, IP and phone limits, the daily cap
   per IP, repeats, honeypot, made-up numbers and the operators' 🚫 Спам button.
+
+## 6. The widget is invisible unless it challenges
+
+`appearance: 'interaction-only'` (`OrderForm.tsx`): no checkbox, no box between the phone field
+and the order button, and nothing drawn at all unless Turnstile decides this visitor needs to
+do something. It still runs, still produces a token, and the Worker still checks it exactly as
+above — the only change is that the honest customer never sees it. Note that this is not a
+defence against the fake orders on this site: those are sent by a person who would pass any
+challenge ([SPAM.md](SPAM.md)).
