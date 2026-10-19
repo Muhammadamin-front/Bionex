@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "createdAt": "2026-10-17T10:05:37.960Z",
+        "reason": "codebase: apps/web/src/main.tsx documents Montserrat as the self-hosted brand display face, chosen before this session; it covers the Cyrillic the Uzbek text needs"
+      }
+    ]
+  }
+}

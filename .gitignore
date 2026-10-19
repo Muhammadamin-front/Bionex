@@ -15,3 +15,6 @@ google-credentials*.json
 # Cloudflare local state and local secrets
 .wrangler/
 .dev.vars
+
+# Local caches of dev tooling
+.impeccable/hook.cache.json
