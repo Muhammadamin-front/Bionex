@@ -12,7 +12,7 @@ Mijoz → zeynaraa-uz.pages.dev (Cloudflare Pages, faqat uning Pixel'i 178379402
           ▼
         asosiy Worker «zeynara» → PartnerSite → acceptPartner
           ├─► Google jadval «Lidlar» varag'i: №, sana, ism, TELEFON, kampaniya, ad set, video
-          │     «Holat» → «Keraksiz» → /api/sheet → spam belgisi (tarmoq + qurilma)
+          │     «Holat» = «Keraksiz» ← server har 5 daqiqada o'qiydi → spam belgisi (tarmoq + qurilma)
           └─► Lead darhol UNING Pixel'iga (META_T2_CAPI_TOKEN) — operator tugmasi yo'q
         ✗ Telegram guruh, CRM panel, /royxat, kunlik hisobot — tushmaydi
 ```
@@ -48,24 +48,22 @@ ochiq) va `npm run build:t2` → `apps/web/dist-t2`.
 8. Jadvalni targetologga **Viewer** (faqat ko'rish) huquqi bilan ulashing.
 
 ```js
-const SITE = 'https://zeynaraa-uz.pages.dev';
-const SHEET = 'Lidlar';
-
-// Server har bir yangi lidni shu yerga yuboradi.
+// Server shu yerga murojaat qiladi: yangi lidni yozish yoki «Holat» ustunini o'qish.
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   if (data.secret !== secret()) return ContentService.createTextOutput('forbidden');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (data.action === 'statuses') return statuses(ss.getSheetByName(data.sheet));
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sh = ss.getSheetByName(data.sheet);
     if (!sh) {
       sh = ss.insertSheet(data.sheet);
       sh.appendRow(data.headers);
       sh.setFrozenRows(1);
     }
-    sh.appendRow(data.row);
+    sh.appendRow(byHeader(sh, data));
     copyDropdown(sh, sh.getLastRow());
     return ContentService.createTextOutput('ok');
   } finally {
@@ -73,56 +71,59 @@ function doPost(e) {
   }
 }
 
-// Bir marta qo'lda ishga tushiriladi: «Holat» o'zgarishini kuzatadigan trigger.
-function setup() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('onHolatEdit').forSpreadsheet(ss).onEdit().create();
+// Har bir lidning № va «Holat»i: server har 5 daqiqada so'raydi («Keraksiz» = spam).
+function statuses(sh) {
+  let rows = [];
+  if (sh && sh.getLastRow() > 1) {
+    const values = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+    const n = values[0].indexOf('№');
+    const h = values[0].indexOf('Holat');
+    if (n >= 0 && h >= 0) rows = values.slice(1).map(function (r) { return [r[n], r[h]]; });
+  }
+  return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// «Holat» o'zgarganda serverga aytadi; «Keraksiz» = spam.
-function onHolatEdit(e) {
-  const sh = e.range.getSheet();
-  const col = holatColumn(sh);
-  if (sh.getName() !== SHEET || !col || col < e.range.getColumn() || col > e.range.getLastColumn()) return;
-  for (let r = Math.max(e.range.getRow(), 2); r <= e.range.getLastRow(); r++) {
-    UrlFetchApp.fetch(SITE + '/api/sheet', {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({ secret: secret(), number: sh.getRange(r, 1).getValue(), status: sh.getRange(r, col).getValue() }),
-      muteHttpExceptions: true,
-    });
-  }
+// Har bir qiymatni o'z sarlavhasi ostiga qo'yadi: ustunlar tartibini bemalol o'zgartirish mumkin.
+function byHeader(sh, data) {
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  return head.map(function (h) {
+    const i = data.headers.indexOf(String(h).trim());
+    return i >= 0 ? data.row[i] : '';
+  });
 }
 
 function holatColumn(sh) {
   return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].indexOf('Holat') + 1;
 }
 
-// Yangi qatorga 2-qatordagi «Holat» dropdown'ini (sizning ro'yxatingizni) nusxalaydi.
+// Yangi qatorda «Holat» dropdown'i bo'lmasa, qo'shni qatordagisini (sizning ro'yxatingizni) nusxalaydi.
 function copyDropdown(sh, row) {
   const col = holatColumn(sh);
-  if (!col || row <= 2) return;
-  const rule = sh.getRange(2, col).getDataValidation();
+  if (!col || sh.getRange(row, col).getDataValidation()) return;
+  const rule = sh.getRange(row > 2 ? row - 1 : row + 1, col).getDataValidation();
   if (rule) sh.getRange(row, col).setDataValidation(rule);
 }
 
 function secret() {
   return PropertiesService.getScriptProperties().getProperty('SECRET');
 }
+
+// Avvalgi versiyadan trigger qolib ketgan bo'lsa, xato bermasligi uchun. Endi ishlatilmaydi.
+function onHolatEdit() {}
 ```
 
-Kodni qo'yib saqlagach, **bir marta** `setup` ni ishga tushiring: kod ustidagi funksiyalar
-ro'yxatidan `setup` ni tanlang → **Выполнить** → ruxsat so'rasa **Advanced → Go to … (unsafe) →
-Allow**. Bu «Holat» o'zgarishini kuzatuvchi triggerni yaratadi. Kodni o'zgartirgandan keyin har safar **Manage deployments → ✏️ → New version →
-Deploy** (URL o'zgarmaydi).
+Kodni qo'yib saqlagach: **Manage deployments → ✏️ → New version → Deploy** (URL o'zgarmaydi).
+Trigger, `setup` yoki qo'shimcha ruxsat kerak emas: server har 5 daqiqada «Holat» ustunini shu
+skript orqali o'qiydi.
 
-«Holat» dropdown'i jadval egasiniki (Data → Data validation, 2-qatordan boshlab); skript uni har
-yangi qatorga nusxalaydi va o'zgartirmaydi. Unda **Keraksiz** varianti bo'lishi kerak (katta-kichik
-harf, lotin/kirill farqi yo'q). «Keraksiz» —
+Ustunlar sarlavha nomi bo'yicha to'ldiriladi (№, Sana, Ism, Telefon, Kampaniya, Ad set, Video,
+Belgi, Holat, Izoh) — tartibini o'zgartirsa bo'ladi, nomini emas. «Holat» dropdown'i jadval
+egasiniki; skript uni yangi qatorga qo'shni qatordan nusxalaydi va o'zgartirmaydi. Unda **Keraksiz** varianti bo'lishi kerak (katta-kichik
+harf, lotin/kirill farqi yo'q); «Spam» ham xuddi shunday hisoblanadi). «Keraksiz» —
 Telegram guruhdagi 🚫 Спам bilan bir xil: o'sha lidning tarmog'i va qurilmasi 30 kun eslab
 qolinadi, keyingi buyurtmalari ikkala saytda ham ⚠️ belgi bilan keladi va uning Pixel'iga
-Lead yuborilmaydi. Boshqa holatga o'zgartirilsa, belgi olib tashlanadi.
+Lead yuborilmaydi (5 daqiqagacha kechikish bilan). Boshqa holatga o'zgartirilsa, belgi olib
+tashlanadi.
 
 Ustunlarni server yuboradi (varaq nomi, sarlavha, qator); skript faqat «Holat» ustunini nomidan
 topadi.

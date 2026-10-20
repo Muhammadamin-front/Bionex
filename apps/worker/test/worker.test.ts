@@ -35,8 +35,8 @@ const meta = {
   paths: [] as string[],
 };
 
-/** Fake Apps Script web app of the partner's Google Sheet: every row it was sent. */
-const sheets = { rows: [] as Array<Record<string, any>> };
+/** Fake Apps Script web app of the partner's Google Sheet: every row it was sent, and its «Holat» column. */
+const sheets = { rows: [] as Array<Record<string, any>>, statuses: [] as Array<[unknown, unknown]> };
 
 async function outbound(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -48,9 +48,11 @@ async function outbound(request: Request): Promise<Response> {
     return Response.json({ events_received: body.data.length, fbtrace_id: 'test' });
   }
   if (url.hostname === 'sheets.mock') {
-    const row = (await request.json()) as Record<string, any>;
-    sheets.rows.push(row);
-    return new Response(row.secret === 'sheet-secret' ? 'ok' : 'forbidden');
+    const body = (await request.json()) as Record<string, any>;
+    if (body.secret !== 'sheet-secret') return new Response('forbidden');
+    if (body.action === 'statuses') return Response.json(sheets.statuses);
+    sheets.rows.push(body);
+    return new Response('ok');
   }
   if (url.hostname === 'turnstile.mock') {
     turnstileCalls++;
@@ -172,6 +174,7 @@ beforeEach(async () => {
   meta.events = [];
   meta.paths = [];
   sheets.rows = [];
+  sheets.statuses = [];
 });
 
 afterAll(async () => {
@@ -1191,16 +1194,18 @@ describe('the partner site (sites.ts t2)', () => {
     expect(meta.bodies[1]!.access_token).toBe('EAA-main');
   });
 
-  it('treats «Keraksiz» in its sheet as spam: the device is flagged on the next order, on either site', async () => {
+  it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {
     const DEVICE = '11111111-2222-4333-8444-555555555555';
-    const sheet = (body: Record<string, unknown>) =>
-      partner('/api/sheet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const readSheet = async () => {
+      const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+      await worker.scheduled({ cron: '*/5 * * * *' });
+    };
     expect((await partnerOrder({ fullName: 'Ёлғон Исм', phone: '+998 90 312 45 86', deviceId: DEVICE }, '203.0.113.86')).status).toBe(201);
     await until(() => meta.bodies.length >= 1);
 
-    expect((await sheet({ secret: 'wrong-secret', number: 1, status: 'Keraksiz' })).status).toBe(403);
-    expect((await sheet({ secret: 'sheet-secret', number: 99, status: 'Keraksiz' })).status).toBe(404);
-    expect((await sheet({ secret: 'sheet-secret', number: 1, status: 'keraksiz ' })).status).toBe(200); // their own dropdown's spelling
+    // Their own dropdown's spelling; a header-less or blank row is skipped.
+    sheets.statuses = [[1, 'keraksiz '], ['', 'Keraksiz'], [99, 'Spam']];
+    await readSheet();
 
     // Same phone, another network: flagged in the sheet, and the ads are not told.
     expect((await partnerOrder({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 87', deviceId: DEVICE }, '198.51.100.87')).status).toBe(201);
@@ -1212,8 +1217,9 @@ describe('the partner site (sites.ts t2)', () => {
     expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
 
-    // Picked something else after all: forgotten.
-    expect((await sheet({ secret: 'sheet-secret', number: 1, status: 'Sotildi' })).status).toBe(200);
+    // Picked something else after all: forgotten at the next read.
+    sheets.statuses = [[1, 'Kerakli']];
+    await readSheet();
     expect((await partnerOrder({ fullName: 'Учинчи Исм', phone: '+998 90 312 45 89', deviceId: DEVICE }, '192.0.2.89')).status).toBe(201);
     await until(() => sheets.rows.length >= 3);
     expect(sheets.rows[2]!.row[7]).toBe('');
@@ -1236,6 +1242,6 @@ describe('the partner site (sites.ts t2)', () => {
     expect((await partner('/api/panel/data')).status).toBe(404);
     expect((await partner('/api/health')).status).toBe(404);
     expect((await partner('/api/leads')).status).toBe(405);
-    expect((await partner('/api/sheet')).status).toBe(405);
+    expect((await partner('/api/sheet', { method: 'POST' })).status).toBe(404);
   });
 });

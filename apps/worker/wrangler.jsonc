@@ -21,8 +21,9 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LeadRegistry"] }],
 
-  // The day's report to the operators' group at 20:00 Tashkent time (15:00 UTC).
-  "triggers": { "crons": ["0 15 * * *"] },
+  // The day's report to the operators' group at 20:00 Tashkent time (15:00 UTC), and every
+  // 5 minutes the partner sheet's «Keraksiz» marks (PARTNER_SHEET_CRON in src/index.ts).
+  "triggers": { "crons": ["0 15 * * *", "*/5 * * * *"] },
 
   "vars": {
     // Order attempts one IP may make per hour (failed ones count too). Deliberately low: the

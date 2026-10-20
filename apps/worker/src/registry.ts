@@ -431,23 +431,26 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /**
-   * «Keraksiz» chosen (or unchosen) for a partner order in its Google Sheet: the partner's 🚫 Спам.
-   * The order's network and device are remembered like an operator's spam mark, for both sites.
+   * The «Holat» column of the partner's Google Sheet, read every few minutes (index.ts
+   * `scheduled`): «Keraksiz» is their 🚫 Спам. A marked order's network and device are
+   * remembered like an operator's spam mark, for both sites; an order marked back is forgotten.
    */
-  async markPartnerSpam(input: { site: Exclude<SiteId, 'main'>; number: number; spam: boolean; now: number }): Promise<boolean> {
-    const source = `${input.site}:${input.number}`;
-    if (!input.spam) {
-      this.sql.exec('DELETE FROM spam_marks WHERE source = ?', source);
-      return true;
+  async syncPartnerSpam(input: { site: Exclude<SiteId, 'main'>; rows: Array<{ number: number; spam: boolean }>; now: number }): Promise<void> {
+    for (const row of input.rows) {
+      const source = `${input.site}:${row.number}`;
+      if (!row.spam) {
+        this.sql.exec('DELETE FROM spam_marks WHERE source = ?', source);
+        continue;
+      }
+      // OR IGNORE: a mark keeps the time it was first seen, so its 30 days do not restart on every read.
+      this.sql.exec(
+        'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, at) SELECT ?, ip_hash, device_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
+        source,
+        input.now,
+        input.site,
+        row.number,
+      );
     }
-    const marked = this.sql.exec(
-      'INSERT OR REPLACE INTO spam_marks (source, ip_hash, device_hash, at) SELECT ?, ip_hash, device_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
-      source,
-      input.now,
-      input.site,
-      input.number,
-    ).rowsWritten;
-    return marked > 0;
   }
 
   /** An earlier order from this device or network was marked as spam within 30 days. */

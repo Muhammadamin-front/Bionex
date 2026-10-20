@@ -5,7 +5,7 @@ import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
-import { isSpamStatus, secretMatches, sheetsConfig } from './sheets';
+import { readSheetStatuses, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
@@ -29,6 +29,8 @@ export const MESSAGES = {
 } as const;
 
 const schema = makeLeadSubmissionSchema();
+/** The cron (wrangler.jsonc) that reads the partner sheet's «Holat» column. */
+const PARTNER_SHEET_CRON = '*/5 * * * *';
 const MAX_BODY = 8 * 1024;
 
 const json = (status: number, body: unknown) =>
@@ -86,8 +88,15 @@ export default {
     return takeOrder(request, env, ctx, url, 'main');
   },
 
-  /** Every evening (cron in wrangler.jsonc): the day's report to the group, which also shows the bot is alive. */
-  async scheduled(_controller, env, ctx) {
+  /**
+   * Crons in wrangler.jsonc. Every few minutes: the partner sheet's «Keraksiz» marks. Every
+   * evening: the day's report to the group, which also shows the bot is alive.
+   */
+  async scheduled(controller, env, ctx) {
+    if (controller.cron === PARTNER_SHEET_CRON) {
+      ctx.waitUntil(syncPartnerSheet(env, Date.now()));
+      return;
+    }
     if (env.TELEGRAM_DRY_RUN !== '1' && !(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)) return;
     ctx.waitUntil(env.REGISTRY.get(env.REGISTRY.idFromName('main')).dailyReport(Date.now()));
   },
@@ -238,28 +247,18 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
 export class PartnerSite extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/leads' && url.pathname !== '/api/sheet') return fail(404, 'not_found', MESSAGES.notFound);
+    if (url.pathname !== '/api/leads') return fail(404, 'not_found', MESSAGES.notFound);
     if (request.method !== 'POST') return fail(405, 'not_found', MESSAGES.notFound);
-    if (url.pathname === '/api/sheet') return sheetStatus(request, this.env, 't2');
     return takeOrder(request, this.env, this.ctx, url, 't2');
   }
 }
 
-/**
- * The partner's Google Sheet telling us an order's «Holat» changed (its Apps Script, on edit).
- * Only «Keraksiz» matters: it is their 🚫 Спам, so the order's network and device are marked.
- * Signed with the sheet's own secret; reached only through the partner site.
- */
-async function sheetStatus(request: Request, env: Env, site: Exclude<SiteId, 'main'>): Promise<Response> {
-  const cfg = sheetsConfig(env, site);
-  if (!cfg) return fail(404, 'not_found', MESSAGES.notFound);
-  const body = (await request.json().catch(() => null)) as { secret?: unknown; number?: unknown; status?: unknown } | null;
-  if (!secretMatches(body?.secret, cfg)) return fail(403, 'forbidden', MESSAGES.forbidden);
-  const number = Number(body?.number);
-  if (!Number.isInteger(number) || number < 1) return fail(400, 'validation_failed', MESSAGES.validation);
-  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
-  const found = await registry.markPartnerSpam({ site, number, spam: isSpamStatus(body?.status), now: Date.now() });
-  return found ? json(200, { ok: true }) : fail(404, 'not_found', MESSAGES.notFound);
+/** «Keraksiz» in the partner's Google Sheet: read back and remembered as spam (sheets.ts). */
+async function syncPartnerSheet(env: Env, now: number): Promise<void> {
+  const cfg = sheetsConfig(env, 't2');
+  if (!cfg) return;
+  const rows = await readSheetStatuses(cfg);
+  if (rows) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncPartnerSpam({ site: 't2', rows, now });
 }
 
 /**

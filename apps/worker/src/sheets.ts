@@ -8,7 +8,9 @@ import type { SiteId } from './sites';
  * The sheet is written by a small Apps Script web app in it (docs/PARTNER-SITE.md has the
  * script). It knows nothing about the columns: each send names its tab, the header row and
  * the row. «Holat» (the partner's own dropdown, copied onto each new row) and «Izoh» are left
- * for the partner's people; picking «Keraksiz» in «Holat» is reported back as spam.
+ * for the partner's people. Every few minutes the Worker reads «Holat» back (`readSheetStatuses`):
+ * «Keraksiz» there is the partner's 🚫 Спам. Reading it needs nothing the script was not already
+ * allowed to do — no trigger, no extra Google permission.
  *
  * One send per order, best effort: a failure is logged and the order is still answered
  * "accepted" — it was recorded, and the customer must not be asked to order twice.
@@ -46,19 +48,9 @@ const FLAG_TEXT: Record<string, string> = {
 
 /**
  * Whether a «Holat» value means "a fake order": the partner's 🚫 Спам. The dropdown is theirs,
- * so «Keraksiz» is recognised whatever its case or script. The Apps Script sends every change
- * back (docs/PARTNER-SITE.md), and a fake order's network and device are then remembered like
- * an operator's spam mark (registry.ts `markPartnerSpam`).
+ * so «Keraksiz» and «Spam» are recognised whatever their case or script.
  */
-export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз/i.test(String(status ?? ''));
-
-/** The sheet's own secret, compared without stopping at the first difference. */
-export function secretMatches(given: unknown, cfg: SheetsConfig): boolean {
-  if (typeof given !== 'string' || given.length !== cfg.secret.length) return false;
-  let diff = 0;
-  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ cfg.secret.charCodeAt(i);
-  return diff === 0;
-}
+export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз|spam|спам/i.test(String(status ?? ''));
 
 export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
   if (site !== 't2' || !env.SHEETS_T2_URL || !env.SHEETS_T2_SECRET) return null;
@@ -80,6 +72,26 @@ const tashkentTime = (ms: number) =>
  * apostrophe keeps it text and does not show.
  */
 const asText = (value: string) => (/^[=+\-@]/.test(value) ? `'${value}` : value);
+
+/** Each order's number and whether its «Holat» says spam; null when the sheet could not be read. */
+export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ number: number; spam: boolean }> | null> {
+  try {
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ secret: cfg.secret, action: 'statuses', sheet: SHEET }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const rows = (await res.json()) as unknown;
+    if (!Array.isArray(rows)) return null;
+    return rows
+      .filter((r): r is [unknown, unknown] => Array.isArray(r) && Number.isInteger(Number(r[0])) && Number(r[0]) > 0)
+      .map(([number, status]) => ({ number: Number(number), spam: isSpamStatus(status) }));
+  } catch (err) {
+    console.error('Google Sheets statuses unreadable', (err as Error)?.message);
+    return null;
+  }
+}
 
 export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder): Promise<void> {
   const row = [
