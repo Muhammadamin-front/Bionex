@@ -12,8 +12,8 @@ Mijoz → zeynaraa-uz.pages.dev (Cloudflare Pages, faqat uning Pixel'i 178379402
           ▼
         asosiy Worker «zeynara» → PartnerSite → acceptPartner
           ├─► Google jadval «Lidlar» varag'i: №, sana, ism, TELEFON, kampaniya, ad set, video
-          │     «Holat» = «Keraksiz» ← server har 5 daqiqada o'qiydi → spam belgisi (tarmoq + qurilma)
-          └─► Lead darhol UNING Pixel'iga (META_T2_CAPI_TOKEN) — operator tugmasi yo'q
+          │     «Holat» ← server har 5 daqiqada o'qiydi: Kerakli → Lead; Keraksiz/Spam → spam belgisi
+          └─► Lead UNING Pixel'iga (META_T2_CAPI_TOKEN) — jadvalda «Kerakli» tanlangach
         ✗ Telegram guruh, CRM panel, /royxat, kunlik hisobot — tushmaydi
 ```
 
@@ -22,7 +22,7 @@ Mijoz → zeynaraa-uz.pages.dev (Cloudflare Pages, faqat uning Pixel'i 178379402
 | Manzil | `zeynara.8pj6jsdbgr.workers.dev` | `zeynaraa-uz.pages.dev` |
 | Pixel (brauzer) | `1109358048693673` | `1783794022832394` |
 | Lead / Purchase (server) | `META_PIXEL_ID` + `META_CAPI_TOKEN` | `META_T2_PIXEL_ID` + `META_T2_CAPI_TOKEN` |
-| Lead qachon ketadi | operator ✅/❌ bosganda | forma yuborilgan zahoti |
+| Lead qachon ketadi | operator ✅/❌ bosganda | jadvalda «Holat» = Kerakli (yoki Sotildi / Rad etdi) bo'lgach, 5 daqiqa ichida |
 | Lidlar qayerga tushadi | Telegram guruh + CRM panel | faqat Google jadval (`SHEETS_T2_URL` + `SHEETS_T2_SECRET`) |
 | Dublikat (24 soat) | o'z ichida | o'z ichida — bir saytdagi buyurtma ikkinchisida takror hisoblanmaydi |
 | Turnstile, IP cheklovlari | bor | bor |
@@ -71,7 +71,7 @@ function doPost(e) {
   }
 }
 
-// Har bir lidning № va «Holat»i: server har 5 daqiqada so'raydi («Keraksiz» = spam).
+// Har bir lidning № va «Holat»i: server har 5 daqiqada so'raydi.
 function statuses(sh) {
   let rows = [];
   if (sh && sh.getLastRow() > 1) {
@@ -118,15 +118,20 @@ skript orqali o'qiydi.
 
 Ustunlar sarlavha nomi bo'yicha to'ldiriladi (№, Sana, Ism, Telefon, Kampaniya, Ad set, Video,
 Belgi, Holat, Izoh) — tartibini o'zgartirsa bo'ladi, nomini emas. «Holat» dropdown'i jadval
-egasiniki; skript uni yangi qatorga qo'shni qatordan nusxalaydi va o'zgartirmaydi. Unda **Keraksiz** varianti bo'lishi kerak (katta-kichik
-harf, lotin/kirill farqi yo'q); «Spam» ham xuddi shunday hisoblanadi). «Keraksiz» —
-Telegram guruhdagi 🚫 Спам bilan bir xil: o'sha lidning tarmog'i va qurilmasi 30 kun eslab
-qolinadi, keyingi buyurtmalari ikkala saytda ham ⚠️ belgi bilan keladi va uning Pixel'iga
-Lead yuborilmaydi (5 daqiqagacha kechikish bilan). Boshqa holatga o'zgartirilsa, belgi olib
-tashlanadi.
+egasiniki; skript uni yangi qatorga qo'shni qatordan nusxalaydi va o'zgartirmaydi.
 
-Ustunlarni server yuboradi (varaq nomi, sarlavha, qator); skript faqat «Holat» ustunini nomidan
-topadi.
+Server «Holat» ni har 5 daqiqada o'qiydi va asosiy saytdagi operator tugmalari kabi tushunadi
+(katta-kichik harf, lotin/kirill farqi yo'q):
+
+| «Holat» | Asosiy saytdagi tugma | Natija |
+|---|---|---|
+| **Kerakli** (yoki Sotildi / Rad etdi) | ✅ / ❌ | Lead uning Pixel'iga bir marta ketadi, buyurtma vaqti bilan |
+| **Keraksiz** yoki **Spam** | 🚫 | Lead hech qachon ketmaydi; tarmog'i va qurilmasi 30 kun eslab qolinadi, keyingi buyurtmalari ikkala saytda ⚠️ bilan keladi |
+| Ko'tarmadi, Qaytib qo'ng'iroq, bo'sh va boshqalar | 🔁 / ⏰ | kutadi; 7 kun ichida belgilanmasa, Lead yuborilmaydi (Meta 7 kundan eskisini olmaydi) |
+
+Lead faqat `META_T2_CAPI_TOKEN` qo'yilgandan keyin kelgan buyurtmalar uchun ketadi. Keraksiz /
+Spam boshqa holatga o'zgartirilsa, spam belgisi olib tashlanadi; yuborilgan Lead esa qaytarib
+olinmaydi.
 
 Skriptni keyin o'zgartirsangiz: **Deploy → Manage deployments → ✏️ → Version: New version →
 Deploy** (URL o'zgarmaydi). Yangi «New deployment» qilsangiz URL o'zgaradi va 3-qadamdagi

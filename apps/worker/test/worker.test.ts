@@ -1179,15 +1179,38 @@ describe('the partner site (sites.ts t2)', () => {
     expect(leadMessages()).toHaveLength(1); // only the main site's order
   });
 
-  it("sends its Lead to the partner's dataset at once; the main site's waits for the operator, to ours", async () => {
-    expect((await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 85' }, '203.0.113.85')).status).toBe(201);
+  /** The 5-minute cron that reads the partner sheet's «Holat» column. */
+  const readSheet = async () => {
+    const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+    await worker.scheduled({ cron: '*/5 * * * *' });
+  };
+
+  it("holds its Lead until its sheet says the person is real, then sends it to the partner's dataset only", async () => {
+    expect((await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 85' }, '203.0.113.85')).status).toBe(201); // 1
+    expect((await partnerOrder({ fullName: 'Икки Киши', phone: '+998 90 312 45 83' }, '203.0.113.83')).status).toBe(201); // 2
+    expect((await partnerOrder({ fullName: 'Уч Киши', phone: '+998 90 312 45 82' }, '203.0.113.82')).status).toBe(201); // 3
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.bodies).toHaveLength(0); // a filled-in form proves nothing
+
+    sheets.statuses = [[1, "Ko'tarmadi"], [2, 'Keraksiz'], [3, '']];
+    await readSheet();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.bodies).toHaveLength(0);
+
+    // Rung back and real; the spam one marked real later is still never reported.
+    sheets.statuses = [[1, 'Kerakli'], [2, 'Kerakli'], [3, '']];
+    await readSheet();
     await until(() => meta.bodies.length >= 1);
+    await new Promise((r) => setTimeout(r, 100));
     expect(meta.paths).toEqual([`/v21.0/${PARTNER_PIXEL}/events`]);
     expect(meta.bodies[0]).toMatchObject({ access_token: 'EAA-partner', data: [{ event_name: 'Lead' }] });
-
-    expect((await order({ phone: '+998 90 312 45 84' }, { ip: '203.0.113.84' })).status).toBe(201);
+    // Once only, however often the sheet is read again.
+    await readSheet();
     await new Promise((r) => setTimeout(r, 100));
     expect(meta.bodies).toHaveLength(1);
+
+    // The main site's order still waits for an operator, and goes to our dataset.
+    expect((await order({ phone: '+998 90 312 45 84' }, { ip: '203.0.113.84' })).status).toBe(201);
     await press('s:1:sold');
     await until(() => meta.bodies.length >= 2);
     expect(meta.paths[1]).toBe(`/v21.0/${MAIN_PIXEL}/events`);
@@ -1196,23 +1219,20 @@ describe('the partner site (sites.ts t2)', () => {
 
   it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {
     const DEVICE = '11111111-2222-4333-8444-555555555555';
-    const readSheet = async () => {
-      const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
-      await worker.scheduled({ cron: '*/5 * * * *' });
-    };
     expect((await partnerOrder({ fullName: 'Ёлғон Исм', phone: '+998 90 312 45 86', deviceId: DEVICE }, '203.0.113.86')).status).toBe(201);
-    await until(() => meta.bodies.length >= 1);
 
     // Their own dropdown's spelling; a header-less or blank row is skipped.
     sheets.statuses = [[1, 'keraksiz '], ['', 'Keraksiz'], [99, 'Spam']];
     await readSheet();
 
-    // Same phone, another network: flagged in the sheet, and the ads are not told.
+    // Same phone, another network: flagged in the sheet — and never reported, even marked real.
     expect((await partnerOrder({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 87', deviceId: DEVICE }, '198.51.100.87')).status).toBe(201);
     await until(() => sheets.rows.length >= 2);
     expect(sheets.rows[1]!.row[7]).toBe('bu qurilmadan avval spam belgilangan');
+    sheets.statuses = [[1, 'Keraksiz'], [2, 'Kerakli']];
+    await readSheet();
     await new Promise((r) => setTimeout(r, 100));
-    expect(meta.bodies).toHaveLength(1);
+    expect(meta.bodies).toHaveLength(0);
     // The operators see it too, on the main site.
     expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');

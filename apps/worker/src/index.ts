@@ -195,8 +195,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     //    sent yet: the order is reported to Meta only once an operator has rung the
     //    customer and pressed an outcome, so the ads learn from real people instead of from
     //    everyone who can type a phone number. See meta.ts and registry.ts `reportToMeta`.
-    //    (A partner-site order is the exception: nobody here rings it, so `acceptPartner`
-    //    sends its Lead to the partner's own dataset at once.)
+    //    A partner-site order waits the same way, for its «Holat» in the partner's sheet
+    //    (registry.ts `syncPartnerSheet`), and goes to the partner's own dataset.
     const match = meta
       ? {
           userData: await buildUserData({
@@ -253,12 +253,12 @@ export class PartnerSite extends WorkerEntrypoint<Env> {
   }
 }
 
-/** «Keraksiz» in the partner's Google Sheet: read back and remembered as spam (sheets.ts). */
+/** The partner sheet's «Holat» column, read back: their Leads and their spam marks (sheets.ts). */
 async function syncPartnerSheet(env: Env, now: number): Promise<void> {
   const cfg = sheetsConfig(env, 't2');
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
-  if (rows) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncPartnerSpam({ site: 't2', rows, now });
+  if (rows) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncPartnerSheet({ site: 't2', rows, now });
 }
 
 /**
