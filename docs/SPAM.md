@@ -19,6 +19,7 @@ changes nothing downstream** — no Meta Lead, no operator's afternoon.
 | Hammer one number | `PHONE_REQUESTS_PER_HOUR` = 5, in `registry.ts` |
 | Teach the ads to find more of him | nothing reaches Meta until an operator confirms a real person answered — see [META-CAPI.md](META-CAPI.md) |
 | Hide that a burst came from one place | every suspicious order shows `🔎 Манба #a1b2c3 (бугун 3 та рақам)` |
+| Change network to shake off a spam mark | the browser keeps a random id (`apps/web/src/lib/device.ts`) and 🚫 marks it too: his next order says «бу қурилмадан аввал спам белгиланган» on any network, until he clears the site's data or uses a private window |
 
 **`IP_ORDERS_PER_HOUR` is 3 on purpose.** It is the only cap that costs him anything per
 attempt, so it is also the one that looks like a mistake when a real customer mistypes a number
@@ -35,9 +36,10 @@ Pressing it does three things:
 
 1. The order is never reported to Meta. ✅ Сотилди and ❌ Рад этди are; 🚫 Спам never is, and
    neither is an order nobody presses anything on.
-2. The order's network is remembered for **30 days** (`spam_sources`, as a hash). The next
-   order from it arrives marked ⚠️ «бу манбадан аввал спам белгиланган», so the operator knows
-   before dialling.
+2. The order's network and device are remembered for **30 days** (`spam_marks`, as hashes).
+   The next order from either arrives marked ⚠️ «бу манбадан / бу қурилмадан аввал спам
+   белгиланган», so the operator knows before dialling. «Keraksiz» in the partner site's Google
+   Sheet does the same ([PARTNER-SITE.md](PARTNER-SITE.md)), and the marks count on both sites.
 3. It counts in the 20:00 report, so the scale of the sabotage is visible day by day.
 
 > The button did nothing in the Telegram group until 2026-10-18 — `index.ts` matched
@@ -55,6 +57,7 @@ report names that number — «📣 Натижаси белгиланмаган:
 | Flag | Shown as | Means |
 |---|---|---|
 | `spam_source` | бу манбадан аввал спам белгиланган | an operator pressed 🚫 on an order from this network within 30 days |
+| `spam_device` | бу қурилмадан аввал спам белгиланган | 🚫 (or «Keraksiz») on an order from this browser within 30 days, whatever its network now |
 | `multi_phone_ip` | бу манбадан бугун бир нечта рақам юборилди | more than one number from this network today |
 | `phone_pattern` | рақам сунъийга ўхшайди | e.g. 90 111 11 11 |
 | `honeypot` | яширин майдон тўлдирилган | a field only a script fills |
@@ -70,7 +73,8 @@ there is only making the fake order worthless, which is now done.
 If it gets worse, in rough order of cost to real customers:
 
 - a Cloudflare **WAF rate-limit rule** on `POST /api/leads` (free plan allows one) — it acts
-  before the Worker runs, so his attempts stop costing anything at all;
+  before the Worker runs, so his attempts stop costing anything at all. It needs the site on
+  **its own domain**: WAF rules belong to a zone, and `workers.dev` / `pages.dev` are not ours;
 - Cloudflare **Bot Fight Mode** / a managed challenge on the order path;
 - during a burst, accept orders only through the Telegram bot, where a shared contact proves
   the number belongs to the sender;

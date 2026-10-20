@@ -12,6 +12,7 @@ Mijoz → zeynaraa-uz.pages.dev (Cloudflare Pages, faqat uning Pixel'i 178379402
           ▼
         asosiy Worker «zeynara» → PartnerSite → acceptPartner
           ├─► Google jadval «Lidlar» varag'i: №, sana, ism, TELEFON, kampaniya, ad set, video
+          │     «Holat» → «Keraksiz» → /api/sheet → spam belgisi (tarmoq + qurilma)
           └─► Lead darhol UNING Pixel'iga (META_T2_CAPI_TOKEN) — operator tugmasi yo'q
         ✗ Telegram guruh, CRM panel, /royxat, kunlik hisobot — tushmaydi
 ```
@@ -47,10 +48,13 @@ ochiq) va `npm run build:t2` → `apps/web/dist-t2`.
 8. Jadvalni targetologga **Viewer** (faqat ko'rish) huquqi bilan ulashing.
 
 ```js
+const SITE = 'https://zeynaraa-uz.pages.dev';
+const SHEET = 'Lidlar';
+
+// Server har bir yangi lidni shu yerga yuboradi.
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
-  const secret = PropertiesService.getScriptProperties().getProperty('SECRET');
-  if (!secret || data.secret !== secret) return ContentService.createTextOutput('forbidden');
+  if (data.secret !== secret()) return ContentService.createTextOutput('forbidden');
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -62,15 +66,66 @@ function doPost(e) {
       sh.setFrozenRows(1);
     }
     sh.appendRow(data.row);
+    copyDropdown(sh, sh.getLastRow());
     return ContentService.createTextOutput('ok');
   } finally {
     lock.releaseLock();
   }
 }
+
+// Bir marta qo'lda ishga tushiriladi: «Holat» o'zgarishini kuzatadigan trigger.
+function setup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('onHolatEdit').forSpreadsheet(ss).onEdit().create();
+}
+
+// «Holat» o'zgarganda serverga aytadi; «Keraksiz» = spam.
+function onHolatEdit(e) {
+  const sh = e.range.getSheet();
+  const col = holatColumn(sh);
+  if (sh.getName() !== SHEET || !col || col < e.range.getColumn() || col > e.range.getLastColumn()) return;
+  for (let r = Math.max(e.range.getRow(), 2); r <= e.range.getLastRow(); r++) {
+    UrlFetchApp.fetch(SITE + '/api/sheet', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ secret: secret(), number: sh.getRange(r, 1).getValue(), status: sh.getRange(r, col).getValue() }),
+      muteHttpExceptions: true,
+    });
+  }
+}
+
+function holatColumn(sh) {
+  return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].indexOf('Holat') + 1;
+}
+
+// Yangi qatorga 2-qatordagi «Holat» dropdown'ini (sizning ro'yxatingizni) nusxalaydi.
+function copyDropdown(sh, row) {
+  const col = holatColumn(sh);
+  if (!col || row <= 2) return;
+  const rule = sh.getRange(2, col).getDataValidation();
+  if (rule) sh.getRange(row, col).setDataValidation(rule);
+}
+
+function secret() {
+  return PropertiesService.getScriptProperties().getProperty('SECRET');
+}
 ```
 
-Skript ustunlarni bilmaydi: varaq nomi, sarlavha va qatorni server yuboradi. Shuning uchun
-ustunlar o'zgarsa ham skriptni qayta tahrirlash kerak bo'lmaydi.
+Kodni qo'yib saqlagach, **bir marta** `setup` ni ishga tushiring: kod ustidagi funksiyalar
+ro'yxatidan `setup` ni tanlang → **Выполнить** → ruxsat so'rasa **Advanced → Go to … (unsafe) →
+Allow**. Bu «Holat» o'zgarishini kuzatuvchi triggerni yaratadi. Kodni o'zgartirgandan keyin har safar **Manage deployments → ✏️ → New version →
+Deploy** (URL o'zgarmaydi).
+
+«Holat» dropdown'i jadval egasiniki (Data → Data validation, 2-qatordan boshlab); skript uni har
+yangi qatorga nusxalaydi va o'zgartirmaydi. Unda **Keraksiz** varianti bo'lishi kerak (katta-kichik
+harf, lotin/kirill farqi yo'q). «Keraksiz» —
+Telegram guruhdagi 🚫 Спам bilan bir xil: o'sha lidning tarmog'i va qurilmasi 30 kun eslab
+qolinadi, keyingi buyurtmalari ikkala saytda ham ⚠️ belgi bilan keladi va uning Pixel'iga
+Lead yuborilmaydi. Boshqa holatga o'zgartirilsa, belgi olib tashlanadi.
+
+Ustunlarni server yuboradi (varaq nomi, sarlavha, qator); skript faqat «Holat» ustunini nomidan
+topadi.
 
 Skriptni keyin o'zgartirsangiz: **Deploy → Manage deployments → ✏️ → Version: New version →
 Deploy** (URL o'zgarmaydi). Yangi «New deployment» qilsangiz URL o'zgaradi va 3-qadamdagi

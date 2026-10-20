@@ -5,6 +5,7 @@ import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
+import { isSpamStatus, secretMatches, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
@@ -201,7 +202,17 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       : undefined;
 
     // 5. New, repeat, or refused — decided and recorded in one place, one order at a time.
-    const order = { submissionId: data.submissionId, ip, phone: data.phone, fullName: data.fullName, utm: data.utm, flags, now, meta: match };
+    const order = {
+      submissionId: data.submissionId,
+      ip,
+      phone: data.phone,
+      fullName: data.fullName,
+      utm: data.utm,
+      flags,
+      now,
+      meta: match,
+      device: data.deviceId,
+    };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.
     const result = site === 'main' ? await registry.accept(order) : await registry.acceptPartner({ ...order, site });
     if (result.status === 'ip_limited') return fail(429, 'rate_limited', MESSAGES.ipDailyLimit);
@@ -227,10 +238,28 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
 export class PartnerSite extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/leads') return fail(404, 'not_found', MESSAGES.notFound);
+    if (url.pathname !== '/api/leads' && url.pathname !== '/api/sheet') return fail(404, 'not_found', MESSAGES.notFound);
     if (request.method !== 'POST') return fail(405, 'not_found', MESSAGES.notFound);
+    if (url.pathname === '/api/sheet') return sheetStatus(request, this.env, 't2');
     return takeOrder(request, this.env, this.ctx, url, 't2');
   }
+}
+
+/**
+ * The partner's Google Sheet telling us an order's «Holat» changed (its Apps Script, on edit).
+ * Only «Keraksiz» matters: it is their 🚫 Спам, so the order's network and device are marked.
+ * Signed with the sheet's own secret; reached only through the partner site.
+ */
+async function sheetStatus(request: Request, env: Env, site: Exclude<SiteId, 'main'>): Promise<Response> {
+  const cfg = sheetsConfig(env, site);
+  if (!cfg) return fail(404, 'not_found', MESSAGES.notFound);
+  const body = (await request.json().catch(() => null)) as { secret?: unknown; number?: unknown; status?: unknown } | null;
+  if (!secretMatches(body?.secret, cfg)) return fail(403, 'forbidden', MESSAGES.forbidden);
+  const number = Number(body?.number);
+  if (!Number.isInteger(number) || number < 1) return fail(400, 'validation_failed', MESSAGES.validation);
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const found = await registry.markPartnerSpam({ site, number, spam: isSpamStatus(body?.status), now: Date.now() });
+  return found ? json(200, { ok: true }) : fail(404, 'not_found', MESSAGES.notFound);
 }
 
 /**

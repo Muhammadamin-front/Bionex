@@ -76,6 +76,9 @@
   7 days, sent only in a private chat, and still checked against group membership on every
   request. `TELEGRAM_DRY_RUN` skips panel sign-in only on `localhost`.
 - ✅ Nothing personal is written to logs.
+- ✅ The browser keeps one random id for this site (`localStorage`, `apps/web/src/lib/device.ts`)
+  and sends it with an order; it is stored only as an HMAC hash, so that a spam mark can follow
+  a phone across networks (30 days). It is not a fingerprint and says nothing about the person.
 - ✅ The partner site ([PARTNER-SITE.md](PARTNER-SITE.md)): its orders go only to its owner's
   Google Sheet (name and phone number included — their people ring the customers) and their
   Meta dataset. This Worker keeps only their hashes (`partner_leads`, 30 days) for repeats and

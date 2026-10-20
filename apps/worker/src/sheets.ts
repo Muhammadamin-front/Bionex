@@ -6,9 +6,9 @@ import type { SiteId } from './sites';
  * a row carries the full name and the phone number.
  *
  * The sheet is written by a small Apps Script web app in it (docs/PARTNER-SITE.md has the
- * script). The script knows nothing about the columns: each send names its tab, the header
- * row and the row, so changing what is sent never means editing the script again. «Holat»
- * and «Izoh» are left empty for the partner's people to fill in.
+ * script). It knows nothing about the columns: each send names its tab, the header row and
+ * the row. «Holat» (the partner's own dropdown, copied onto each new row) and «Izoh» are left
+ * for the partner's people; picking «Keraksiz» in «Holat» is reported back as spam.
  *
  * One send per order, best effort: a failure is logged and the order is still answered
  * "accepted" — it was recorded, and the customer must not be asked to order twice.
@@ -40,7 +40,25 @@ const FLAG_TEXT: Record<string, string> = {
   honeypot: "bot bo'lishi mumkin",
   phone_pattern: "raqam soxtaga o'xshaydi",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
+  spam_source: 'bu tarmoqdan avval spam belgilangan',
+  spam_device: 'bu qurilmadan avval spam belgilangan',
 };
+
+/**
+ * Whether a «Holat» value means "a fake order": the partner's 🚫 Спам. The dropdown is theirs,
+ * so «Keraksiz» is recognised whatever its case or script. The Apps Script sends every change
+ * back (docs/PARTNER-SITE.md), and a fake order's network and device are then remembered like
+ * an operator's spam mark (registry.ts `markPartnerSpam`).
+ */
+export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз/i.test(String(status ?? ''));
+
+/** The sheet's own secret, compared without stopping at the first difference. */
+export function secretMatches(given: unknown, cfg: SheetsConfig): boolean {
+  if (typeof given !== 'string' || given.length !== cfg.secret.length) return false;
+  let diff = 0;
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ cfg.secret.charCodeAt(i);
+  return diff === 0;
+}
 
 export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
   if (site !== 't2' || !env.SHEETS_T2_URL || !env.SHEETS_T2_SECRET) return null;

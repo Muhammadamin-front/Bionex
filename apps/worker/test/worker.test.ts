@@ -1191,9 +1191,51 @@ describe('the partner site (sites.ts t2)', () => {
     expect(meta.bodies[1]!.access_token).toBe('EAA-main');
   });
 
+  it('treats «Keraksiz» in its sheet as spam: the device is flagged on the next order, on either site', async () => {
+    const DEVICE = '11111111-2222-4333-8444-555555555555';
+    const sheet = (body: Record<string, unknown>) =>
+      partner('/api/sheet', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await partnerOrder({ fullName: 'Ёлғон Исм', phone: '+998 90 312 45 86', deviceId: DEVICE }, '203.0.113.86')).status).toBe(201);
+    await until(() => meta.bodies.length >= 1);
+
+    expect((await sheet({ secret: 'wrong-secret', number: 1, status: 'Keraksiz' })).status).toBe(403);
+    expect((await sheet({ secret: 'sheet-secret', number: 99, status: 'Keraksiz' })).status).toBe(404);
+    expect((await sheet({ secret: 'sheet-secret', number: 1, status: 'keraksiz ' })).status).toBe(200); // their own dropdown's spelling
+
+    // Same phone, another network: flagged in the sheet, and the ads are not told.
+    expect((await partnerOrder({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 87', deviceId: DEVICE }, '198.51.100.87')).status).toBe(201);
+    await until(() => sheets.rows.length >= 2);
+    expect(sheets.rows[1]!.row[7]).toBe('bu qurilmadan avval spam belgilangan');
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.bodies).toHaveLength(1);
+    // The operators see it too, on the main site.
+    expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+
+    // Picked something else after all: forgotten.
+    expect((await sheet({ secret: 'sheet-secret', number: 1, status: 'Sotildi' })).status).toBe(200);
+    expect((await partnerOrder({ fullName: 'Учинчи Исм', phone: '+998 90 312 45 89', deviceId: DEVICE }, '192.0.2.89')).status).toBe(201);
+    await until(() => sheets.rows.length >= 3);
+    expect(sheets.rows[2]!.row[7]).toBe('');
+  });
+
+  it("an operator's 🚫 marks the device: its next order is flagged even from another network", async () => {
+    const DEVICE = '66666666-7777-4888-9999-000000000000';
+    expect((await order({ phone: '+998 90 312 45 90', deviceId: DEVICE }, { ip: '203.0.113.90' })).status).toBe(201);
+    await press('s:1:spam');
+    expect((await order({ phone: '+998 90 312 45 91', deviceId: DEVICE }, { ip: '198.51.100.91' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+    expect(leadMessages().at(-1)!.text).not.toContain('бу манбадан аввал спам');
+    // Another phone on that first network: only the network warning.
+    expect((await order({ phone: '+998 90 312 45 92', deviceId: '12345678-1234-4234-8234-123456789012' }, { ip: '203.0.113.90' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('бу манбадан аввал спам белгиланган');
+    expect(leadMessages().at(-1)!.text).not.toContain('қурилмадан');
+  });
+
   it('opens nothing but the order form to the partner site', async () => {
     expect((await partner('/api/panel/data')).status).toBe(404);
     expect((await partner('/api/health')).status).toBe(404);
     expect((await partner('/api/leads')).status).toBe(405);
+    expect((await partner('/api/sheet')).status).toBe(405);
   });
 });

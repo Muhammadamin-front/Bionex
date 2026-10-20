@@ -135,6 +135,8 @@ export interface OrderInput {
    * bot orders and when the Conversions API is not configured.
    */
   meta?: { userData: MetaUserData; sourceUrl: string };
+  /** The browser's own random id (apps/web lib/device.ts); absent for bot orders and blocked storage. */
+  device?: string;
 }
 
 /**
@@ -245,9 +247,16 @@ export class LeadRegistry extends DurableObject<Env> {
     const leadColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(leads)').toArray().map((c) => c.name);
     if (leadColumns.includes('site_seq')) this.sql.exec('ALTER TABLE leads DROP COLUMN site_seq');
     if (leadColumns.includes('site')) this.sql.exec('ALTER TABLE leads DROP COLUMN site');
-    this.sql.exec(
-      'CREATE TABLE IF NOT EXISTS spam_sources (lead_id INTEGER PRIMARY KEY, ip_hash TEXT NOT NULL, at INTEGER NOT NULL)',
-    );
+    // What 🚫 Спам (and «Keraksiz» in the partner's sheet) remembers for 30 days: the order's
+    // network and, when its browser sent one, its device. `source` is 'lead:<id>' or '<site>:<n>'.
+    this.sql.exec('CREATE TABLE IF NOT EXISTS spam_marks (source TEXT PRIMARY KEY, ip_hash TEXT NOT NULL, device_hash TEXT, at INTEGER NOT NULL)');
+    if (this.sql.exec("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'spam_sources'").toArray().length) {
+      this.sql.exec("INSERT OR IGNORE INTO spam_marks (source, ip_hash, at) SELECT 'lead:' || lead_id, ip_hash, at FROM spam_sources");
+      this.sql.exec('DROP TABLE spam_sources');
+    }
+    if (!leadColumns.includes('device_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN device_hash TEXT');
+    const partnerColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(partner_leads)').toArray().map((c) => c.name);
+    if (!partnerColumns.includes('device_hash')) this.sql.exec('ALTER TABLE partner_leads ADD COLUMN device_hash TEXT');
     // Orders whose Meta Lead is waiting for an operator to confirm the person is real.
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS meta_pending (
@@ -279,6 +288,7 @@ export class LeadRegistry extends DurableObject<Env> {
   async accept(input: OrderInput): Promise<AcceptResult> {
     const phoneHash = await this.hash(input.phone);
     const ipHash = await this.hash(input.ip);
+    const deviceHash = input.device ? await this.hash(`device:${input.device}`) : null;
     const { now } = input;
 
     // Everything below runs without awaiting, so no other order can interleave with it.
@@ -305,14 +315,11 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().n;
     if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
 
-    // Operators marked an earlier order from this source as spam: say so on this one.
-    const flags = [...input.flags];
-    const spamBefore = this.sql.exec('SELECT 1 FROM spam_sources WHERE ip_hash = ? AND at > ? LIMIT 1', ipHash, now - 30 * DAY).toArray().length > 0;
-    if (spamBefore) flags.push('spam_source');
-    input = { ...input, flags };
+    // Operators marked an earlier order from this network or device as spam: say so on this one.
+    input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, now)] };
 
     const leadId = this.sql
-      .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, at) VALUES (?, ?, ?) RETURNING id', phoneHash, ipHash, now)
+      .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, device_hash, at) VALUES (?, ?, ?, ?) RETURNING id', phoneHash, ipHash, deviceHash, now)
       .one().id;
     this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
     // Meta is told nothing yet: a name and a number in a form prove nothing. Held until an
@@ -370,6 +377,7 @@ export class LeadRegistry extends DurableObject<Env> {
   async acceptPartner(input: OrderInput & { site: Exclude<SiteId, 'main'> }): Promise<AcceptResult> {
     const phoneHash = await this.hash(input.phone);
     const ipHash = await this.hash(input.ip);
+    const deviceHash = input.device ? await this.hash(`device:${input.device}`) : null;
     const { now, site } = input;
 
     // Everything below runs without awaiting, so no other order can interleave with it.
@@ -388,28 +396,69 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().n;
     if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
 
+    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, now)];
     const seq = this.nextSiteNumber(site);
-    this.sql.exec('INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, at) VALUES (?, ?, ?, ?, ?)', site, seq, phoneHash, ipHash, now);
+    this.sql.exec(
+      'INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, device_hash, at) VALUES (?, ?, ?, ?, ?, ?)',
+      site,
+      seq,
+      phoneHash,
+      ipHash,
+      deviceHash,
+      now,
+    );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
     const sheet = sheetsConfig(this.env, site);
     if (sheet) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
-        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags: input.flags }),
+        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags }),
       );
     } else {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
     }
-    // A filled-in hidden field is a script, not a person: the ads must not learn from it.
+    // A script (the hidden field), or a phone already marked as spam: the ads must not learn
+    // from it. A network marked as spam is not enough — thousands of customers share one.
     const meta = metaConfig(this.env, site);
-    if (meta && input.meta && !input.flags.includes('honeypot')) {
+    if (meta && input.meta && !flags.includes('honeypot') && !flags.includes('spam_device')) {
       this.ctx.waitUntil(
         sendMetaEvent(meta, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
       );
     }
     this.prune(now);
     return { status: 'accepted', number: seq };
+  }
+
+  /**
+   * «Keraksiz» chosen (or unchosen) for a partner order in its Google Sheet: the partner's 🚫 Спам.
+   * The order's network and device are remembered like an operator's spam mark, for both sites.
+   */
+  async markPartnerSpam(input: { site: Exclude<SiteId, 'main'>; number: number; spam: boolean; now: number }): Promise<boolean> {
+    const source = `${input.site}:${input.number}`;
+    if (!input.spam) {
+      this.sql.exec('DELETE FROM spam_marks WHERE source = ?', source);
+      return true;
+    }
+    const marked = this.sql.exec(
+      'INSERT OR REPLACE INTO spam_marks (source, ip_hash, device_hash, at) SELECT ?, ip_hash, device_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
+      source,
+      input.now,
+      input.site,
+      input.number,
+    ).rowsWritten;
+    return marked > 0;
+  }
+
+  /** An earlier order from this device or network was marked as spam within 30 days. */
+  private spamFlags(ipHash: string, deviceHash: string | null, now: number): string[] {
+    const since = now - 30 * DAY;
+    const seen = (column: 'device_hash' | 'ip_hash', value: string) =>
+      this.sql.exec(`SELECT 1 FROM spam_marks WHERE ${column} = ? AND at > ? LIMIT 1`, value, since).toArray().length > 0;
+    const flags: string[] = [];
+    if (deviceHash && seen('device_hash', deviceHash)) flags.push('spam_device');
+    if (seen('ip_hash', ipHash)) flags.push('spam_source');
+    return flags;
   }
 
   /** A partner site's own running number for its next order (1, 2, 3 …), kept across pruning. */
@@ -549,7 +598,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (input.action === 'release') {
       if (row.taker_id === null) return { changed: false, toast: 'Буни ҳали ҳеч ким олмаган.' };
       this.sql.exec('UPDATE lead_status SET taker_id = NULL, taker_name = NULL, taken_at = NULL, outcome = NULL, outcome_at = NULL WHERE lead_id = ?', input.leadId);
-      this.sql.exec('DELETE FROM spam_sources WHERE lead_id = ?', input.leadId);
+      this.sql.exec('DELETE FROM spam_marks WHERE source = ?', `lead:${input.leadId}`);
       return { changed: true, toast: 'Буюртма қайтарилди — энди бошқа оператор олиши мумкин.', line: null, keyboard: 'take', ...message() };
     }
     if (row.taker_id !== null && !mine) return { changed: false, toast: `Бу буюртмани ${row.taker_name} олган.` };
@@ -577,11 +626,11 @@ export class LeadRegistry extends DurableObject<Env> {
       input.now,
       input.leadId,
     );
-    // Spam: remember its source, so later orders from it arrive marked "⚠️ аввал спам белгиланган".
-    this.sql.exec('DELETE FROM spam_sources WHERE lead_id = ?', input.leadId);
+    // Spam: remember its network and device, so later orders from them arrive marked "⚠️ аввал спам белгиланган".
+    this.sql.exec('DELETE FROM spam_marks WHERE source = ?', `lead:${input.leadId}`);
     if (input.action === 'spam') {
       this.sql.exec(
-        'INSERT INTO spam_sources (lead_id, ip_hash, at) SELECT id, ip_hash, ? FROM leads WHERE id = ?',
+        "INSERT INTO spam_marks (source, ip_hash, device_hash, at) SELECT 'lead:' || id, ip_hash, device_hash, ? FROM leads WHERE id = ?",
         input.now,
         input.leadId,
       );
@@ -1031,7 +1080,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
-    this.sql.exec('DELETE FROM spam_sources WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM spam_marks WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM partner_leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
     // Never marked, and now too old for Meta to accept: there is nothing left to send.

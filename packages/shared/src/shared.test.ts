@@ -130,9 +130,10 @@ describe('sanitizeUtm', () => {
         medium: '=cpc',
         campaign: 'kuz<script>2026',
         content: '   ',
-        term: 'ignored',
+        term: 'A | Video 1-2 | UZ 30-55', // the ad set name ({{adset.name}})
+        placement: 'ignored',
       }),
-    ).toEqual({ source: 'instagram', medium: 'cpc', campaign: 'kuzscript2026' });
+    ).toEqual({ source: 'instagram', medium: 'cpc', campaign: 'kuzscript2026', term: 'A | Video 1-2 | UZ 30-55' });
   });
 
   it('truncates long values', () => {
