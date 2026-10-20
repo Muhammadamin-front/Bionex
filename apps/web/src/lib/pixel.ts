@@ -66,8 +66,18 @@ export function trackInitiateCheckout(): void {
   window.fbq?.('track', 'InitiateCheckout', { content_name: 'Zeynara' });
 }
 
-// There is deliberately no `Lead` here. A filled-in form is not a customer: `Lead` is sent by
-// the Worker's Conversions API call, and only once an operator has rung the customer, so the
-// ads learn from people who really answer the phone. A browser-side `Lead` would fire for every
-// form — including the ones an operator later marks spam — and no amount of de-duplication can
-// take such an event back.
+/**
+ * The main site sends no `Lead` from here. A filled-in form is not a customer: its `Lead` is
+ * sent by the Worker's Conversions API call, and only once an operator has rung the customer,
+ * so the ads learn from people who really answer the phone. A browser-side `Lead` would fire
+ * for every form — including the ones an operator later marks spam — and no amount of
+ * de-duplication can take such an event back.
+ *
+ * The partner site (VITE_META_BROWSER_LEAD=1 in apps/web/.env.t2) is the exception, by its
+ * owner's choice: every accepted form is their Lead, at once. It carries the order's
+ * submissionId as eventID, the event_id of the same Lead from the Worker, so Meta counts one.
+ */
+export function trackLead(submissionId: string): void {
+  if (import.meta.env.VITE_META_BROWSER_LEAD !== '1') return;
+  window.fbq?.('track', 'Lead', { content_name: 'Zeynara' }, { eventID: submissionId });
+}

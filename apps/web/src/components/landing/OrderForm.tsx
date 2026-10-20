@@ -6,7 +6,7 @@ import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
 import { deviceId } from '../../lib/device';
-import { trackInitiateCheckout } from '../../lib/pixel';
+import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
@@ -288,19 +288,20 @@ export function OrderForm({
       setWaitingForCheck(false);
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;
+      const { submissionId } = verification.current!;
       const response = await submitLead({
         fullName,
         phone: fullPhone,
-        submissionId: verification.current!.submissionId,
+        submissionId,
         deviceId: deviceId(),
         turnstileToken: token ?? undefined,
         [HONEYPOT_FIELD]: honeypotRef.current?.value ?? '',
         utm,
       });
       unansweredPayload.current = null;
-      // No Lead is reported from here. The Worker reports the order to Meta itself, and only
-      // after an operator has rung the customer, so the ads learn from people who really
-      // answer the phone rather than from everyone who can type a phone number.
+      // The main site reports no Lead from here: the Worker does, once an operator has rung
+      // the customer. Only the partner site sends one at once (see trackLead).
+      if (response.status === 'accepted') trackLead(submissionId);
       submittedHere.current = true;
       setBusy(false);
       // The heading already says the order was received; for a new order the body only

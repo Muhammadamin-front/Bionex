@@ -4,7 +4,7 @@ import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
-import { sendSheetOrder, sheetsConfig, type SheetVerdict } from './sheets';
+import { sendSheetOrder, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import {
   callTelegram,
@@ -242,16 +242,9 @@ export class LeadRegistry extends DurableObject<Env> {
         PRIMARY KEY (site, seq)
       );
       CREATE INDEX IF NOT EXISTS partner_leads_phone ON partner_leads (site, phone_hash, at);
-      CREATE TABLE IF NOT EXISTS partner_meta_pending (
-        site TEXT NOT NULL,
-        seq INTEGER NOT NULL,
-        event_id TEXT NOT NULL,
-        user_data TEXT NOT NULL,
-        source_url TEXT NOT NULL,
-        at INTEGER NOT NULL,
-        PRIMARY KEY (site, seq)
-      );
     `);
+    // Partner Leads briefly waited for the sheet's verdict here; they are sent at once again.
+    this.sql.exec('DROP TABLE IF EXISTS partner_meta_pending');
     // A first version kept partner orders in `leads` with these columns; they are no longer used.
     const leadColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(leads)').toArray().map((c) => c.name);
     if (leadColumns.includes('site_seq')) this.sql.exec('ALTER TABLE leads DROP COLUMN site_seq');
@@ -380,9 +373,8 @@ export class LeadRegistry extends DurableObject<Env> {
    * An order from the partner site (sites.ts). It belongs to that site's owner: it never
    * reaches the operators' group, panel, lists or reports, and it is not a repeat of an order
    * on the main site (nor the other way round). It goes to the owner's Google Sheet — whose
-   * people ring the customer — and its Lead to the owner's Meta dataset waits for their verdict
-   * in that sheet (syncPartnerSheet). Only the hashes that repeats and limits need are kept,
-   * and the match data for Meta until then (7 days at most).
+   * people ring the customer — and, at once, as a Lead to the owner's Meta dataset: nobody
+   * here presses an outcome for it. Only the hashes that repeats and limits need are kept.
    */
   async acceptPartner(input: OrderInput & { site: Exclude<SiteId, 'main'> }): Promise<AcceptResult> {
     const phoneHash = await this.hash(input.phone);
@@ -428,18 +420,12 @@ export class LeadRegistry extends DurableObject<Env> {
     } else {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
     }
-    // Held, like a main-site order's, until someone who rang the customer says in the sheet that
-    // the person is real (syncPartnerSheet). A script (the hidden field) or a phone already marked
-    // as spam is never held at all. A network marked as spam is not enough — thousands share one.
-    if (input.meta && !flags.includes('honeypot') && !flags.includes('spam_device')) {
-      this.sql.exec(
-        'INSERT INTO partner_meta_pending (site, seq, event_id, user_data, source_url, at) VALUES (?, ?, ?, ?, ?, ?)',
-        site,
-        seq,
-        input.submissionId,
-        JSON.stringify(input.meta.userData),
-        input.meta.sourceUrl,
-        now,
+    // A script (the hidden field), or a phone already marked as spam: the ads must not learn
+    // from it. A network marked as spam is not enough — thousands of customers share one.
+    const meta = metaConfig(this.env, site);
+    if (meta && input.meta && !flags.includes('honeypot') && !flags.includes('spam_device')) {
+      this.ctx.waitUntil(
+        sendMetaEvent(meta, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
       );
     }
     this.prune(now);
@@ -448,21 +434,16 @@ export class LeadRegistry extends DurableObject<Env> {
 
   /**
    * The «Holat» column of the partner's Google Sheet, read every few minutes (index.ts
-   * `scheduled`) and taken like the operators' buttons (sheets.ts `sheetVerdict`):
-   *   'real' — the order's Lead goes to the partner's dataset, once, timed when they ordered;
-   *   'spam' — never reported; its network and device are remembered like an operator's 🚫,
-   *            for both sites (marked back to something else, it is forgotten);
-   *   'wait' — nothing yet. Unmarked for 7 days, it is never reported (Meta's limit).
+   * `scheduled`): «Keraksiz» is their 🚫 Спам. A marked order's network and device are
+   * remembered like an operator's spam mark, for both sites; an order marked back is forgotten.
    */
-  async syncPartnerSheet(input: { site: Exclude<SiteId, 'main'>; rows: Array<{ number: number; verdict: SheetVerdict }>; now: number }): Promise<void> {
+  async syncPartnerSpam(input: { site: Exclude<SiteId, 'main'>; rows: Array<{ number: number; spam: boolean }>; now: number }): Promise<void> {
     for (const row of input.rows) {
       const source = `${input.site}:${row.number}`;
-      if (row.verdict === 'real') this.reportPartnerLead(input.site, row.number, input.now);
-      if (row.verdict !== 'spam') {
+      if (!row.spam) {
         this.sql.exec('DELETE FROM spam_marks WHERE source = ?', source);
         continue;
       }
-      this.sql.exec('DELETE FROM partner_meta_pending WHERE site = ? AND seq = ?', input.site, row.number);
       // OR IGNORE: a mark keeps the time it was first seen, so its 30 days do not restart on every read.
       this.sql.exec(
         'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, at) SELECT ?, ip_hash, device_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
@@ -472,28 +453,6 @@ export class LeadRegistry extends DurableObject<Env> {
         row.number,
       );
     }
-  }
-
-  /** A partner order's Lead, once its sheet says the person is real (see `reportToMeta` for ours). */
-  private reportPartnerLead(site: Exclude<SiteId, 'main'>, seq: number, now: number): void {
-    const row = this.sql
-      .exec<{ event_id: string; user_data: string; source_url: string; at: number }>(
-        'SELECT event_id, user_data, source_url, at FROM partner_meta_pending WHERE site = ? AND seq = ?',
-        site,
-        seq,
-      )
-      .toArray()[0];
-    if (!row) return;
-    this.sql.exec('DELETE FROM partner_meta_pending WHERE site = ? AND seq = ?', site, seq);
-    const cfg = metaConfig(this.env, site);
-    if (!cfg || now - row.at > META_WINDOW) return;
-    let userData: MetaUserData;
-    try {
-      userData = JSON.parse(row.user_data) as MetaUserData;
-    } catch {
-      return;
-    }
-    this.ctx.waitUntil(sendMetaEvent(cfg, { eventName: 'Lead', eventId: row.event_id, userData, eventTime: row.at, sourceUrl: row.source_url }));
   }
 
   /** An earlier order from this device or network was marked as spam within 30 days. */
@@ -1131,7 +1090,6 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
     // Never marked, and now too old for Meta to accept: there is nothing left to send.
     this.sql.exec('DELETE FROM meta_pending WHERE at < ?', now - META_WINDOW);
-    this.sql.exec('DELETE FROM partner_meta_pending WHERE at < ?', now - META_WINDOW);
   }
 
   /** Keyed hash (HMAC-SHA-256) with a random secret created on first use and kept here. */

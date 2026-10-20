@@ -8,9 +8,9 @@ import type { SiteId } from './sites';
  * The sheet is written by a small Apps Script web app in it (docs/PARTNER-SITE.md has the
  * script). It knows nothing about the columns: each send names its tab, the header row and
  * the row. «Holat» (the partner's own dropdown, copied onto each new row) and «Izoh» are left
- * for the partner's people. Every few minutes the Worker reads «Holat» back (`readSheetStatuses`)
- * and treats it like the operators' buttons (`sheetVerdict`). Reading it needs nothing the
- * script was not already allowed to do — no trigger, no extra Google permission.
+ * for the partner's people. Every few minutes the Worker reads «Holat» back (`readSheetStatuses`):
+ * «Keraksiz» there is the partner's 🚫 Спам. Reading it needs nothing the script was not already
+ * allowed to do — no trigger, no extra Google permission.
  *
  * One send per order, best effort: a failure is logged and the order is still answered
  * "accepted" — it was recorded, and the customer must not be asked to order twice.
@@ -47,18 +47,10 @@ const FLAG_TEXT: Record<string, string> = {
 };
 
 /**
- * What a «Holat» value means, read like the operators' buttons on the main site: 'spam' (the
- * partner's 🚫 Спам — never reported to Meta), 'real' (someone answered: their Lead goes to
- * Meta), or 'wait' (not rung yet, no answer, ring back — anything else). The dropdown is theirs,
- * so the words are recognised whatever their case or script.
+ * Whether a «Holat» value means "a fake order": the partner's 🚫 Спам. The dropdown is theirs,
+ * so «Keraksiz» and «Spam» are recognised whatever their case or script.
  */
-export type SheetVerdict = 'spam' | 'real' | 'wait';
-export function sheetVerdict(status: unknown): SheetVerdict {
-  const s = String(status ?? '');
-  if (/keraksiz|кераксиз|spam|спам/i.test(s)) return 'spam';
-  if (/kerakli|керакли|sotildi|сотилди|rad etdi|рад этди/i.test(s)) return 'real';
-  return 'wait';
-}
+export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз|spam|спам/i.test(String(status ?? ''));
 
 export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
   if (site !== 't2' || !env.SHEETS_T2_URL || !env.SHEETS_T2_SECRET) return null;
@@ -81,8 +73,8 @@ const tashkentTime = (ms: number) =>
  */
 const asText = (value: string) => (/^[=+\-@]/.test(value) ? `'${value}` : value);
 
-/** Each order's number and what its «Holat» says; null when the sheet could not be read. */
-export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ number: number; verdict: SheetVerdict }> | null> {
+/** Each order's number and whether its «Holat» says spam; null when the sheet could not be read. */
+export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ number: number; spam: boolean }> | null> {
   try {
     const res = await fetch(cfg.url, {
       method: 'POST',
@@ -94,7 +86,7 @@ export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ numb
     if (!Array.isArray(rows)) return null;
     return rows
       .filter((r): r is [unknown, unknown] => Array.isArray(r) && Number.isInteger(Number(r[0])) && Number(r[0]) > 0)
-      .map(([number, status]) => ({ number: Number(number), verdict: sheetVerdict(status) }));
+      .map(([number, status]) => ({ number: Number(number), spam: isSpamStatus(status) }));
   } catch (err) {
     console.error('Google Sheets statuses unreadable', (err as Error)?.message);
     return null;
