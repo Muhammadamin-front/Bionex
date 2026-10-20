@@ -71,7 +71,10 @@
 - ✅ IPs and phone numbers are stored only as HMAC hashes (secret generated inside the
   Durable Object), for 30 days.
 - ✅ Name and number are stored in clear only while a message waits for Telegram, and for
-  7 days for the operators' `/royxat` list (then deleted).
+  30 days for the operators' `/royxat` list and panel, archive included (then deleted).
+- ✅ The panel's browser link (`/panel?key=…`) is personal, signed with the bot token, valid
+  7 days, sent only in a private chat, and still checked against group membership on every
+  request. `TELEGRAM_DRY_RUN` skips panel sign-in only on `localhost`.
 - ✅ Nothing personal is written to logs.
 - ✅ Meta Conversions API (only when **both** `META_PIXEL_ID` and `META_CAPI_TOKEN` are set):
   once an operator has rung the customer and pressed ✅ or ❌, Meta is sent a one-way

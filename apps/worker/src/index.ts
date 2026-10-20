@@ -2,7 +2,7 @@ import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorC
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
 import { site } from '../../web/src/config/product';
 import { buildUserData, metaConfig } from './meta';
-import { isGroupMember, panelApi, panelPage } from './panel';
+import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
@@ -51,8 +51,8 @@ const CONFIG_ALERT: Record<string, string> = {
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
-    // The operators' Mini App (served by the Worker for its own CSP, so Telegram can frame it).
-    if (url.pathname === '/panel' && (request.method === 'GET' || request.method === 'HEAD')) return panelPage();
+    // The operators' Mini App & Table CRM (served by the Worker for its own CSP).
+    if ((url.pathname === '/panel' || url.pathname === '/crm') && (request.method === 'GET' || request.method === 'HEAD')) return panelPage();
     if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
@@ -246,7 +246,7 @@ async function telegramCommand(request: Request, env: Env, origin: string): Prom
     if (command === 'royxat' || command === 'list') await registry.listNow(now, thread);
     else if (command === 'holat' || command === 'status') await registry.reportStatus(now, thread);
     else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now, thread);
-    else if (command === 'panel') await sendPanelButton(env, Number(message.chat.id), thread);
+    else if (command === 'panel' || command === 'crm') await sendPanelButton(env, Number(message.chat.id), thread);
     else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now, thread);
   } catch (err) {
     console.error('Telegram command failed', (err as Error)?.message);
@@ -336,7 +336,7 @@ async function sendPanelButton(env: Env, chatId: number, thread?: number): Promi
   const sent = await callTelegram<{ message_id: number }>(cfg, 'sendMessage', {
     chat_id: chatId,
     ...(thread ? { message_thread_id: thread } : {}),
-    text: '📊 <b>Операторлар панели</b>\nБарча буюртмалар, кунлик сонлар, сотилди / сотилмади, спам. Фақат шу гуруҳ аъзолари учун.',
+    text: '📊 <b>Операторлар панели (Жадвал CRM)</b>\nБарча буюртмалар, таргет (кампания / ad set / видео) статистикаси, сотилди / сотилмади, спам. Фақат шу гуруҳ аъзолари учун.\n\n🖥 Компьютерда очиш учун ботга шахсий хабарда /panel деб ёзинг — ўзингизнинг ҳаволангизни оласиз.',
     parse_mode: 'HTML',
     reply_markup: panelKeyboard(`https://t.me/${me.username}?startapp=panel`),
   });
@@ -349,13 +349,24 @@ async function customerChat(message: TelegramMessage, env: Env, origin: string):
   const cfg = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
   // An operator can open the panel privately, without posting in the operators' group.
   // (web_app buttons work in private chats, so this needs no BotFather setup.)
-  if (/^\/panel\b/i.test(message.text?.trim() ?? '')) {
+  if (/^\/(panel|crm)\b/i.test(message.text?.trim() ?? '')) {
     const member = await isGroupMember(cfg, message.from.id);
+    const name = [message.from.first_name, message.from.last_name].filter(Boolean).join(' ') || 'Оператор';
+    const key = member ? await signWebToken({ id: message.from.id, name }, env.TELEGRAM_BOT_TOKEN) : '';
     await callTelegram(cfg, 'sendMessage', {
       chat_id: message.chat.id,
-      text: member ? '📊 <b>Операторлар панели</b>' : 'Бу буйруқ фақат операторлар учун.',
+      text: member ? '📊 <b>Операторлар панели (Жадвал CRM)</b>' : 'Бу буйруқ фақат операторлар учун.',
       parse_mode: 'HTML',
-      ...(member ? { reply_markup: { inline_keyboard: [[{ text: '📊 Панелни очиш', web_app: { url: `${origin}/panel` } }]] } } : {}),
+      ...(member
+        ? {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📊 Панелни очиш', web_app: { url: `${origin}/panel` } }],
+                [{ text: '🖥 Катта экранда очиш (Браузер CRM)', url: `${origin}/panel?key=${encodeURIComponent(key)}` }],
+              ],
+            },
+          }
+        : {}),
     });
     return;
   }

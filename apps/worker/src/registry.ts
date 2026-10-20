@@ -19,6 +19,7 @@ import {
   takeKeyboard,
   TelegramError,
   todayTitle,
+  utmParts,
   webhookSecret,
   type InlineKeyboard,
   type LeadOutcome,
@@ -34,6 +35,8 @@ const PHONE_REQUESTS_PER_HOUR = 5;
 const GIVE_UP_AFTER = 7 * DAY;
 /** Meta's Conversions API refuses events older than this, so unmarked orders expire with it. */
 const META_WINDOW = 7 * DAY;
+/** At most this many orders reach the panel at once. */
+const PANEL_LIMIT = 1000;
 /**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
@@ -92,6 +95,10 @@ export interface PanelLead {
   phone: string;
   createdAt: number;
   source: string | null;
+  platform: string | null;
+  campaign: string | null;
+  adset: string | null;
+  ad: string | null;
   flagged: boolean;
   takerId: number | null;
   takerName: string | null;
@@ -101,6 +108,10 @@ export interface PanelLead {
 
 export interface PanelData {
   leads: PanelLead[];
+  /** The query hit its row cap: older orders of the period are missing. */
+  truncated: boolean;
+  /** Orders moved to the archive (the panel's "🗄 Архив" view) and not yet pruned. */
+  archived: number;
   /** The last 14 days, oldest first: orders, sold, spam per day. */
   days: Array<{ date: number; total: number; sold: number; spam: number }>;
 }
@@ -210,6 +221,12 @@ export class LeadRegistry extends DurableObject<Env> {
     // For the operators' panel: the order's group message (to update it) and where it came from.
     if (!listColumns.includes('msg_html')) this.sql.exec('ALTER TABLE list_items ADD COLUMN msg_html TEXT');
     if (!listColumns.includes('source')) this.sql.exec('ALTER TABLE list_items ADD COLUMN source TEXT');
+    if (!listColumns.includes('platform')) this.sql.exec('ALTER TABLE list_items ADD COLUMN platform TEXT');
+    if (!listColumns.includes('campaign')) this.sql.exec('ALTER TABLE list_items ADD COLUMN campaign TEXT');
+    if (!listColumns.includes('adset')) this.sql.exec('ALTER TABLE list_items ADD COLUMN adset TEXT');
+    if (!listColumns.includes('ad')) this.sql.exec('ALTER TABLE list_items ADD COLUMN ad TEXT');
+    // Set when operators clear the panel (e.g. before new ad sets start); the order stays in the archive view.
+    if (!listColumns.includes('archived_at')) this.sql.exec('ALTER TABLE list_items ADD COLUMN archived_at INTEGER');
     this.sql.exec(
       'CREATE TABLE IF NOT EXISTS spam_sources (lead_id INTEGER PRIMARY KEY, ip_hash TEXT NOT NULL, at INTEGER NOT NULL)',
     );
@@ -304,10 +321,16 @@ export class LeadRegistry extends DurableObject<Env> {
       list: list ? { count: list.count, size: list.size } : undefined,
       via: input.via,
     });
+    const parts = utmParts(input.utm);
+    const platform = input.via ? 'Telegram бот' : parts.platform;
     this.sql.exec(
-      'UPDATE list_items SET msg_html = ?, source = ? WHERE lead_id = ?',
+      'UPDATE list_items SET msg_html = ?, source = ?, platform = ?, campaign = ?, adset = ?, ad = ? WHERE lead_id = ?',
       text,
       input.via ? 'Telegram бот' : sourceLabel(input.utm),
+      platform,
+      input.via ? null : parts.campaign,
+      input.via ? null : parts.adset,
+      input.via ? null : parts.ad,
       leadId,
     );
     // The order first, then (if it completed one) the list under it.
@@ -553,9 +576,12 @@ export class LeadRegistry extends DurableObject<Env> {
     }
   }
 
-  /** The operators' panel: orders of the last `days` days (names and numbers are kept 7 days) and 14 days of totals. */
-  async panelData(input: { days: number; now: number }): Promise<PanelData> {
-    const since = tashkentDayStart(input.now) - (Math.min(Math.max(input.days, 1), 7) - 1) * DAY;
+  /**
+   * The operators' panel: orders of the last `days` days (names and numbers are kept 30 days) and 14 days of totals.
+   * `archive` shows the orders moved out of the panel instead of the current ones.
+   */
+  async panelData(input: { days: number; now: number; archive?: boolean }): Promise<PanelData> {
+    const since = tashkentDayStart(input.now) - (Math.min(Math.max(input.days, 1), 30) - 1) * DAY;
     const leads = this.sql
       .exec<{
         lead_id: number;
@@ -563,31 +589,49 @@ export class LeadRegistry extends DurableObject<Env> {
         phone: string;
         at: number;
         source: string | null;
+        platform: string | null;
+        campaign: string | null;
+        adset: string | null;
+        ad: string | null;
         flagged: number;
         taker_id: number | null;
         taker_name: string | null;
         outcome: string | null;
         outcome_at: number | null;
       }>(
-        `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.flagged,
+        `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.platform, li.campaign, li.adset, li.ad, li.flagged,
                 ls.taker_id, ls.taker_name, ls.outcome, ls.outcome_at
            FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
-          WHERE li.at >= ? ORDER BY li.lead_id DESC LIMIT 500`,
+          WHERE li.at >= ? AND li.archived_at IS ${input.archive ? 'NOT NULL' : 'NULL'}
+          ORDER BY li.lead_id DESC LIMIT ${PANEL_LIMIT}`,
         since,
       )
       .toArray()
-      .map((r) => ({
-        number: r.lead_id,
-        name: r.name,
-        phone: r.phone,
-        createdAt: r.at,
-        source: r.source,
-        flagged: r.flagged === 1,
-        takerId: r.taker_id,
-        takerName: r.taker_name,
-        outcome: r.outcome as LeadOutcome | null,
-        outcomeAt: r.outcome_at,
-      }));
+      .map((r) => {
+        // Fallback for older rows stored before separate campaign/adset/ad columns existed.
+        const legacyParts = !r.platform && r.source ? r.source.split(' · ') : [];
+        const platform = r.platform ?? (legacyParts[0] || null);
+        const campaign = r.campaign ?? (legacyParts[1] || null);
+        const adset = r.adset ?? (legacyParts.length >= 4 ? legacyParts[2]! : null);
+        const ad = r.ad ?? (legacyParts.length >= 4 ? legacyParts[3]! : legacyParts[2] || null);
+        return {
+          number: r.lead_id,
+          name: r.name,
+          phone: r.phone,
+          createdAt: r.at,
+          source: r.source,
+          platform,
+          campaign,
+          adset,
+          ad,
+          flagged: r.flagged === 1,
+          takerId: r.taker_id,
+          takerName: r.taker_name,
+          outcome: r.outcome as LeadOutcome | null,
+          outcomeAt: r.outcome_at,
+        };
+      });
+
     const first = tashkentDayStart(input.now) - 13 * DAY;
     const rows = this.sql
       .exec<{ created_at: number; outcome: string | null }>('SELECT created_at, outcome FROM lead_status WHERE created_at >= ?', first)
@@ -600,7 +644,20 @@ export class LeadRegistry extends DurableObject<Env> {
       if (r.outcome === 'sold') d.sold++;
       if (r.outcome === 'spam') d.spam++;
     }
-    return { leads, days };
+    const archived = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM list_items WHERE archived_at IS NOT NULL').one().n;
+    return { leads, truncated: leads.length === PANEL_LIMIT, archived, days };
+  }
+
+  /** Clears the panel: every current order moves to the archive. Returns how many moved and how many were still open. */
+  async archivePanel(now: number): Promise<{ moved: number; open: number }> {
+    const open = this.sql
+      .exec<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
+          WHERE li.archived_at IS NULL AND (ls.outcome IS NULL OR ls.outcome IN ('noanswer', 'callback'))`,
+      )
+      .one().n;
+    const moved = this.sql.exec('UPDATE list_items SET archived_at = ? WHERE archived_at IS NULL', now).rowsWritten;
+    return { moved, open };
   }
 
   /** The day's numbers for the group: every evening by cron, and on /hisobot. */
@@ -894,7 +951,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM hits WHERE at < ?', now - DAY);
     this.sql.exec('DELETE FROM submissions WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
-    this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 7 * DAY);
+    this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM spam_sources WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);

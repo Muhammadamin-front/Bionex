@@ -24,6 +24,34 @@ const isAdId = (value: string | undefined): boolean => !value || /^\d{6,}$/.test
 /** Campaign names run long; the operator only needs enough of one to tell two ads apart. */
 const shorten = (value: string, max = 42): string => (value.length <= max ? value : `${value.slice(0, max - 1).trimEnd()}…`);
 
+const KNOWN_SOURCES: Record<string, string> = {
+  ig: 'Instagram',
+  instagram: 'Instagram',
+  fb: 'Facebook',
+  facebook: 'Facebook',
+  tg: 'Telegram',
+  telegram: 'Telegram',
+  google: 'Google',
+  youtube: 'YouTube',
+};
+
+export interface UtmParts {
+  platform: string | null;
+  campaign: string | null;
+  adset: string | null;
+  ad: string | null;
+}
+
+/** Extracts separate platform, campaign, ad set (target), and video/ad names for the CRM table. */
+export function utmParts(utm: Record<string, string | undefined>): UtmParts {
+  const src = (utm.source ?? '').toLowerCase();
+  const platform = KNOWN_SOURCES[src] ?? (utm.source || null);
+  const campaign = !isAdId(utm.campaign) ? shorten(utm.campaign!, 80) : null;
+  const ad = !isAdId(utm.content) ? shorten(utm.content!, 80) : null;
+  const adset = !isAdId(utm.term) ? shorten(utm.term!, 80) : null;
+  return { platform, campaign, adset, ad };
+}
+
 /**
  * Where the visitor came from, in words an operator understands (ad ids are left out).
  *
@@ -34,17 +62,7 @@ const shorten = (value: string, max = 42): string => (value.length <= max ? valu
  */
 export function sourceLabel(utm: Record<string, string | undefined>): string | null {
   const src = (utm.source ?? '').toLowerCase();
-  const known: Record<string, string> = {
-    ig: 'Instagram',
-    instagram: 'Instagram',
-    fb: 'Facebook',
-    facebook: 'Facebook',
-    tg: 'Telegram',
-    telegram: 'Telegram',
-    google: 'Google',
-    youtube: 'YouTube',
-  };
-  const name = known[src] ?? (utm.source || null);
+  const name = KNOWN_SOURCES[src] ?? (utm.source || null);
   if (!name) return null;
   const parts: string[] = [];
   for (const value of [utm.campaign, utm.term, utm.content]) {

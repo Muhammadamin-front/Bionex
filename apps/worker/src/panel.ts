@@ -12,6 +12,8 @@ import { callTelegram, escapeHtml, outcomeKeyboard, STATUS_MARK, takeKeyboard, t
  */
 
 const MAX_AGE_SECONDS = 24 * 3600;
+/** A browser link is personal and can be forwarded, so it lasts a week (the group check still runs on every request). */
+const WEB_MAX_AGE_SECONDS = 7 * 24 * 3600;
 const ACTIONS = new Set(['take', 'release', 'sold', 'noanswer', 'callback', 'rejected', 'spam']);
 
 export interface PanelUser {
@@ -24,6 +26,44 @@ const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString
 async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
   const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', k, new TextEncoder().encode(data));
+}
+
+/**
+ * Signs a browser access token for a group member so they can open `/panel` (or `/crm`) in a
+ * full desktop/mobile browser tab outside Telegram's small Mini App popup.
+ */
+export async function signWebToken(user: PanelUser, botToken: string, nowSeconds = Math.floor(Date.now() / 1000)): Promise<string> {
+  const params = new URLSearchParams({
+    id: String(user.id),
+    name: user.name.slice(0, 40),
+    t: String(nowSeconds),
+  });
+  const payload = params.toString();
+  const sig = hex(await hmac(new TextEncoder().encode(`zeynara-web-crm:${botToken}`), payload));
+  return `${btoa(encodeURIComponent(payload))}.${sig}`;
+}
+
+export async function verifyWebToken(token: string, botToken: string, nowSeconds: number): Promise<PanelUser | null> {
+  const dot = token.indexOf('.');
+  if (dot < 1) return null;
+  let payload: string;
+  try {
+    payload = decodeURIComponent(atob(token.slice(0, dot)));
+  } catch {
+    return null;
+  }
+  const sig = token.slice(dot + 1);
+  const expected = hex(await hmac(new TextEncoder().encode(`zeynara-web-crm:${botToken}`), payload));
+  if (expected.length !== sig.length) return null;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+  if (diff !== 0) return null;
+  const params = new URLSearchParams(payload);
+  const id = Number(params.get('id'));
+  const t = Number(params.get('t'));
+  const name = params.get('name') || 'Оператор';
+  if (!Number.isInteger(id) || id < 1 || !t || nowSeconds - t > WEB_MAX_AGE_SECONDS) return null;
+  return { id, name };
 }
 
 /** Telegram's Mini App check: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app */
@@ -101,20 +141,44 @@ export function panelPage(): Response {
 
 /** /api/panel/* — data and actions for group members only. */
 export async function panelApi(request: Request, env: Env, url: URL): Promise<Response> {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return json(503, { error: 'not_configured' });
+  // Dry run (local dev without a bot) skips sign-in, but only on this machine: never on a public address.
+  const dryRun = env.TELEGRAM_DRY_RUN === '1' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+  if (!dryRun && (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID)) return json(503, { error: 'not_configured' });
   const cfg: TelegramConfig = { token: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID, apiBase: env.TELEGRAM_API_BASE || undefined };
   const auth = request.headers.get('authorization') ?? '';
-  const user = auth.startsWith('tma ') ? await verifyInitData(auth.slice(4), env.TELEGRAM_BOT_TOKEN, Math.floor(Date.now() / 1000)) : null;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let user: PanelUser | null = null;
+  if (auth.startsWith('tma ') && auth.slice(4)) {
+    user = await verifyInitData(auth.slice(4), env.TELEGRAM_BOT_TOKEN, nowSeconds);
+  } else if (auth.startsWith('web ') && auth.slice(4)) {
+    user = await verifyWebToken(auth.slice(4), env.TELEGRAM_BOT_TOKEN, nowSeconds);
+  } else if (dryRun) {
+    user = { id: 1, name: 'Оператор (Локал)' };
+  }
   if (!user) return json(401, { error: 'unauthorized', message: 'Панелни Telegram ичида, гуруҳдаги тугма орқали очинг.' });
-  if (!(await isGroupMember(cfg, user.id))) {
+  if (!dryRun && !(await isGroupMember(cfg, user.id))) {
     return json(403, { error: 'forbidden', message: 'Бу панел фақат «Bionex Leads» гуруҳи аъзолари учун.' });
   }
   const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
 
   if (url.pathname === '/api/panel/data' && request.method === 'GET') {
     const days = Number(url.searchParams.get('days') ?? 1) || 1;
-    const data = await registry.panelData({ days, now: Date.now() });
+    const data = await registry.panelData({ days, now: Date.now(), archive: url.searchParams.get('archive') === '1' });
     return json(200, { me: user, ...data });
+  }
+
+  if (url.pathname === '/api/panel/archive' && request.method === 'POST') {
+    const origin = request.headers.get('origin');
+    if (origin && origin !== url.origin) return json(403, { error: 'forbidden' });
+    const { moved, open } = await registry.archivePanel(Date.now());
+    if (moved && !dryRun) {
+      await callTelegram(cfg, 'sendMessage', {
+        chat_id: cfg.chatId,
+        text: `🗄 ${escapeHtml(user.name)} панелни тозалади: ${moved} та буюртма архивга ўтди${open ? ` (улардан ${open} таси ҳали якунланмаган)` : ''}.`,
+        parse_mode: 'HTML',
+      }).catch((err) => console.error('Panel: could not announce the archive', (err as Error)?.message));
+    }
+    return json(200, { moved, open, message: moved ? `${moved} та буюртма архивга ўтказилди.` : 'Панел аллақачон тоза.' });
   }
 
   if (url.pathname === '/api/panel/action' && request.method === 'POST') {

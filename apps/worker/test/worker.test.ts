@@ -625,10 +625,13 @@ describe("the operators' Mini App panel", () => {
   });
 
   it('/panel posts and pins the button that opens the panel', async () => {
-    await hook({ message: { message_id: 4, chat: { id: Number(CHAT) }, text: '/panel' } });
+    await hook({ message: { message_id: 4, chat: { id: Number(CHAT) }, from: { id: 11, first_name: 'Ойша' }, text: '/panel' } });
     const msg = telegram.messages.at(-1) as unknown as { text: string; reply_markup: { inline_keyboard: Array<Array<{ url: string }>> } };
     expect(msg.text).toContain('Операторлар панели');
     expect(msg.reply_markup.inline_keyboard[0]![0]!.url).toBe('https://t.me/bionexecobot?startapp=panel');
+    // A personal browser key is never posted (and pinned) where the whole group sees it.
+    expect(msg.reply_markup.inline_keyboard).toHaveLength(1);
+    expect(JSON.stringify(msg)).not.toContain('key=');
     expect(telegram.calls.some((c) => c.method === 'pinChatMessage')).toBe(true);
   });
 
@@ -636,13 +639,67 @@ describe("the operators' Mini App panel", () => {
     const dm = (userId: number) =>
       hook({ message: { message_id: 5, chat: { id: userId, type: 'private' }, from: { id: userId, first_name: 'X' }, text: '/panel' } });
     await dm(11);
-    const mine = telegram.messages.at(-1) as unknown as { chat_id: number; reply_markup: { inline_keyboard: Array<Array<{ web_app: { url: string } }>> } };
+    const mine = telegram.messages.at(-1) as unknown as {
+      chat_id: number;
+      reply_markup: { inline_keyboard: Array<Array<{ web_app?: { url: string }; url?: string }>> };
+    };
     expect(mine.chat_id).toBe(11);
-    expect(mine.reply_markup.inline_keyboard[0]![0]!.web_app.url).toBe(`${SITE}/panel`);
+    expect(mine.reply_markup.inline_keyboard[0]![0]!.web_app!.url).toBe(`${SITE}/panel`);
+    // Also provides a signed browser link for the full-screen Table CRM.
+    const webUrl = mine.reply_markup.inline_keyboard[1]![0]!.url!;
+    expect(webUrl).toContain(`${SITE}/panel?key=`);
+    const key = new URL(webUrl).searchParams.get('key')!;
+    const webRes = await mf.dispatchFetch(`${SITE}/api/panel/data?days=1`, {
+      headers: { authorization: `web ${key}` },
+    });
+    expect(webRes.status).toBe(200);
+
     await dm(555);
     const other = telegram.messages.at(-1) as unknown as { text: string; reply_markup?: unknown };
     expect(other.text).toBe('Бу буйруқ фақат операторлар учун.');
     expect(other.reply_markup).toBeUndefined();
+  });
+
+  it('keeps campaign, ad set (utm_term) and video (utm_content) per lead', async () => {
+    await order(
+      {
+        fullName: 'Дилноза Каримова',
+        phone: '+998 90 312 45 96',
+        utm: { source: 'facebook', campaign: 'qon-bosimi', term: 'A | Video 1-2 | UZ 30-55', content: 'video1' },
+      },
+      { ip: '203.0.113.96' },
+    );
+    // No utm_term: the ad set stays unknown rather than guessed from the video's name.
+    await order({ fullName: 'Санжар Рахимов', phone: '+998 90 312 45 97', utm: { source: 'facebook', campaign: 'qon-bosimi', content: 'video3' } }, { ip: '203.0.113.97' });
+    const data = (await (await panel('/api/panel/data?days=7', { auth: await initData(ali) })).json()) as {
+      leads: Array<{ number: number; platform: string | null; campaign: string | null; adset: string | null; ad: string | null }>;
+      truncated: boolean;
+    };
+    expect(data.truncated).toBe(false);
+    expect(data.leads[0]).toMatchObject({ number: 2, platform: 'Facebook', campaign: 'qon-bosimi', adset: null, ad: 'video3' });
+    expect(data.leads[1]).toMatchObject({ number: 1, platform: 'Facebook', campaign: 'qon-bosimi', adset: 'A | Video 1-2 | UZ 30-55', ad: 'video1' });
+  });
+
+  it('clearing the panel moves every order to the archive, where it can still be worked', async () => {
+    await order({ fullName: 'Эски Буюртма', phone: '+998 90 312 45 98' }, { ip: '203.0.113.98' });
+    const auth = await initData(ali);
+    expect((await panel('/api/panel/archive', { auth, method: 'GET' })).status).toBe(404);
+    const r = (await (await panel('/api/panel/archive', { auth, method: 'POST' })).json()) as { moved: number; open: number };
+    expect(r).toMatchObject({ moved: 1, open: 1 });
+    expect(telegram.messages.at(-1)!.text).toContain('1 та буюртма архивга ўтди');
+
+    await order({ fullName: 'Янги Буюртма', phone: '+998 90 312 45 99' }, { ip: '203.0.113.99' });
+    type Data = { leads: Array<{ name: string }>; archived: number; days: Array<{ total: number }> };
+    const current = (await (await panel('/api/panel/data?days=1', { auth })).json()) as Data;
+    expect(current.leads.map((l) => l.name)).toEqual(['Янги Буюртма']);
+    expect(current.archived).toBe(1);
+    expect(current.days.at(-1)!.total).toBe(2); // the daily totals are not touched
+    const archive = (await (await panel('/api/panel/data?days=1&archive=1', { auth })).json()) as Data;
+    expect(archive.leads.map((l) => l.name)).toEqual(['Эски Буюртма']);
+    expect(((await (await panel('/api/panel/action', { auth, method: 'POST', body: { leadId: 1, action: 'take' } })).json()) as { changed: boolean }).changed).toBe(true);
+    // Only group members can clear it.
+    expect((await panel('/api/panel/archive', { auth: await initData({ id: 555, first_name: 'Бегона' }), method: 'POST' })).status).toBe(403);
+    expect(((await (await panel('/api/panel/archive', { auth, method: 'POST' })).json()) as { moved: number }).moved).toBe(1);
   });
 
   async function hook(update: unknown) {
@@ -865,12 +922,14 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
   });
 
   it('reports the moment the customer ordered, not the moment the operator pressed', async () => {
-    const ordered = Math.floor(Date.now() / 1000);
+    const before = Math.floor(Date.now() / 1000);
     await order();
+    const after = Math.floor(Date.now() / 1000); // the order may straddle a second boundary
     await new Promise((r) => setTimeout(r, 1100)); // the operator calls back later
     await press('s:1:sold');
     const [event] = await settled();
-    expect(event!.event_time).toBe(ordered);
+    expect(event!.event_time).toBeGreaterThanOrEqual(before);
+    expect(event!.event_time).toBeLessThanOrEqual(after);
   });
 
   it('reports a customer who said no: a real person, which is what the ads must look for', async () => {

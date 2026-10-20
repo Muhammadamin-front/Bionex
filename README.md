@@ -109,13 +109,16 @@ health check, and re-checks it daily):
   every step is the same, but no order is created — the group gets a "🧪 СИНОВ — қўнғироқ
   қилманг" note in the reports topic, with no button, number or list entry;
 - `/panel` — posts and pins the button that opens the **operators' Mini App** (`/panel`): orders of
-  today / 3 / 7 days with search and tabs (untaken, mine, sold, no answer, rejected, spam or
-  suspicious), take / outcome / spam / hand-back buttons that also update the group message,
-  totals, conversion and a 14-day chart. Set it up once: @BotFather → your bot → Bot Settings →
+  today / 3 / 7 / 14 / 30 days in a sortable table with search, tabs (untaken, mine, sold, no
+  answer, rejected, spam or suspicious) and campaign / ad set (`utm_term`) / video (`utm_content`)
+  filters, take / outcome / spam / hand-back buttons that also update the group message, totals,
+  conversion per target, CSV export, and «🧹 Панелни тозалаш», which moves every current order to
+  «🗄 Архив» (still workable there) so new ad sets start from zero. Set it up once: @BotFather → your bot → Bot Settings →
   Configure Mini App → URL `https://<site>/panel`. Only members of the operators' group get data
   (Telegram-signed initData + `getChatMember`). Marking an order spam flags later orders from
   the same source "⚠️ аввал спам белгиланган". A group member can also open it privately: send
-  `/panel` to the bot in a private chat (others get "only for operators");
+  `/panel` to the bot in a private chat (others get "only for operators"); that reply also has a
+  personal 7-day link for a full browser tab (`/panel?key=…`, never posted in the group);
 - `/hisobot` — the day's report (sold, no answer, rejected, untaken, per operator); it also
   arrives by itself every day at 20:00 Tashkent time (cron in `wrangler.jsonc`).
 
