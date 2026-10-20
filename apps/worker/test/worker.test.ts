@@ -31,7 +31,12 @@ let turnstileCalls = 0;
 const meta = {
   bodies: [] as Array<{ access_token: string; test_event_code?: string; data: Array<Record<string, any>> }>,
   events: [] as Array<Record<string, any>>,
+  /** The request path of each body: it names the dataset (/v21.0/<pixel id>/events). */
+  paths: [] as string[],
 };
+
+/** Fake Apps Script web app of the partner's Google Sheet: every row it was sent. */
+const sheets = { rows: [] as Array<Record<string, any>> };
 
 async function outbound(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -39,7 +44,13 @@ async function outbound(request: Request): Promise<Response> {
     const body = (await request.json()) as { access_token: string; data: Array<Record<string, any>> };
     meta.bodies.push(body);
     meta.events.push(...body.data);
+    meta.paths.push(url.pathname);
     return Response.json({ events_received: body.data.length, fbtrace_id: 'test' });
+  }
+  if (url.hostname === 'sheets.mock') {
+    const row = (await request.json()) as Record<string, any>;
+    sheets.rows.push(row);
+    return new Response(row.secret === 'sheet-secret' ? 'ok' : 'forbidden');
   }
   if (url.hostname === 'turnstile.mock') {
     turnstileCalls++;
@@ -52,7 +63,7 @@ async function outbound(request: Request): Promise<Response> {
       success: true,
       action: 'lead-submit',
       cdata: token === 'other-form' ? 'something-else' : cdata,
-      hostname: token === 'other-site' ? 'evil.example' : 'zeynara.example',
+      hostname: token === 'other-site' ? 'evil.example' : token === 'partner' ? 'zeynaraa-uz.example' : 'zeynara.example',
     });
   }
   if (url.hostname === 'telegram.mock') {
@@ -80,11 +91,16 @@ async function outbound(request: Request): Promise<Response> {
 
 function start(bindings: Record<string, string> = {}) {
   return new Miniflare(convertV4MiniflareOptions({
+    name: 'zeynara',
     modules: true,
     script,
     compatibilityDate: '2026-10-01',
     durableObjects: { REGISTRY: { className: 'LeadRegistry', useSQLite: true } },
-    serviceBindings: { ASSETS: () => new Response('<!doctype html><title>site</title>') },
+    serviceBindings: {
+      ASSETS: () => new Response('<!doctype html><title>site</title>'),
+      // What the partner site's Pages function is bound to (apps/partner/wrangler.jsonc).
+      PARTNER: { name: 'zeynara', entrypoint: 'PartnerSite' },
+    },
     outboundService: outbound,
     bindings: {
       IP_ORDERS_PER_HOUR: '3',
@@ -154,6 +170,8 @@ beforeEach(async () => {
   turnstileCalls = 0;
   meta.bodies = [];
   meta.events = [];
+  meta.paths = [];
+  sheets.rows = [];
 });
 
 afterAll(async () => {
@@ -1075,3 +1093,107 @@ async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+describe('the partner site (sites.ts t2)', () => {
+  const PARTNER_SITE = 'https://zeynaraa-uz.example';
+  const MAIN_PIXEL = '1109358048693673';
+  const PARTNER_PIXEL = '1783794022832394';
+
+  beforeEach(async () => {
+    await mf.dispose();
+    mf = start({
+      META_PIXEL_ID: MAIN_PIXEL,
+      META_CAPI_TOKEN: 'EAA-main',
+      META_T2_PIXEL_ID: PARTNER_PIXEL,
+      META_T2_CAPI_TOKEN: 'EAA-partner',
+      META_API_BASE: 'https://graph.mock',
+      SHEETS_T2_URL: 'https://sheets.mock/exec',
+      SHEETS_T2_SECRET: 'sheet-secret',
+    });
+  });
+
+  /** The Pages function forwards the customer's request unchanged over the service binding. */
+  async function partner(path: string, init: RequestInit = {}) {
+    const { PARTNER } = await mf.getBindings<{ PARTNER: { fetch(url: string, init?: RequestInit): Promise<Response> } }>();
+    return PARTNER.fetch(`${PARTNER_SITE}${path}`, init);
+  }
+  const partnerOrder = (body: Record<string, unknown>, ip: string) =>
+    partner('/api/leads', {
+      method: 'POST',
+      // No Origin: Miniflare's binding proxy refuses any request carrying one. The origin check
+      // itself is the same code as the main site's and is tested there.
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+      body: JSON.stringify({ submissionId: sid(), turnstileToken: 'partner', ...body }),
+    });
+
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const press = async (data: string) =>
+    mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+      body: JSON.stringify({
+        update_id: 1,
+        callback_query: { id: `cb${Math.random()}`, from: { id: 11, first_name: 'Ойша' }, data, message: { message_id: 1001, chat: { id: Number(CHAT) }, text: '🆕' } },
+      }),
+    });
+  /** Rows and events leave after the answer (waitUntil), so give them a moment. */
+  const until = async (done: () => boolean) => {
+    for (let i = 0; i < 50 && !done(); i++) await new Promise((r) => setTimeout(r, 10));
+  };
+
+  it('go to its sheet alone, with the phone number, and never to the operators’ group', async () => {
+    const res = await partnerOrder(
+      { fullName: 'Дилноза Каримова', phone: '+998 90 312 45 80', utm: { source: 'facebook', campaign: 'qon-bosimi', term: 'A', content: 'Video 1' } },
+      '203.0.113.80',
+    );
+    expect(res.status).toBe(201);
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows[0]).toMatchObject({ secret: 'sheet-secret', sheet: 'Lidlar' });
+    expect(sheets.rows[0]!.headers.slice(0, 4)).toEqual(['№', 'Sana', 'Ism', 'Telefon']);
+    const [number, , name, phone, campaign, adset, ad, flags] = sheets.rows[0]!.row;
+    expect([number, name, phone, campaign, adset, ad, flags]).toEqual([1, 'Дилноза Каримова', "'+998 90 312 45 80", 'qon-bosimi', 'A', 'Video 1', '']);
+    await new Promise((r) => setTimeout(r, 100));
+    // Not in the group, not in the lists, and the bot's webhook is left alone.
+    expect(telegram.messages).toHaveLength(0);
+    expect(telegram.calls.some((c) => c.method === 'setWebhook')).toBe(false);
+  });
+
+  it('numbers its own orders, and is no repeat of a main-site order', async () => {
+    expect((await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' })).status).toBe(201);
+    // The same customer on the partner site: theirs, not a repeat of ours.
+    expect(await (await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 81' }, '203.0.113.82')).json()).toMatchObject({ status: 'accepted' });
+    expect(await (await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 81' }, '203.0.113.82')).json()).toMatchObject({ status: 'duplicate' });
+    expect(await (await partnerOrder({ fullName: 'Икки Киши', phone: '+998 90 312 45 83' }, '203.0.113.83')).json()).toMatchObject({ status: 'accepted' });
+    await until(() => sheets.rows.length >= 2);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows.map((r) => [r.row[0], r.row[2]])).toEqual([
+      [1, 'Бир Киши'],
+      [2, 'Икки Киши'],
+    ]);
+    expect(leadMessages()).toHaveLength(1); // only the main site's order
+  });
+
+  it("sends its Lead to the partner's dataset at once; the main site's waits for the operator, to ours", async () => {
+    expect((await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 85' }, '203.0.113.85')).status).toBe(201);
+    await until(() => meta.bodies.length >= 1);
+    expect(meta.paths).toEqual([`/v21.0/${PARTNER_PIXEL}/events`]);
+    expect(meta.bodies[0]).toMatchObject({ access_token: 'EAA-partner', data: [{ event_name: 'Lead' }] });
+
+    expect((await order({ phone: '+998 90 312 45 84' }, { ip: '203.0.113.84' })).status).toBe(201);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.bodies).toHaveLength(1);
+    await press('s:1:sold');
+    await until(() => meta.bodies.length >= 2);
+    expect(meta.paths[1]).toBe(`/v21.0/${MAIN_PIXEL}/events`);
+    expect(meta.bodies[1]!.access_token).toBe('EAA-main');
+  });
+
+  it('opens nothing but the order form to the partner site', async () => {
+    expect((await partner('/api/panel/data')).status).toBe(404);
+    expect((await partner('/api/health')).status).toBe(404);
+    expect((await partner('/api/leads')).status).toBe(405);
+  });
+});

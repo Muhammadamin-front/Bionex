@@ -35,7 +35,10 @@
     // The same number again within this time is a repeat, not a new order.
     "DUPLICATE_WINDOW_HOURS": "24",
     // Every this many new orders, the group also gets them as one numbered list. 0 = off.
-    "LEADS_PER_LIST": "10"
+    "LEADS_PER_LIST": "10",
+    // The partner site's Pixel (apps/partner, docs/PARTNER-SITE.md). Public: it is in that
+    // site's page anyway. Its Conversions API token is the secret META_T2_CAPI_TOKEN.
+    "META_T2_PIXEL_ID": "1783794022832394"
   }
   // Secrets (never in this file): set once with `npx wrangler secret put NAME`
   //   TURNSTILE_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

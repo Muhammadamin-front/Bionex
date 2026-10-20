@@ -4,6 +4,8 @@ import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
+import { sendSheetOrder, sheetsConfig } from './sheets';
+import type { SiteId } from './sites';
 import {
   callTelegram,
   formatLead,
@@ -227,6 +229,22 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('ad')) this.sql.exec('ALTER TABLE list_items ADD COLUMN ad TEXT');
     // Set when operators clear the panel (e.g. before new ad sets start); the order stays in the archive view.
     if (!listColumns.includes('archived_at')) this.sql.exec('ALTER TABLE list_items ADD COLUMN archived_at INTEGER');
+    // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS partner_leads (
+        site TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        phone_hash TEXT NOT NULL,
+        ip_hash TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (site, seq)
+      );
+      CREATE INDEX IF NOT EXISTS partner_leads_phone ON partner_leads (site, phone_hash, at);
+    `);
+    // A first version kept partner orders in `leads` with these columns; they are no longer used.
+    const leadColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(leads)').toArray().map((c) => c.name);
+    if (leadColumns.includes('site_seq')) this.sql.exec('ALTER TABLE leads DROP COLUMN site_seq');
+    if (leadColumns.includes('site')) this.sql.exec('ALTER TABLE leads DROP COLUMN site');
     this.sql.exec(
       'CREATE TABLE IF NOT EXISTS spam_sources (lead_id INTEGER PRIMARY KEY, ip_hash TEXT NOT NULL, at INTEGER NOT NULL)',
     );
@@ -340,6 +358,66 @@ export class LeadRegistry extends DurableObject<Env> {
     this.prune(now);
     await this.flush();
     return { status: 'accepted', number: leadId };
+  }
+
+  /**
+   * An order from the partner site (sites.ts). It belongs to that site's owner: it never
+   * reaches the operators' group, panel, lists or reports, and it is not a repeat of an order
+   * on the main site (nor the other way round). It goes to the owner's Google Sheet — whose
+   * people ring the customer — and, at once, as a Lead to the owner's Meta dataset: nobody
+   * here presses an outcome for it. Only the hashes that repeats and limits need are kept.
+   */
+  async acceptPartner(input: OrderInput & { site: Exclude<SiteId, 'main'> }): Promise<AcceptResult> {
+    const phoneHash = await this.hash(input.phone);
+    const ipHash = await this.hash(input.ip);
+    const { now, site } = input;
+
+    // Everything below runs without awaiting, so no other order can interleave with it.
+    const prior = this.sql.exec<{ status: 'accepted' | 'duplicate' }>('SELECT status FROM submissions WHERE id = ?', input.submissionId).toArray()[0];
+    if (prior) return { status: prior.status };
+    const windowMs = Number(this.env.DUPLICATE_WINDOW_HOURS || 24) * HOUR;
+    const repeat = this.sql
+      .exec('SELECT 1 FROM partner_leads WHERE site = ? AND phone_hash = ? AND at > ? LIMIT 1', site, phoneHash, now - windowMs)
+      .toArray().length;
+    if (repeat) {
+      this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'duplicate', now);
+      return { status: 'duplicate' };
+    }
+    const otherPhones = this.sql
+      .exec<{ n: number }>('SELECT count(DISTINCT phone_hash) AS n FROM partner_leads WHERE ip_hash = ? AND at > ?', ipHash, now - DAY)
+      .one().n;
+    if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
+
+    const seq = this.nextSiteNumber(site);
+    this.sql.exec('INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, at) VALUES (?, ?, ?, ?, ?)', site, seq, phoneHash, ipHash, now);
+    this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
+
+    const sheet = sheetsConfig(this.env, site);
+    if (sheet) {
+      const { campaign, adset, ad } = utmParts(input.utm);
+      this.ctx.waitUntil(
+        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags: input.flags }),
+      );
+    } else {
+      console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
+    }
+    // A filled-in hidden field is a script, not a person: the ads must not learn from it.
+    const meta = metaConfig(this.env, site);
+    if (meta && input.meta && !input.flags.includes('honeypot')) {
+      this.ctx.waitUntil(
+        sendMetaEvent(meta, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
+      );
+    }
+    this.prune(now);
+    return { status: 'accepted', number: seq };
+  }
+
+  /** A partner site's own running number for its next order (1, 2, 3 …), kept across pruning. */
+  private nextSiteNumber(site: SiteId): number {
+    const key = `site_seq_${site}`;
+    const next = Number(this.sql.exec<{ v: string }>('SELECT v FROM meta WHERE k = ?', key).toArray()[0]?.v ?? 0) + 1;
+    this.sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', key, String(next));
+    return next;
   }
 
   /** A configuration problem that silently loses every order: tell the group, at most hourly. */
@@ -954,6 +1032,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM spam_sources WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM partner_leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
     // Never marked, and now too old for Meta to accept: there is nothing left to send.
     this.sql.exec('DELETE FROM meta_pending WHERE at < ?', now - META_WINDOW);

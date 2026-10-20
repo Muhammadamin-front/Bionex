@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The partner site (docs/PARTNER-SITE.md): the same landing page on Cloudflare Pages, at
+  // https://zeynaraa-uz.pages.dev — an address that says nothing about the main site's.
+  // Deploy with `npm run deploy:t2 --workspace=@bionex/worker`, after the main Worker.
+  "name": "zeynaraa-uz",
+  "compatibility_date": "2026-10-01",
+
+  // apps/web built with `--mode t2` (apps/web/.env.t2: this site's Pixel and address).
+  "pages_build_output_dir": "../web/dist-t2",
+
+  // Orders go to the main Worker's PartnerSite entrypoint, inside Cloudflare: the browser
+  // only ever talks to this site, and the internet cannot reach that entrypoint.
+  "services": [{ "binding": "MAIN", "service": "zeynara", "entrypoint": "PartnerSite" }]
+}

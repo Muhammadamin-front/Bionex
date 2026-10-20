@@ -150,7 +150,8 @@ function warnAboutProductionConfig(env: Record<string, string>): void {
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  if (command === 'build' && mode === 'production') warnAboutProductionConfig(env);
+  // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
+  if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
     plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders()],
     server: {

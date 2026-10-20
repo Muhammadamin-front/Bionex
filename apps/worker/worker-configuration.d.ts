@@ -7,6 +7,7 @@ interface __BaseEnv_Env {
 	LEADS_PER_IP_PER_DAY: "3";
 	DUPLICATE_WINDOW_HOURS: "24";
 	LEADS_PER_LIST: "10";
+	META_T2_PIXEL_ID: "1783794022832394";
 	REGISTRY: DurableObjectNamespace<import("./src/index").LeadRegistry>;
 }
 declare namespace Cloudflare {
@@ -21,7 +22,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "IP_ORDERS_PER_HOUR" | "LEADS_PER_IP_PER_DAY" | "DUPLICATE_WINDOW_HOURS" | "LEADS_PER_LIST">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "IP_ORDERS_PER_HOUR" | "LEADS_PER_IP_PER_DAY" | "DUPLICATE_WINDOW_HOURS" | "LEADS_PER_LIST" | "META_T2_PIXEL_ID">> {}
 }
 declare module "*.txt" {
 	const value: string;

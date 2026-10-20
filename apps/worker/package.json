@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "STRICT_PRODUCTION_BUILD=1 npm run build --workspace=@bionex/web && wrangler deploy",
+    "deploy:t2": "STRICT_PRODUCTION_BUILD=1 npm run build:t2 --workspace=@bionex/web && cd ../partner && wrangler pages deploy --branch main",
     "types": "wrangler types",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",

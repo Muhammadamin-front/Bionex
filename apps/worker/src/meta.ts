@@ -27,6 +27,8 @@
  * into one.
  */
 
+import type { SiteId } from './sites';
+
 const API_VERSION = 'v21.0';
 
 export interface MetaConfig {
@@ -77,14 +79,19 @@ export interface MetaEvent {
   currency?: string;
 }
 
-export function metaConfig(env: Env): MetaConfig | null {
-  if (!env.META_PIXEL_ID || !env.META_CAPI_TOKEN) return null;
+/** The dataset an order's events go to: each site's own, never the other's (see sites.ts). */
+export function metaConfig(env: Env, site: SiteId = 'main'): MetaConfig | null {
+  const own =
+    site === 't2'
+      ? { pixelId: env.META_T2_PIXEL_ID, token: env.META_T2_CAPI_TOKEN, testEventCode: env.META_T2_TEST_EVENT_CODE }
+      : { pixelId: env.META_PIXEL_ID, token: env.META_CAPI_TOKEN, testEventCode: env.META_TEST_EVENT_CODE };
+  if (!own.pixelId || !own.token) return null;
   const orderValue = Number(env.META_ORDER_VALUE);
   return {
-    pixelId: env.META_PIXEL_ID,
-    token: env.META_CAPI_TOKEN,
+    pixelId: own.pixelId,
+    token: own.token,
     apiBase: env.META_API_BASE || undefined,
-    testEventCode: env.META_TEST_EVENT_CODE || undefined,
+    testEventCode: own.testEventCode || undefined,
     orderValue: Number.isFinite(orderValue) && orderValue > 0 ? orderValue : undefined,
     currency: env.META_CURRENCY || 'UZS',
   };

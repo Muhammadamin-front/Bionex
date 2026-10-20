@@ -23,6 +23,15 @@ interface WorkerSecrets {
   META_CURRENCY?: string;
   /** Events Manager → Test events: sends there instead of counting (remove when done). */
   META_TEST_EVENT_CODE?: string;
+  /**
+   * The partner site (sites.ts 't2'): its own Conversions API token (META_T2_PIXEL_ID is in
+   * wrangler.jsonc) and test code, and the Apps Script web app of its Google Sheet with the
+   * secret that script checks. Each part is off until its values are set.
+   */
+  META_T2_CAPI_TOKEN?: string;
+  META_T2_TEST_EVENT_CODE?: string;
+  SHEETS_T2_URL?: string;
+  SHEETS_T2_SECRET?: string;
   /** Test overrides for the outside services. */
   TELEGRAM_API_BASE?: string;
   TURNSTILE_VERIFY_URL?: string;

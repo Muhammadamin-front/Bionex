@@ -76,6 +76,10 @@
   7 days, sent only in a private chat, and still checked against group membership on every
   request. `TELEGRAM_DRY_RUN` skips panel sign-in only on `localhost`.
 - ✅ Nothing personal is written to logs.
+- ✅ The partner site ([PARTNER-SITE.md](PARTNER-SITE.md)): its orders go only to its owner's
+  Google Sheet (name and phone number included — their people ring the customers) and their
+  Meta dataset. This Worker keeps only their hashes (`partner_leads`, 30 days) for repeats and
+  limits. Main-site orders never reach that sheet or dataset.
 - ✅ Meta Conversions API (only when **both** `META_PIXEL_ID` and `META_CAPI_TOKEN` are set):
   once an operator has rung the customer and pressed ✅ or ❌, Meta is sent a one-way
   **SHA-256** of the phone number, first name, last name and `uz`, plus the IP address, the
