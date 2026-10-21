@@ -10,7 +10,7 @@
  * says which iPhone it is.
  */
 
-const MAX = 60;
+const MAX = 80;
 
 /** Keeps only what a model name is made of, so a value can never break a message or a cell. */
 export function cleanDeviceModel(value: unknown): string | undefined {
@@ -37,7 +37,8 @@ const version = (v: string | undefined) => v?.replace(/_/g, '.').replace(/(\.0)+
 export function modelFromUserAgent(ua: string | null | undefined): string | undefined {
   if (!ua) return undefined;
   // Facebook / Instagram in-app browsers: "FBDV/iPhone14,2", "FBDV/SM-A135F".
-  const fbdv = /FBDV\/([^;]+)/.exec(ua)?.[1];
+  // Instagram: "Instagram 451.0 (iPhone16,2; iOS 18_7; …)".
+  const fbdv = /FBDV\/([^;]+)/.exec(ua)?.[1] ?? /\((iPhone\d+,\d+);/.exec(ua)?.[1];
   const ios = /\b(iPhone|iPad|iPod)\b.*?OS (\d+(?:_\d+)*)/.exec(ua);
   if (ios) return cleanDeviceModel(`${fbdv ?? ios[1]} · iOS ${version(ios[2])}`);
   const android = /Android (\d+(?:\.\d+)*)(?:;\s*([^;)]+))?/.exec(ua);

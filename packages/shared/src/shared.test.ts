@@ -197,6 +197,9 @@ describe('modelFromUserAgent', () => {
         'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/480.0;FBBV/1;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/17.5.1]',
       ),
     ).toBe('iPhone14,2 · iOS 17.5.1');
+    expect(modelFromUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 451.0.0 (iPhone16,2; iOS 18_7; uz_UZ; en)')).toBe(
+      'iPhone16,2 · iOS 18.7',
+    );
   });
 
   it('falls back to the system when the model is hidden', () => {
@@ -208,7 +211,7 @@ describe('modelFromUserAgent', () => {
 
   it('keeps only harmless characters, and short', () => {
     expect(cleanDeviceModel('<b>=HYPERLINK("x")</b> Redmi Note 12')).toBe('bHYPERLINK(x)/b Redmi Note 12');
-    expect(cleanDeviceModel('x'.repeat(300))).toHaveLength(60);
+    expect(cleanDeviceModel('x'.repeat(300))).toHaveLength(80);
     expect(cleanDeviceModel('   ')).toBeUndefined();
   });
 });

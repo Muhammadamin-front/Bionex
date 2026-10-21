@@ -99,7 +99,7 @@ let model: Promise<string | undefined> | undefined;
  */
 export function deviceModel(): Promise<string | undefined> {
   model ??= (async () => {
-    const fromUa = modelFromUserAgent(navigator.userAgent);
+    const fromUa = iphoneBySize(modelFromUserAgent(navigator.userAgent));
     try {
       const hints = (navigator as Navigator & { userAgentData?: { getHighEntropyValues(keys: string[]): Promise<Record<string, string>> } }).userAgentData;
       if (!hints) return fromUa;
@@ -111,4 +111,35 @@ export function deviceModel(): Promise<string | undefined> {
     }
   })();
   return model;
+}
+
+/**
+ * Safari never says which iPhone it is; its screen size narrows it to a few models that share
+ * one (in points, portrait, and the pixel density where two models differ only in that).
+ */
+const IPHONE_SIZES: Record<string, string> = {
+  '320x568': 'iPhone SE (1)',
+  '375x667': 'iPhone SE / 6 / 7 / 8',
+  '414x736': 'iPhone 6 / 7 / 8 Plus',
+  '375x812': 'iPhone X / XS / 11 Pro / 12 mini / 13 mini',
+  '414x896@2': 'iPhone XR / 11',
+  '414x896@3': 'iPhone XS Max / 11 Pro Max',
+  '390x844': 'iPhone 12 / 13 / 14 / 16e',
+  '428x926': 'iPhone 12 Pro Max / 13 Pro Max / 14 Plus',
+  '393x852': 'iPhone 14 Pro / 15 / 15 Pro / 16',
+  '430x932': 'iPhone 14 Pro Max / 15 Plus / 15 Pro Max / 16 Plus',
+  '402x874': 'iPhone 16 Pro / 17 / 17 Pro',
+  '420x912': 'iPhone Air',
+  '440x956': 'iPhone 16 Pro Max / 17 Pro Max',
+};
+
+function iphoneBySize(model: string | undefined): string | undefined {
+  if (!model?.startsWith('iPhone ·')) return model;
+  try {
+    const size = `${Math.min(screen.width, screen.height)}x${Math.max(screen.width, screen.height)}`;
+    const name = IPHONE_SIZES[`${size}@${Math.round(window.devicePixelRatio)}`] ?? IPHONE_SIZES[size];
+    return name ? model.replace(/^iPhone/, name) : model;
+  } catch {
+    return model;
+  }
 }

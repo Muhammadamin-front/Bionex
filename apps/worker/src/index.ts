@@ -6,6 +6,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
+import { readableModel } from './models';
 import { readSheetStatuses, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
@@ -226,7 +227,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       meta: match,
       device: data.deviceId,
       fingerprint: data.fingerprint,
-      model: data.deviceModel ?? modelFromUserAgent(request.headers.get('user-agent')),
+      model: readableModel(data.deviceModel ?? modelFromUserAgent(request.headers.get('user-agent'))),
     };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.
     const result = site === 'main' ? await registry.accept(order) : await registry.acceptPartner({ ...order, site });

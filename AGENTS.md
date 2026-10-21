@@ -95,6 +95,9 @@ user's Mac.
    never names the iPhone), server falls back to the request's user agent
    (`packages/shared/src/device.ts`). Shown as 📱 in Telegram and in the sheet's «Qurilma»
    column (the owner must add that header; rows go by header name). Not stored, not hashed.
+   Shown by name: Android codes via `apps/worker/src/android-models.json` (from Google Play's
+   device list, rebuilt by `scripts/android-models.py`), iPhone ids by a table in `models.ts`;
+   Safari's plain «iPhone» is narrowed by screen size in the browser (a group of models).
    Seen on 2026-10-21: every partner spam order carried `no_captcha` and a plain Chrome
    «Android 10; K» user agent with rotating versions (141/144/147/152); every real one came
    from the Instagram in-app browser.
