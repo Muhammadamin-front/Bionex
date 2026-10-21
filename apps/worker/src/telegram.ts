@@ -101,6 +101,7 @@ const FLAG_TEXT: Record<string, string> = {
   spam_device: 'бу қурилмадан аввал спам белгиланган (тармоғини алмаштирган бўлса ҳам)',
   spam_lookalike: 'аввал спам бўлган қурилмага ўхшайди (браузерини тозалаган бўлиши мумкин)',
   no_captcha: '«бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)',
+  likely_bot: 'Instagram/Facebook орқали эмас — бот эҳтимоли катта',
 };
 
 export function formatLead(lead: LeadMessage): string {

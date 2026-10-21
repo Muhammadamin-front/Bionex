@@ -1029,6 +1029,19 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     expect(await settled()).toHaveLength(1);
   });
 
+  it('a failed check from outside the Instagram / Facebook app is flagged as a likely robot', async () => {
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
+    expect((await order({ phone: '+998 90 312 45 71', turnstileToken: 'bad' }, { ip: '203.0.113.71', userAgent: chrome })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли катта');
+    // In the app the ads open in, a failed check alone is not enough.
+    expect((await order({ phone: '+998 90 312 45 72', turnstileToken: 'bad' }, { ip: '203.0.113.72', userAgent: instagram })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
+    // A passed check is never flagged, wherever it was opened.
+    expect((await order({ phone: '+998 90 312 45 73' }, { ip: '203.0.113.73', userAgent: chrome })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
+  });
+
   it('identifies the customer only by one-way hashes, never the number itself', async () => {
     await order({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67' });
     await press('s:1:sold');

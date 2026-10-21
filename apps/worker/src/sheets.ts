@@ -44,6 +44,7 @@ const FLAG_TEXT: Record<string, string> = {
   honeypot: "bot bo'lishi mumkin",
   phone_pattern: "raqam soxtaga o'xshaydi",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
+  likely_bot: "Instagram/Facebook'dan emas — bot ehtimoli katta",
   spam_source: 'bu tarmoqdan avval spam belgilangan',
   spam_device: 'bu qurilmadan avval spam belgilangan',
   spam_lookalike: "avval spam bo'lgan qurilmaga o'xshaydi",

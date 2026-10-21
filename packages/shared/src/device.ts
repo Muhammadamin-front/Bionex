@@ -24,6 +24,13 @@ export function cleanDeviceModel(value: unknown): string | undefined {
   return text || undefined;
 }
 
+/**
+ * Whether the page was opened inside the Instagram or Facebook app, where an ad click opens.
+ * On 2026-10-21 every real partner-site order came from there, and every fake one from a plain
+ * Chrome that also failed the "not a robot" check (see the worker's `likely_bot` flag).
+ */
+export const fromSocialApp = (ua: string | null | undefined) => /Instagram|FBAN|FBAV|FB_IAB|FBIOS|FB4A/.test(ua ?? '');
+
 const version = (v: string | undefined) => v?.replace(/_/g, '.').replace(/(\.0)+$/, '');
 
 /** The model a user agent names, or at least its system; undefined when it names neither. */
