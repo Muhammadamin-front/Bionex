@@ -78,6 +78,8 @@ export function makeLeadSubmissionSchema(opts: { phonePrefixes?: readonly string
     submissionId: z.string().regex(SUBMISSION_ID_PATTERN),
     /** The browser's own random id (apps/web lib/device.ts), so spam can be traced to a phone. */
     deviceId: z.string().regex(SUBMISSION_ID_PATTERN).optional(),
+    /** A SHA-256 (hex) of what the browser reports about the phone (apps/web lib/device.ts). */
+    fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     turnstileToken: z.string().max(2048).optional(),
     [HONEYPOT_FIELD]: z.string().max(500).optional(),
     utm: utmInputSchema,

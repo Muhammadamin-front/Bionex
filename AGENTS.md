@@ -84,6 +84,12 @@ user's Mac.
    them; later orders on **both** sites arrive flagged (`spam_device` / `spam_source`).
    The sheet's «Holat» column is read by the cron `*/5 * * * *` (`PARTNER_SHEET_CRON`,
    `readSheetStatuses` → `syncPartnerSpam`). A marked device or a honeypot gets no server Lead.
+6. **Look-alike phones** (2026-10-21): the browser also sends `fingerprint`, a SHA-256 of user
+   agent, screen, languages, time zone, CPU, graphics and a canvas drawing (`deviceFingerprint`
+   in `apps/web/src/lib/device.ts`); stored as `fp_hash` on leads, partner_leads, spam_marks.
+   When the device id is new but the likeness matches a spam mark, the order is flagged
+   `spam_lookalike` («аввал спам бўлган қурилмага ўхшайди»). **Flag only, never block** —
+   the owner's decision; same-model phones can share a likeness.
 
 ## Open items
 

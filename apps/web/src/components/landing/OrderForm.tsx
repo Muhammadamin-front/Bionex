@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
-import { deviceId } from '../../lib/device';
+import { deviceFingerprint, deviceId } from '../../lib/device';
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
@@ -289,11 +289,13 @@ export function OrderForm({
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;
       const { submissionId } = verification.current!;
+      const fingerprint = await deviceFingerprint();
       const response = await submitLead({
         fullName,
         phone: fullPhone,
         submissionId,
         deviceId: deviceId(),
+        fingerprint,
         turnstileToken: token ?? undefined,
         [HONEYPOT_FIELD]: honeypotRef.current?.value ?? '',
         utm,

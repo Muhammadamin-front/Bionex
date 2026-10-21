@@ -221,6 +221,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       now,
       meta: match,
       device: data.deviceId,
+      fingerprint: data.fingerprint,
     };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.
     const result = site === 'main' ? await registry.accept(order) : await registry.acceptPartner({ ...order, site });

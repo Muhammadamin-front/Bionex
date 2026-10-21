@@ -78,7 +78,11 @@
 - ✅ Nothing personal is written to logs.
 - ✅ The browser keeps one random id for this site (`localStorage`, `apps/web/src/lib/device.ts`)
   and sends it with an order; it is stored only as an HMAC hash, so that a spam mark can follow
-  a phone across networks (30 days). It is not a fingerprint and says nothing about the person.
+  a phone across networks (30 days). With it goes a SHA-256 of what the browser reports about
+  the phone (model and system, screen, languages, time zone, CPU, graphics, a canvas drawing),
+  made in the browser with no third-party service and stored only as an HMAC hash, so a spam
+  mark still recognises a look-alike phone after its site data is cleared. Neither says
+  anything about the person, and neither ever refuses an order.
 - ✅ The partner site ([PARTNER-SITE.md](PARTNER-SITE.md)): its orders go only to its owner's
   Google Sheet (name and phone number included — their people ring the customers) and their
   Meta dataset. This Worker keeps only their hashes (`partner_leads`, 30 days) for repeats and

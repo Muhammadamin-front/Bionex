@@ -1238,6 +1238,29 @@ describe('the partner site (sites.ts t2)', () => {
     expect(leadMessages().at(-1)!.text).not.toContain('қурилмадан');
   });
 
+  it('a phone that looks like a marked one is flagged after its browser data is cleared, on either site', async () => {
+    const LOOKS = 'ab'.repeat(32);
+    const device = (n: number) => `aaaaaaaa-0000-4000-8000-00000000000${n}`;
+    expect((await order({ phone: '+998 90 312 45 93', deviceId: device(1), fingerprint: LOOKS }, { ip: '203.0.113.93' })).status).toBe(201);
+    await press('s:1:spam');
+
+    // Cleared data (a new device id), the same likeness, another network: a hint, not a refusal.
+    expect((await order({ phone: '+998 90 312 45 94', deviceId: device(2), fingerprint: LOOKS }, { ip: '198.51.100.94' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('аввал спам бўлган қурилмага ўхшайди');
+    expect(leadMessages().at(-1)!.text).not.toContain('бу қурилмадан');
+    // The same device still gets the stronger warning only.
+    expect((await order({ phone: '+998 90 312 45 95', deviceId: device(1), fingerprint: LOOKS }, { ip: '192.0.2.95' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+    expect(leadMessages().at(-1)!.text).not.toContain('ўхшайди');
+    // Another phone altogether: nothing.
+    expect((await order({ phone: '+998 90 312 45 96', deviceId: device(3), fingerprint: 'cd'.repeat(32) }, { ip: '192.0.2.96' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('спам');
+    // On the partner site too, in its sheet.
+    expect((await partnerOrder({ fullName: 'Ўхшаш Исм', phone: '+998 90 312 45 97', deviceId: device(4), fingerprint: LOOKS }, '192.0.2.97')).status).toBe(201);
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows[0]!.row[7]).toBe("avval spam bo'lgan qurilmaga o'xshaydi");
+  });
+
   it('opens nothing but the order form to the partner site', async () => {
     expect((await partner('/api/panel/data')).status).toBe(404);
     expect((await partner('/api/health')).status).toBe(404);

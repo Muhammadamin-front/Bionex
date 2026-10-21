@@ -58,6 +58,7 @@ report names that number — «📣 Натижаси белгиланмаган:
 |---|---|---|
 | `spam_source` | бу манбадан аввал спам белгиланган | an operator pressed 🚫 on an order from this network within 30 days |
 | `spam_device` | бу қурилмадан аввал спам белгиланган | 🚫 (or «Keraksiz») on an order from this browser within 30 days, whatever its network now |
+| `spam_lookalike` | аввал спам бўлган қурилмага ўхшайди | the browser id is new (data cleared, private window) but the phone's likeness (`deviceFingerprint`: user agent, screen, languages, time zone, CPU, graphics, a canvas drawing) matches a marked order. Phones of the same model and system can share it, so it is a hint for the operator, never a refusal |
 | `multi_phone_ip` | бу манбадан бугун бир нечта рақам юборилди | more than one number from this network today |
 | `phone_pattern` | рақам сунъийга ўхшайди | e.g. 90 111 11 11 |
 | `honeypot` | яширин майдон тўлдирилган | a field only a script fills |

@@ -137,6 +137,8 @@ export interface OrderInput {
   meta?: { userData: MetaUserData; sourceUrl: string };
   /** The browser's own random id (apps/web lib/device.ts); absent for bot orders and blocked storage. */
   device?: string;
+  /** The phone's likeness, a SHA-256 the browser made (apps/web lib/device.ts); absent for bot orders. */
+  fingerprint?: string;
 }
 
 /**
@@ -257,8 +259,13 @@ export class LeadRegistry extends DurableObject<Env> {
       this.sql.exec('DROP TABLE spam_sources');
     }
     if (!leadColumns.includes('device_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN device_hash TEXT');
+    // The phone's likeness (apps/web lib/device.ts deviceFingerprint), for marks that outlive a cleared browser.
+    if (!leadColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN fp_hash TEXT');
+    const markColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(spam_marks)').toArray().map((c) => c.name);
+    if (!markColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE spam_marks ADD COLUMN fp_hash TEXT');
     const partnerColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(partner_leads)').toArray().map((c) => c.name);
     if (!partnerColumns.includes('device_hash')) this.sql.exec('ALTER TABLE partner_leads ADD COLUMN device_hash TEXT');
+    if (!partnerColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE partner_leads ADD COLUMN fp_hash TEXT');
     // Orders whose Meta Lead is waiting for an operator to confirm the person is real.
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS meta_pending (
@@ -291,6 +298,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const phoneHash = await this.hash(input.phone);
     const ipHash = await this.hash(input.ip);
     const deviceHash = input.device ? await this.hash(`device:${input.device}`) : null;
+    const fpHash = input.fingerprint ? await this.hash(`fp:${input.fingerprint}`) : null;
     const { now } = input;
 
     // Everything below runs without awaiting, so no other order can interleave with it.
@@ -318,10 +326,17 @@ export class LeadRegistry extends DurableObject<Env> {
     if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
 
     // Operators marked an earlier order from this network or device as spam: say so on this one.
-    input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, now)] };
+    input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)] };
 
     const leadId = this.sql
-      .exec<{ id: number }>('INSERT INTO leads (phone_hash, ip_hash, device_hash, at) VALUES (?, ?, ?, ?) RETURNING id', phoneHash, ipHash, deviceHash, now)
+      .exec<{ id: number }>(
+        'INSERT INTO leads (phone_hash, ip_hash, device_hash, fp_hash, at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+        phoneHash,
+        ipHash,
+        deviceHash,
+        fpHash,
+        now,
+      )
       .one().id;
     this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
     // Meta is told nothing yet: a name and a number in a form prove nothing. Held until an
@@ -380,6 +395,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const phoneHash = await this.hash(input.phone);
     const ipHash = await this.hash(input.ip);
     const deviceHash = input.device ? await this.hash(`device:${input.device}`) : null;
+    const fpHash = input.fingerprint ? await this.hash(`fp:${input.fingerprint}`) : null;
     const { now, site } = input;
 
     // Everything below runs without awaiting, so no other order can interleave with it.
@@ -398,15 +414,16 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().n;
     if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
 
-    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, now)];
+    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)];
     const seq = this.nextSiteNumber(site);
     this.sql.exec(
-      'INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, device_hash, at) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, device_hash, fp_hash, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       site,
       seq,
       phoneHash,
       ipHash,
       deviceHash,
+      fpHash,
       now,
     );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
@@ -446,7 +463,7 @@ export class LeadRegistry extends DurableObject<Env> {
       }
       // OR IGNORE: a mark keeps the time it was first seen, so its 30 days do not restart on every read.
       this.sql.exec(
-        'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, at) SELECT ?, ip_hash, device_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
+        'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
         source,
         input.now,
         input.site,
@@ -455,13 +472,18 @@ export class LeadRegistry extends DurableObject<Env> {
     }
   }
 
-  /** An earlier order from this device or network was marked as spam within 30 days. */
-  private spamFlags(ipHash: string, deviceHash: string | null, now: number): string[] {
+  /**
+   * An earlier order from this device, from a phone that looks like it, or from this network
+   * was marked as spam within 30 days. The look-alike is said only when the device itself is
+   * not recognised (its browser data was cleared, or a private window): a hint, never a refusal.
+   */
+  private spamFlags(ipHash: string, deviceHash: string | null, fpHash: string | null, now: number): string[] {
     const since = now - 30 * DAY;
-    const seen = (column: 'device_hash' | 'ip_hash', value: string) =>
+    const seen = (column: 'device_hash' | 'fp_hash' | 'ip_hash', value: string) =>
       this.sql.exec(`SELECT 1 FROM spam_marks WHERE ${column} = ? AND at > ? LIMIT 1`, value, since).toArray().length > 0;
     const flags: string[] = [];
     if (deviceHash && seen('device_hash', deviceHash)) flags.push('spam_device');
+    else if (fpHash && seen('fp_hash', fpHash)) flags.push('spam_lookalike');
     if (seen('ip_hash', ipHash)) flags.push('spam_source');
     return flags;
   }
@@ -635,7 +657,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM spam_marks WHERE source = ?', `lead:${input.leadId}`);
     if (input.action === 'spam') {
       this.sql.exec(
-        "INSERT INTO spam_marks (source, ip_hash, device_hash, at) SELECT 'lead:' || id, ip_hash, device_hash, ? FROM leads WHERE id = ?",
+        "INSERT INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT 'lead:' || id, ip_hash, device_hash, fp_hash, ? FROM leads WHERE id = ?",
         input.now,
         input.leadId,
       );

@@ -44,6 +44,7 @@ const FLAG_TEXT: Record<string, string> = {
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
   spam_source: 'bu tarmoqdan avval spam belgilangan',
   spam_device: 'bu qurilmadan avval spam belgilangan',
+  spam_lookalike: "avval spam bo'lgan qurilmaga o'xshaydi",
 };
 
 /**
