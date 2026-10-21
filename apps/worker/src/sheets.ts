@@ -34,10 +34,11 @@ export interface SheetOrder {
   flags: string[];
   /** The phone's model as its browser names it. */
   model?: string;
+  details?: string;
 }
 
 const SHEET = 'Lidlar';
-const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma'];
+const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma', 'Tafsilot'];
 
 /** The same warnings the operators' group shows, for the people ringing from the sheet. */
 const FLAG_TEXT: Record<string, string> = {
@@ -110,6 +111,7 @@ export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder): Prom
     '',
     '',
     asText(order.model ?? ''),
+    asText(order.details ?? ''),
   ];
   try {
     // Apps Script answers a POST with a redirect to its output; following it is how "ok" is read.

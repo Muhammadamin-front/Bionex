@@ -5,7 +5,7 @@ import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
-import { fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
+import { describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
 import { readableModel } from './models';
 import { readSheetStatuses, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
@@ -193,7 +193,9 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     if (!check.ok) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: so far
     // that has always been a robot. Still only a flag (docs/SPAM.md: never refuse a customer).
-    if (!check.ok && !fromSocialApp(request.headers.get('user-agent'))) flags.push('likely_bot');
+    // So does a browser that says a program drives it.
+    const userAgent = request.headers.get('user-agent');
+    if (data.signals?.webdriver || (!check.ok && !fromSocialApp(userAgent))) flags.push('likely_bot');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the
     //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is
@@ -227,7 +229,10 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       meta: match,
       device: data.deviceId,
       fingerprint: data.fingerprint,
-      model: readableModel(data.deviceModel ?? modelFromUserAgent(request.headers.get('user-agent'))),
+      model: readableModel(data.deviceModel ?? modelFromUserAgent(userAgent)),
+      details: data.signals
+        ? { latn: describeSignals(data.signals, userAgent, 'latn'), cyrl: describeSignals(data.signals, userAgent, 'cyrl') }
+        : undefined,
     };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.
     const result = site === 'main' ? await registry.accept(order) : await registry.acceptPartner({ ...order, site });

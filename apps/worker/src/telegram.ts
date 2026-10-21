@@ -14,6 +14,8 @@ export interface LeadMessage {
   flags: string[];
   /** The phone's model as its browser names it ("SM-A135F · Android 13"). */
   model?: string;
+  /** The browser's signals in one line: GPU, touch, how the form was filled… */
+  details?: string;
   /** Where this order stands in the next list, e.g. 3 of 10 (absent when lists are off). */
   list?: { count: number; size: number };
   /** Ordered through the Telegram bot: the number was shared as a contact (verified) or typed. */
@@ -119,6 +121,7 @@ export function formatLead(lead: LeadMessage): string {
     if (source) lines.push(`📣 ${escapeHtml(source)}`);
   }
   if (lead.model) lines.push(`📱 ${escapeHtml(lead.model)}`);
+  if (lead.details) lines.push(`🔬 ${escapeHtml(lead.details)}`);
   // The source line matters only when something looks off; otherwise it is noise.
   if (lead.source.phonesToday > 1 || lead.flags.length > 0) {
     const sourceNote = lead.source.phonesToday > 1 ? ` (бугун ${lead.source.phonesToday} та рақам)` : '';

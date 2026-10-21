@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 77 tests, Miniflare
+npm test --workspace=@bionex/worker      # 78 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -101,8 +101,12 @@ user's Mac.
    Seen on 2026-10-21: every partner spam order carried `no_captcha` and a plain Chrome
    «Android 10; K» user agent with rotating versions (141/144/147/152); every real one came
    from the Instagram in-app browser.
-8. **`likely_bot` flag**: `no_captcha` and not opened in Instagram/Facebook (`fromSocialApp`).
+8. **`likely_bot` flag**: `webdriver`, or `no_captcha` and not opened in Instagram/Facebook (`fromSocialApp`).
    Flag only. The owner chose NOT to withhold the partner's server Lead for it (yet).
+9. **«Tafsilot»** (sheet column / 🔬 in Telegram): `signals` from the browser (GPU, touch
+   points, webdriver, fill time, keys typed/pasted, time zone, language, ad click via
+   fbclid/_fbc, Chrome's real version vs the user agent's), `describeSignals` in shared. The
+   owner suspects a computer posing as a phone behind mobile proxies; this is how to tell.
 
 ## Open items
 

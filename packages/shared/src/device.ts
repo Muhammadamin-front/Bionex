@@ -53,3 +53,93 @@ export function modelFromUserAgent(ua: string | null | undefined): string | unde
   if (/Linux/.test(ua)) return 'Linux';
   return undefined;
 }
+
+/** What the browser reports about itself and the visit (apps/web lib/device.ts `deviceSignals`). */
+export interface DeviceSignals {
+  /** The graphics chip: "Adreno (TM) 750" on a phone, "NVIDIA GeForce …", "Intel …" on a computer. */
+  gpu?: string;
+  /** Touch points: 5–10 on a phone, usually 0 on a computer. */
+  touch?: number;
+  /** Set by browsers a program drives (Selenium, Puppeteer, Playwright). */
+  webdriver?: boolean;
+  /** From the first change in the form to sending it. 0: nothing was ever typed. */
+  fillMs?: number;
+  keys?: number;
+  pasted?: boolean;
+  tz?: string;
+  lang?: string;
+  /** The visit came from an ad click (fbclid in the address, or Meta's _fbc cookie). */
+  adClick?: boolean;
+  /** Chrome's real major version, from userAgentData (the user agent string can be edited). */
+  chrome?: string;
+}
+
+const short = (v: unknown, max: number) => cleanDeviceModel(typeof v === 'string' ? v : undefined)?.slice(0, max);
+const count = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v), max) : undefined);
+const flag = (v: unknown) => (typeof v === 'boolean' ? v : undefined);
+
+/** Whatever arrived, only the known fields in their shape: a bad value is dropped, never refused. */
+export function cleanSignals(value: unknown): DeviceSignals | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const v = value as Record<string, unknown>;
+  const out: DeviceSignals = {
+    gpu: short(v.gpu, 80),
+    touch: count(v.touch, 50),
+    webdriver: flag(v.webdriver),
+    fillMs: count(v.fillMs, 86_400_000),
+    keys: count(v.keys, 10_000),
+    pasted: flag(v.pasted),
+    tz: short(v.tz, 40),
+    lang: short(v.lang, 20),
+    adClick: flag(v.adClick),
+    chrome: typeof v.chrome === 'string' && /^\d{1,4}$/.test(v.chrome) ? v.chrome : undefined,
+  };
+  for (const key of Object.keys(out) as Array<keyof DeviceSignals>) if (out[key] === undefined) delete out[key];
+  return Object.keys(out).length ? out : undefined;
+}
+
+const WORDS = {
+  latn: {
+    noAd: 'reklama bosilmagan',
+    webdriver: 'webdriver (dastur boshqargan)',
+    touch: 'sensor',
+    seconds: 'soniyada',
+    keys: 'ta harf yozilgan',
+    pasted: "nusxa qo'yilgan",
+    noTyping: 'hech narsa yozilmagan',
+    really: 'aslida',
+  },
+  cyrl: {
+    noAd: 'реклама босилмаган',
+    webdriver: 'webdriver (дастур бошқарган)',
+    touch: 'сенсор',
+    seconds: 'сонияда',
+    keys: 'та ҳарф ёзилган',
+    pasted: 'нусха қўйилган',
+    noTyping: 'ҳеч нарса ёзилмаган',
+    really: 'аслида',
+  },
+};
+
+/**
+ * One short line for the people checking orders, e.g.
+ * "reklama bosilmagan · GPU: NVIDIA GeForce RTX 3060 · sensor 0 · 2 soniyada · hech narsa yozilmagan · Asia/Tashkent · ru-RU".
+ */
+export function describeSignals(s: DeviceSignals | undefined, userAgent: string | null | undefined, script: 'latn' | 'cyrl'): string {
+  if (!s) return '';
+  const w = WORDS[script];
+  const parts: string[] = [];
+  if (s.adClick === false) parts.push(w.noAd);
+  if (s.webdriver) parts.push(w.webdriver);
+  if (s.gpu) parts.push(`GPU: ${s.gpu.replace(/^ANGLE \((.*)\)$/, '$1')}`);
+  if (s.touch !== undefined) parts.push(`${w.touch} ${s.touch}`);
+  if (s.fillMs !== undefined) parts.push(`${Math.round(s.fillMs / 1000)} ${w.seconds}`);
+  if (s.keys) parts.push(`${s.keys} ${w.keys}`);
+  if (s.pasted) parts.push(w.pasted);
+  if (!s.keys && !s.pasted) parts.push(w.noTyping);
+  const claimed = /Chrome\/(\d+)/.exec(userAgent ?? '')?.[1];
+  if (s.chrome && claimed && claimed !== s.chrome) parts.push(`Chrome ${claimed} (${w.really} ${s.chrome})`);
+  if (s.tz) parts.push(s.tz);
+  if (s.lang) parts.push(s.lang);
+  return parts.join(' · ');
+}

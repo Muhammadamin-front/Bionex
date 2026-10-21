@@ -1042,6 +1042,19 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
   });
 
+  it('shows how the order was made («Tafsilot»), and a driven browser is a likely robot', async () => {
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    const signals = { gpu: 'ANGLE (NVIDIA GeForce RTX 3060)', touch: 0, webdriver: true, fillMs: 1800, keys: 0, pasted: false, tz: 'Asia/Tashkent', lang: 'ru-RU', adClick: false, chrome: '152' };
+    expect((await order({ phone: '+998 90 312 45 74', signals }, { ip: '203.0.113.74', userAgent: chrome })).status).toBe(201);
+    const text = leadMessages().at(-1)!.text;
+    expect(text).toContain('🔬 реклама босилмаган · webdriver (дастур бошқарган) · GPU: NVIDIA GeForce RTX 3060 · сенсор 0 · 2 сонияда');
+    expect(text).toContain('Chrome 141 (аслида 152)');
+    expect(text).toContain('бот эҳтимоли катта');
+    // Nonsense in the signals is dropped, never a refused order.
+    expect((await order({ phone: '+998 90 312 45 75', signals: { gpu: 5, touch: 'x', extra: 1 } }, { ip: '203.0.113.75' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('🔬');
+  });
+
   it('identifies the customer only by one-way hashes, never the number itself', async () => {
     await order({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67' });
     await press('s:1:sold');
@@ -1257,9 +1270,11 @@ describe('the partner site (sites.ts t2)', () => {
     const ua = 'Mozilla/5.0 (Linux; Android 13; SM-A135F Build/TP1A.220624.014; wv) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36';
     expect((await order({ phone: '+998 90 312 45 82' }, { ip: '203.0.113.82', userAgent: ua })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('📱 Samsung Galaxy A13 (SM-A135F) · Android 13');
-    expect((await partnerOrder({ fullName: 'Модел Исм', phone: '+998 90 312 45 83', deviceModel: 'iPhone14,2 · iOS 17.5' }, '192.0.2.83')).status).toBe(201);
+    const signals = { touch: 10, keys: 21, fillMs: 34_000, adClick: true };
+    expect((await partnerOrder({ fullName: 'Модел Исм', phone: '+998 90 312 45 83', deviceModel: 'iPhone14,2 · iOS 17.5', signals }, '192.0.2.83')).status).toBe(201);
     await until(() => sheets.rows.length >= 1);
     expect(sheets.rows[0]!.headers).toContain('Qurilma');
+    expect(sheets.rows[0]!.row[sheets.rows[0]!.headers.indexOf('Tafsilot')]).toBe('sensor 10 · 34 soniyada · 21 ta harf yozilgan');
     expect(sheets.rows[0]!.row[sheets.rows[0]!.headers.indexOf('Qurilma')]).toBe('iPhone 13 Pro (iPhone14,2) · iOS 17.5');
   });
 

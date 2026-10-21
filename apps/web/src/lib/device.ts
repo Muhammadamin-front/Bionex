@@ -1,4 +1,4 @@
-import { modelFromUserAgent } from '@bionex/shared/device';
+import { modelFromUserAgent, type DeviceSignals } from '@bionex/shared/device';
 import { newSubmissionId } from './api';
 
 const KEY = 'bx_device';
@@ -91,6 +91,26 @@ function webglSignal(): string {
   }
 }
 
+type Hints = { model?: string; platform?: string; platformVersion?: string; fullVersionList?: Array<{ brand: string; version: string }> };
+let hints: Promise<Hints | undefined> | undefined;
+
+/** What Chrome tells only when asked (other browsers have no `userAgentData`). */
+function askHints(): Promise<Hints | undefined> {
+  hints ??= (async () => {
+    try {
+      const data = (navigator as Navigator & { userAgentData?: { getHighEntropyValues(keys: string[]): Promise<Hints> } }).userAgentData;
+      if (!data) return undefined;
+      return await Promise.race([
+        data.getHighEntropyValues(['model', 'platform', 'platformVersion', 'fullVersionList']),
+        new Promise<undefined>((r) => setTimeout(r, 1_000)),
+      ]);
+    } catch {
+      return undefined;
+    }
+  })();
+  return hints;
+}
+
 let model: Promise<string | undefined> | undefined;
 
 /**
@@ -101,9 +121,7 @@ export function deviceModel(): Promise<string | undefined> {
   model ??= (async () => {
     const fromUa = iphoneBySize(modelFromUserAgent(navigator.userAgent));
     try {
-      const hints = (navigator as Navigator & { userAgentData?: { getHighEntropyValues(keys: string[]): Promise<Record<string, string>> } }).userAgentData;
-      if (!hints) return fromUa;
-      const asked = await Promise.race([hints.getHighEntropyValues(['model', 'platform', 'platformVersion']), new Promise<undefined>((r) => setTimeout(r, 1_000))]);
+      const asked = await askHints();
       if (!asked?.model) return fromUa;
       return `${asked.model} · ${asked.platform || 'Android'} ${(asked.platformVersion ?? '').replace(/(\.0)+$/, '')}`.trim();
     } catch {
@@ -141,5 +159,63 @@ function iphoneBySize(model: string | undefined): string | undefined {
     return name ? model.replace(/^iPhone/, name) : model;
   } catch {
     return model;
+  }
+}
+
+/**
+ * How the form was filled: typed key by key, pasted, or set by a program (no typing at all).
+ * Counted from the first change in any field of the page.
+ */
+const typing = { first: 0, keys: 0, pasted: false };
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'input',
+    (e) => {
+      typing.first ||= performance.now();
+      const type = (e as InputEvent).inputType;
+      if (type === 'insertText' || type === 'deleteContentBackward') typing.keys++;
+      else if (type === 'insertFromPaste') typing.pasted = true;
+    },
+    true,
+  );
+}
+
+/**
+ * What tells a phone from a computer pretending to be one, and a person from a program
+ * (docs/SPAM.md): graphics chip, touch points, the automation mark, how the form was filled,
+ * the phone's time zone and language, whether the visit came from an ad click, and Chrome's
+ * real version. Shown to the people checking orders as «Tafsilot»; never a reason to refuse.
+ */
+export async function deviceSignals(): Promise<DeviceSignals> {
+  const asked = await askHints();
+  const chrome = asked?.fullVersionList?.find((b) => /Chrome|Chromium/.test(b.brand))?.version.split('.')[0];
+  let adClick = false;
+  try {
+    adClick = new URLSearchParams(location.search).has('fbclid') || /(^|;\s*)_fbc=/.test(document.cookie);
+  } catch {
+    /* no cookies in this browser */
+  }
+  return {
+    gpu: gpuName(),
+    touch: navigator.maxTouchPoints,
+    webdriver: navigator.webdriver === true,
+    fillMs: typing.first ? Math.round(performance.now() - typing.first) : 0,
+    keys: typing.keys,
+    pasted: typing.pasted,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    lang: navigator.language,
+    adClick,
+    chrome,
+  };
+}
+
+function gpuName(): string | undefined {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    if (!gl) return undefined;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    return String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+  } catch {
+    return undefined;
   }
 }

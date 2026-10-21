@@ -141,6 +141,8 @@ export interface OrderInput {
   fingerprint?: string;
   /** The phone's model as its browser names it (@bionex/shared device.ts), for people to read. */
   model?: string;
+  /** The browser's signals in one line («Tafsilot»), in both scripts: the sheet's and the group's. */
+  details?: { latn: string; cyrl: string };
 }
 
 /**
@@ -363,6 +365,7 @@ export class LeadRegistry extends DurableObject<Env> {
       source: { id: ipHash.slice(0, 6), phonesToday: otherPhones + 1 },
       flags: input.flags,
       model: input.model,
+      details: input.details?.cyrl,
       list: list ? { count: list.count, size: list.size } : undefined,
       via: input.via,
     });
@@ -435,7 +438,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (sheet) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
-        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model }),
+        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),
       );
     } else {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
