@@ -33,8 +33,8 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 74 tests, Miniflare
-npm test --workspace=@bionex/shared      # 63 tests
+npm test --workspace=@bionex/worker      # 76 tests, Miniflare
+npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
 ```
@@ -74,7 +74,7 @@ user's Mac.
 4. **Google Sheet** («Bionex Leads», tab «Lidlar», owned by the user, shared with the
    targetologist): an Apps Script web app (code in `docs/PARTNER-SITE.md`) appends rows **by
    header name** (columns may be reordered, not renamed: №, Sana, Ism, Telefon, Kampaniya,
-   Ad set, Video, Belgi, Holat, Izoh) and copies the owner's own «Holat» dropdown to new rows.
+   Ad set, Video, Belgi, Holat, Izoh, Qurilma) and copies the owner's own «Holat» dropdown to new rows.
    Secrets `SHEETS_T2_URL`, `SHEETS_T2_SECRET` are set. Changing the script needs
    **Manage deployments → ✏️ → New version** (never «New deployment»: the URL would change).
    An edit trigger was tried and abandoned (the user could not get `setup` to run).
@@ -90,6 +90,12 @@ user's Mac.
    When the device id is new but the likeness matches a spam mark, the order is flagged
    `spam_lookalike` («аввал спам бўлган қурилмага ўхшайди»). **Flag only, never block** —
    the owner's decision; same-model phones can share a likeness.
+7. **Phone model shown to people** (2026-10-21): `deviceModel` («SM-A135F · Android 13») from
+   `navigator.userAgentData` (Chrome) or the user agent (FB/IG in-app browsers name it; Safari
+   never names the iPhone), server falls back to the request's user agent
+   (`packages/shared/src/device.ts`). Shown as 📱 in Telegram and in the sheet's «Qurilma»
+   column (the owner must add that header; rows go by header name). Not stored, not hashed.
+   Seen on 2026-10-21: every partner spam order carried `no_captcha`.
 
 ## Open items
 

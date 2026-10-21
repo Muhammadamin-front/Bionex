@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   caretAfterDigits,
+  cleanDeviceModel,
+  modelFromUserAgent,
   formatNationalAsTyped,
   nationalDigitsFromInput,
   formatUzPhone,
@@ -180,5 +182,33 @@ describe('lead submission schema', () => {
     expect(r.success).toBe(false);
     expect(r.error?.issues[0]?.path).toEqual(['phone']);
     expect(r.error?.issues[0]?.message).toMatch(/нотўғри/);
+  });
+});
+
+describe('modelFromUserAgent', () => {
+  it('names the model the in-app browsers and WebViews still report', () => {
+    expect(
+      modelFromUserAgent(
+        'Mozilla/5.0 (Linux; Android 13; SM-A135F Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/480.0.0.40.94;]',
+      ),
+    ).toBe('SM-A135F · Android 13');
+    expect(
+      modelFromUserAgent(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/480.0;FBBV/1;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/17.5.1]',
+      ),
+    ).toBe('iPhone14,2 · iOS 17.5.1');
+  });
+
+  it('falls back to the system when the model is hidden', () => {
+    expect(modelFromUserAgent('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36')).toBe('Android 10');
+    expect(modelFromUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1')).toBe('iPhone · iOS 18');
+    expect(modelFromUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0')).toBe('Windows');
+    expect(modelFromUserAgent('')).toBeUndefined();
+  });
+
+  it('keeps only harmless characters, and short', () => {
+    expect(cleanDeviceModel('<b>=HYPERLINK("x")</b> Redmi Note 12')).toBe('bHYPERLINK(x)/b Redmi Note 12');
+    expect(cleanDeviceModel('x'.repeat(300))).toHaveLength(60);
+    expect(cleanDeviceModel('   ')).toBeUndefined();
   });
 });

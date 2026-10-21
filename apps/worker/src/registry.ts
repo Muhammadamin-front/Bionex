@@ -139,6 +139,8 @@ export interface OrderInput {
   device?: string;
   /** The phone's likeness, a SHA-256 the browser made (apps/web lib/device.ts); absent for bot orders. */
   fingerprint?: string;
+  /** The phone's model as its browser names it (@bionex/shared device.ts), for people to read. */
+  model?: string;
 }
 
 /**
@@ -360,6 +362,7 @@ export class LeadRegistry extends DurableObject<Env> {
       utm: input.utm,
       source: { id: ipHash.slice(0, 6), phonesToday: otherPhones + 1 },
       flags: input.flags,
+      model: input.model,
       list: list ? { count: list.count, size: list.size } : undefined,
       via: input.via,
     });
@@ -432,7 +435,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (sheet) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
-        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags }),
+        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model }),
       );
     } else {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);

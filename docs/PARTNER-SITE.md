@@ -117,7 +117,7 @@ Trigger, `setup` yoki qo'shimcha ruxsat kerak emas: server har 5 daqiqada «Hola
 skript orqali o'qiydi.
 
 Ustunlar sarlavha nomi bo'yicha to'ldiriladi (№, Sana, Ism, Telefon, Kampaniya, Ad set, Video,
-Belgi, Holat, Izoh) — tartibini o'zgartirsa bo'ladi, nomini emas. «Holat» dropdown'i jadval
+Belgi, Holat, Izoh, Qurilma) — tartibini o'zgartirsa bo'ladi, nomini emas. «Holat» dropdown'i jadval
 egasiniki; skript uni yangi qatorga qo'shni qatordan nusxalaydi va o'zgartirmaydi. Unda **Keraksiz** varianti bo'lishi kerak (katta-kichik
 harf, lotin/kirill farqi yo'q); «Spam» ham xuddi shunday hisoblanadi). «Keraksiz» —
 Telegram guruhdagi 🚫 Спам bilan bir xil: o'sha lidning tarmog'i va qurilmasi 30 kun eslab

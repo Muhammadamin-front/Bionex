@@ -1238,6 +1238,18 @@ describe('the partner site (sites.ts t2)', () => {
     expect(leadMessages().at(-1)!.text).not.toContain('қурилмадан');
   });
 
+  it('shows the phone model: the one the browser named, else the one its user agent names', async () => {
+    expect((await order({ phone: '+998 90 312 45 81', deviceModel: 'Redmi Note 12 · Android 14' }, { ip: '203.0.113.81' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('📱 Redmi Note 12 · Android 14');
+    const ua = 'Mozilla/5.0 (Linux; Android 13; SM-A135F Build/TP1A.220624.014; wv) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36';
+    expect((await order({ phone: '+998 90 312 45 82' }, { ip: '203.0.113.82', userAgent: ua })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('📱 SM-A135F · Android 13');
+    expect((await partnerOrder({ fullName: 'Модел Исм', phone: '+998 90 312 45 83', deviceModel: 'iPhone14,2 · iOS 17.5' }, '192.0.2.83')).status).toBe(201);
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows[0]!.headers).toContain('Qurilma');
+    expect(sheets.rows[0]!.row[sheets.rows[0]!.headers.indexOf('Qurilma')]).toBe('iPhone14,2 · iOS 17.5');
+  });
+
   it('a phone that looks like a marked one is flagged after its browser data is cleared, on either site', async () => {
     const LOOKS = 'ab'.repeat(32);
     const device = (n: number) => `aaaaaaaa-0000-4000-8000-00000000000${n}`;

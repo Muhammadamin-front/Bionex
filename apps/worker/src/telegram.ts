@@ -12,6 +12,8 @@ export interface LeadMessage {
   /** Short pseudonymous id of the visitor's network, and how many numbers it sent today. */
   source: { id: string; phonesToday: number };
   flags: string[];
+  /** The phone's model as its browser names it ("SM-A135F · Android 13"). */
+  model?: string;
   /** Where this order stands in the next list, e.g. 3 of 10 (absent when lists are off). */
   list?: { count: number; size: number };
   /** Ordered through the Telegram bot: the number was shared as a contact (verified) or typed. */
@@ -115,6 +117,7 @@ export function formatLead(lead: LeadMessage): string {
     const source = sourceLabel(lead.utm);
     if (source) lines.push(`📣 ${escapeHtml(source)}`);
   }
+  if (lead.model) lines.push(`📱 ${escapeHtml(lead.model)}`);
   // The source line matters only when something looks off; otherwise it is noise.
   if (lead.source.phonesToday > 1 || lead.flags.length > 0) {
     const sourceNote = lead.source.phonesToday > 1 ? ` (бугун ${lead.source.phonesToday} та рақам)` : '';

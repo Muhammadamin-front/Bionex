@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HONEYPOT_FIELD } from './constants';
+import { cleanDeviceModel } from './device';
 import { normalizeName, type NameErrorReason } from './name';
 import { DEFAULT_UZ_PREFIXES, normalizeUzPhone, type PhoneErrorReason } from './phone';
 import { sanitizeUtm, UTM_KEYS } from './utm';
@@ -80,6 +81,8 @@ export function makeLeadSubmissionSchema(opts: { phonePrefixes?: readonly string
     deviceId: z.string().regex(SUBMISSION_ID_PATTERN).optional(),
     /** A SHA-256 (hex) of what the browser reports about the phone (apps/web lib/device.ts). */
     fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    /** The phone's model as the browser names it (device.ts); cleaned, never a reason to refuse. */
+    deviceModel: z.string().max(200).optional().transform(cleanDeviceModel),
     turnstileToken: z.string().max(2048).optional(),
     [HONEYPOT_FIELD]: z.string().max(500).optional(),
     utm: utmInputSchema,

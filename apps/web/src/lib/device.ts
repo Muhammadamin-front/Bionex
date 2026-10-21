@@ -1,3 +1,4 @@
+import { modelFromUserAgent } from '@bionex/shared/device';
 import { newSubmissionId } from './api';
 
 const KEY = 'bx_device';
@@ -88,4 +89,26 @@ function webglSignal(): string {
   } catch {
     return '';
   }
+}
+
+let model: Promise<string | undefined> | undefined;
+
+/**
+ * The phone's model, for the people ringing the customer (see @bionex/shared device.ts).
+ * Chrome on Android names it only when asked; elsewhere the user agent is all there is.
+ */
+export function deviceModel(): Promise<string | undefined> {
+  model ??= (async () => {
+    const fromUa = modelFromUserAgent(navigator.userAgent);
+    try {
+      const hints = (navigator as Navigator & { userAgentData?: { getHighEntropyValues(keys: string[]): Promise<Record<string, string>> } }).userAgentData;
+      if (!hints) return fromUa;
+      const asked = await Promise.race([hints.getHighEntropyValues(['model', 'platform', 'platformVersion']), new Promise<undefined>((r) => setTimeout(r, 1_000))]);
+      if (!asked?.model) return fromUa;
+      return `${asked.model} · ${asked.platform || 'Android'} ${(asked.platformVersion ?? '').replace(/(\.0)+$/, '')}`.trim();
+    } catch {
+      return fromUa;
+    }
+  })();
+  return model;
 }
