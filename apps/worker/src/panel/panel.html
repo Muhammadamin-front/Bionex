@@ -31,6 +31,9 @@
     --info-bg: #e0f2fe;
     --cb: #854d0e;
     --cb-bg: #fef9c3;
+    --grid: #d0d7de;
+    --head: #1e2a4a;
+    --head-hover: #2b3a60;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -237,32 +240,35 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+  /* Google Sheets ko‘rinishi: to‘q ko‘k sarlavha qatori va katak chiziqlari (grid) */
   table {
     width: 100%;
     border-collapse: collapse;
     text-align: left;
     font-size: 13px;
+    border: 1px solid var(--grid);
+    background: var(--bg);
   }
   th, td {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
+    padding: 7px 10px;
+    border: 1px solid var(--grid);
     vertical-align: middle;
   }
   th {
-    background: var(--bg2);
-    color: var(--hint);
+    background: var(--head);
+    color: #ffffff;
     font-weight: 600;
     font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .3px;
     white-space: nowrap;
     user-select: none;
     cursor: pointer;
     position: sticky;
     top: 0;
   }
-  th:hover { color: var(--text); background: #e9eef5; }
-  th.active-sort { color: var(--btn); }
+  th:hover { background: var(--head-hover); }
+  th.active-sort { background: var(--head-hover); color: #ffffff; }
+  /* Sheet kabi juft/toq qatorlar */
+  tbody tr:nth-child(even) { background: #f8fafc; }
   tbody tr:hover { background: var(--bg-hover); }
   tbody tr.selected-row { background: var(--bg-selected); }
   tbody tr.flagged-row { background: #fffbeb; }
