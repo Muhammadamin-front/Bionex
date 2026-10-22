@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 78 tests, Miniflare
+npm test --workspace=@bionex/worker      # 80 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -116,6 +116,14 @@ user's Mac.
     `spam_lookalike` is accepted and counted but NOT written to the Google Sheet, so the
     partner's people don't call bots. Bare `no_captcha` still goes (a real in-app-browser
     customer can fail Turnstile). The Meta Lead gate (principle #3) was NOT changed.
+12. **Panel installable as a desktop app (PWA)** (2026-10-23, owner's request, for a computer):
+    `apps/worker/src/panel/pwa.ts` serves a manifest, two PNG icons and a tiny service worker
+    (caches nothing — a fetch handler only, Chrome's install condition) at
+    `/panel/manifest.webmanifest`, `/panel/sw.js` (header `Service-Worker-Allowed: /panel`) and
+    `/panel/icon-{192,512}.png` (routed in index.ts, public, no lead data). panel.html links the
+    manifest + theme-color and registers the SW; panel.ts CSP gained `manifest-src`/`worker-src`.
+    Chrome/Edge then show «Install» in the address bar. start_url `/panel`; the personal key
+    still lives in localStorage, so a 7-day-expired install shows the «open from the bot» message.
 
 ## Open items
 
