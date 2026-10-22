@@ -8,6 +8,21 @@
         "value": "montserrat",
         "createdAt": "2026-10-17T10:05:37.960Z",
         "reason": "codebase: apps/web/src/main.tsx documents Montserrat as the self-hosted brand display face, chosen before this session; it covers the Cyrillic the Uzbek text needs"
+      },
+      {
+        "rule": "overused-font",
+        "value": "roboto",
+        "createdAt": "2026-10-22T15:35:14.998Z",
+        "reason": "Panel deliberately mimics Google Sheets (user requested the Sheets look); Sheets itself uses Roboto, so it is the correct face here"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "apps/worker/src/panel/panel.html"
+        ],
+        "createdAt": "2026-10-22T15:35:15.023Z",
+        "reason": "Spreadsheet-grid CRM mimicking Google Sheets (user requested); tight cells are inherent to a data grid"
       }
     ]
   }
