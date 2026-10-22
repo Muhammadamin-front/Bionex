@@ -101,6 +101,9 @@ export interface PanelLead {
   campaign: string | null;
   adset: string | null;
   ad: string | null;
+  /** The phone's model («Qurilma») and the browser's signals («Tafsilot»); null for bot orders. */
+  device: string | null;
+  details: string | null;
   flagged: boolean;
   takerId: number | null;
   takerName: string | null;
@@ -237,6 +240,9 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('ad')) this.sql.exec('ALTER TABLE list_items ADD COLUMN ad TEXT');
     // Set when operators clear the panel (e.g. before new ad sets start); the order stays in the archive view.
     if (!listColumns.includes('archived_at')) this.sql.exec('ALTER TABLE list_items ADD COLUMN archived_at INTEGER');
+    // The phone's model («Qurilma») and the browser's signals («Tafsilot»), for the panel.
+    if (!listColumns.includes('device')) this.sql.exec('ALTER TABLE list_items ADD COLUMN device TEXT');
+    if (!listColumns.includes('details')) this.sql.exec('ALTER TABLE list_items ADD COLUMN details TEXT');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS partner_leads (
@@ -372,13 +378,15 @@ export class LeadRegistry extends DurableObject<Env> {
     const parts = utmParts(input.utm);
     const platform = input.via ? 'Telegram бот' : parts.platform;
     this.sql.exec(
-      'UPDATE list_items SET msg_html = ?, source = ?, platform = ?, campaign = ?, adset = ?, ad = ? WHERE lead_id = ?',
+      'UPDATE list_items SET msg_html = ?, source = ?, platform = ?, campaign = ?, adset = ?, ad = ?, device = ?, details = ? WHERE lead_id = ?',
       text,
       input.via ? 'Telegram бот' : sourceLabel(input.utm),
       platform,
       input.via ? null : parts.campaign,
       input.via ? null : parts.adset,
       input.via ? null : parts.ad,
+      input.via ? null : (input.model ?? null),
+      input.via ? null : (input.details?.cyrl || null),
       leadId,
     );
     // The order first, then (if it completed one) the list under it.
@@ -753,13 +761,15 @@ export class LeadRegistry extends DurableObject<Env> {
         campaign: string | null;
         adset: string | null;
         ad: string | null;
+        device: string | null;
+        details: string | null;
         flagged: number;
         taker_id: number | null;
         taker_name: string | null;
         outcome: string | null;
         outcome_at: number | null;
       }>(
-        `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.platform, li.campaign, li.adset, li.ad, li.flagged,
+        `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.platform, li.campaign, li.adset, li.ad, li.device, li.details, li.flagged,
                 ls.taker_id, ls.taker_name, ls.outcome, ls.outcome_at
            FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
           WHERE li.at >= ? AND li.archived_at IS ${input.archive ? 'NOT NULL' : 'NULL'}
@@ -784,6 +794,8 @@ export class LeadRegistry extends DurableObject<Env> {
           campaign,
           adset,
           ad,
+          device: r.device,
+          details: r.details,
           flagged: r.flagged === 1,
           takerId: r.taker_id,
           takerName: r.taker_name,

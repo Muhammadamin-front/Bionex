@@ -107,6 +107,10 @@ user's Mac.
    points, webdriver, fill time, keys typed/pasted, time zone, language, ad click via
    fbclid/_fbc, Chrome's real version vs the user agent's), `describeSignals` in shared. The
    owner suspects a computer posing as a phone behind mobile proxies; this is how to tell.
+10. **Panel shows «Qurilma» and «Tafsilot» too** (2026-10-22): `list_items` gained `device`
+    and `details` columns, stored on `accept` (main site); `panelData` returns them and the
+    operators' Mini App (`panel.html`) renders them as two columns (details wrap, suspect ones
+    amber) and in the CSV. Makes the Telegram panel match the partner Google Sheet's layout.
 
 ## Open items
 

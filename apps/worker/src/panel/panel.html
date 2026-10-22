@@ -311,6 +311,11 @@
   .tag.video { background: #fef3c7; color: #92400e; font-weight: 700; }
   .tag.empty-tag { background: transparent; color: var(--hint); padding: 0; }
 
+  /* Device model («Qurilma») and browser signals («Tafsilot») */
+  .device-cell { white-space: nowrap; font-size: 12px; color: var(--ink); }
+  .details-cell { max-width: 260px; white-space: normal; font-size: 11px; line-height: 1.35; color: var(--hint); }
+  .details-cell.suspect { color: #92400e; font-weight: 600; }
+
   /* Status Badges */
   .badge {
     display: inline-flex;
@@ -704,6 +709,8 @@
           l.campaign || '',
           l.adset || '',
           l.ad || '',
+          l.device || '',
+          l.details || '',
           l.takerName || ''
         ].join(' ').toLowerCase();
         var matchText = hay.indexOf(q) >= 0;
@@ -725,6 +732,8 @@
       else if (col === 'adset') { va = (a.adset || '').toLowerCase(); vb = (b.adset || '').toLowerCase(); }
       else if (col === 'ad') { va = (a.ad || '').toLowerCase(); vb = (b.ad || '').toLowerCase(); }
       else if (col === 'platform') { va = (a.platform || a.source || '').toLowerCase(); vb = (b.platform || b.source || '').toLowerCase(); }
+      else if (col === 'device') { va = (a.device || '').toLowerCase(); vb = (b.device || '').toLowerCase(); }
+      else if (col === 'details') { va = (a.details || '').toLowerCase(); vb = (b.details || '').toLowerCase(); }
       else if (col === 'status') { va = STATUS[statusOf(a)][2]; vb = STATUS[statusOf(b)][2]; }
       else if (col === 'operator') { va = (a.takerName || '').toLowerCase(); vb = (b.takerName || '').toLowerCase(); }
       else { va = a.number; vb = b.number; }
@@ -818,7 +827,7 @@
   function exportCsv() {
     if (!state.data || !state.data.leads) return;
     var list = filteredLeads(state.data.leads);
-    var headers = ['№', 'Вақт', 'Исм', 'Телефон', 'Ҳолат', 'Оператор', 'Манба', 'Кампания', 'Ad Set (Таргет)', 'Видео (Реклама)', 'Шубҳали'];
+    var headers = ['№', 'Вақт', 'Исм', 'Телефон', 'Ҳолат', 'Оператор', 'Манба', 'Кампания', 'Ad Set (Таргет)', 'Видео (Реклама)', 'Қурилма', 'Тафсилот', 'Шубҳали'];
     var rows = [headers.join(',')];
     list.forEach(function (l) {
       var s = STATUS[statusOf(l)][0];
@@ -833,6 +842,8 @@
         l.campaign || '',
         l.adset || '',
         l.ad || '',
+        l.device || '',
+        l.details || '',
         l.flagged ? 'Ҳа' : ''
       ].map(function (c) {
         var str = String(c == null ? '' : c);
@@ -1121,6 +1132,8 @@
       ['campaign', 'Кампания'],
       ['adset', 'Ad Set (Таргет)'],
       ['ad', 'Видео / Реклама'],
+      ['device', 'Қурилма'],
+      ['details', 'Тафсилот'],
       ['platform', 'Манба'],
       ['status', 'Ҳолат (Telegram)'],
       ['operator', 'Оператор'],
@@ -1195,6 +1208,14 @@
         var tdAd = el('td');
         tdAd.appendChild(el('span', l.ad ? 'tag video' : 'tag empty-tag', l.ad || '—'));
         tr.appendChild(tdAd);
+
+        // 7b. Device model («Qurilma»)
+        tr.appendChild(el('td', 'device-cell', l.device || '—'));
+
+        // 7c. Browser signals («Tafsilot»)
+        var tdDet = el('td', 'details-cell', l.details || '—');
+        if (l.details && /webdriver|бот/i.test(l.details)) tdDet.className = 'details-cell suspect';
+        tr.appendChild(tdDet);
 
         // 8. Platform / Source
         var platform = l.platform || (l.source ? l.source.split(' · ')[0] : '—');

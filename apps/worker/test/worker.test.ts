@@ -691,13 +691,24 @@ describe("the operators' Mini App panel", () => {
       { ip: '203.0.113.96' },
     );
     // No utm_term: the ad set stays unknown rather than guessed from the video's name.
-    await order({ fullName: 'Санжар Рахимов', phone: '+998 90 312 45 97', utm: { source: 'facebook', campaign: 'qon-bosimi', content: 'video3' } }, { ip: '203.0.113.97' });
+    // Also carries the phone model and the browser signals, for the panel's «Qurilma»/«Tafsilot».
+    await order(
+      {
+        fullName: 'Санжар Рахимов',
+        phone: '+998 90 312 45 97',
+        utm: { source: 'facebook', campaign: 'qon-bosimi', content: 'video3' },
+        deviceModel: 'SM-A175F · Android 16',
+        signals: { webdriver: true, touch: 0, gpu: 'NVIDIA GeForce RTX 3060', fillMs: 1500, keys: 0 },
+      },
+      { ip: '203.0.113.97' },
+    );
     const data = (await (await panel('/api/panel/data?days=7', { auth: await initData(ali) })).json()) as {
-      leads: Array<{ number: number; platform: string | null; campaign: string | null; adset: string | null; ad: string | null }>;
+      leads: Array<{ number: number; platform: string | null; campaign: string | null; adset: string | null; ad: string | null; device: string | null; details: string | null }>;
       truncated: boolean;
     };
     expect(data.truncated).toBe(false);
-    expect(data.leads[0]).toMatchObject({ number: 2, platform: 'Facebook', campaign: 'qon-bosimi', adset: null, ad: 'video3' });
+    expect(data.leads[0]).toMatchObject({ number: 2, platform: 'Facebook', campaign: 'qon-bosimi', adset: null, ad: 'video3', device: 'Samsung Galaxy A17 (SM-A175F) · Android 16' });
+    expect(data.leads[0]!.details).toContain('webdriver (дастур бошқарган)');
     expect(data.leads[1]).toMatchObject({ number: 1, platform: 'Facebook', campaign: 'qon-bosimi', adset: 'A | Video 1-2 | UZ 30-55', ad: 'video1' });
   });
 
