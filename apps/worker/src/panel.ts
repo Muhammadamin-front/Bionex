@@ -130,6 +130,9 @@ export function panelPage(): Response {
         "style-src 'unsafe-inline'",
         "connect-src 'self'",
         "img-src 'self' data:",
+        // The installable-app (PWA) files: its manifest and its service worker.
+        "manifest-src 'self'",
+        "worker-src 'self'",
         "base-uri 'none'",
         "form-action 'none'",
         // Telegram Web and Desktop show Mini Apps in a frame.

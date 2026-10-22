@@ -594,6 +594,25 @@ describe("the operators' Mini App panel", () => {
     expect(html).not.toContain('{{NONCE}}');
   });
 
+  it('serves the installable-app (PWA) files publicly, with no lead data', async () => {
+    const manifest = await mf.dispatchFetch(`${SITE}/panel/manifest.webmanifest`);
+    expect(manifest.status).toBe(200);
+    expect(manifest.headers.get('content-type')).toContain('application/manifest+json');
+    const m = (await manifest.json()) as { start_url: string; icons: unknown[] };
+    expect(m.start_url).toBe('/panel');
+    expect(m.icons).toHaveLength(2);
+    const sw = await mf.dispatchFetch(`${SITE}/panel/sw.js`);
+    expect(sw.status).toBe(200);
+    expect(sw.headers.get('service-worker-allowed')).toBe('/panel');
+    const icon = await mf.dispatchFetch(`${SITE}/panel/icon-512.png`);
+    expect(icon.status).toBe(200);
+    expect(icon.headers.get('content-type')).toBe('image/png');
+    // The page points at them, and its CSP allows a manifest and a worker.
+    const page = await mf.dispatchFetch(`${SITE}/panel`);
+    expect(await page.text()).toContain('rel="manifest"');
+    expect(page.headers.get('content-security-policy')).toContain("manifest-src 'self'");
+  });
+
   it('refuses a missing or forged signature, an old one, and people outside the group', async () => {
     expect((await panel('/api/panel/data')).status).toBe(401);
     expect((await panel('/api/panel/data', { auth: await initData(ali, { token: '999:other-bot' }) })).status).toBe(401);

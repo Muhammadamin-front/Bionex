@@ -4,6 +4,7 @@ import { site } from '../../web/src/config/product';
 import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
+import { pwaIcon, pwaManifest, pwaServiceWorker } from './panel/pwa';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
 import { readableModel } from './models';
@@ -60,6 +61,11 @@ export default {
     const url = new URL(request.url);
     // The operators' Mini App & Table CRM (served by the Worker for its own CSP).
     if ((url.pathname === '/panel' || url.pathname === '/crm') && (request.method === 'GET' || request.method === 'HEAD')) return panelPage();
+    // The panel's installable-app (PWA) files: public, no lead data. See panel/pwa.ts.
+    if (url.pathname === '/panel/manifest.webmanifest') return pwaManifest();
+    if (url.pathname === '/panel/sw.js') return pwaServiceWorker();
+    if (url.pathname === '/panel/icon-192.png') return pwaIcon(192);
+    if (url.pathname === '/panel/icon-512.png') return pwaIcon(512);
     if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 

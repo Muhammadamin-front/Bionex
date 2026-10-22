@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Зейнара · Лидлар жадвали</title>
+<!-- Installable as a desktop app (PWA): see panel/pwa.ts -->
+<link rel="manifest" href="/panel/manifest.webmanifest">
+<meta name="theme-color" content="#1e2a4a">
+<link rel="icon" type="image/png" sizes="192x192" href="/panel/icon-192.png">
 <style>
   /*
    * The operators' CRM, drawn like a spreadsheet: column letters, row numbers, cell grid,
@@ -1355,6 +1359,14 @@
   load();
   setInterval(function () { if (!document.hidden && !state.busy) load(); }, 30000);
 })();
+</script>
+<script nonce="{{NONCE}}">
+  // Register the service worker so Chrome/Edge on a computer offer «Install» in the address bar.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/panel/sw.js', { scope: '/panel' }).catch(function () { /* install is optional */ });
+    });
+  }
 </script>
 </body>
 </html>
