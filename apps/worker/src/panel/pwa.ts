@@ -33,11 +33,12 @@ const MANIFEST = JSON.stringify({
   ],
 });
 
-// Caches nothing: the CRM must always be live. The fetch handler is only here so the browser
-// counts the app as installable.
+// Caches nothing: the CRM must always be live. The fetch handler just passes every request
+// straight to the network — its only job is to exist, which is one of Chrome's conditions for
+// offering «Install». (An empty handler is not enough; it must actually answer the request.)
 const SERVICE_WORKER = `self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', () => {});
+self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });
 `;
 
 const asset = (body: BodyInit, type: string, extra: Record<string, string> = {}) =>
