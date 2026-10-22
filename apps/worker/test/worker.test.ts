@@ -1201,6 +1201,19 @@ describe('the partner site (sites.ts t2)', () => {
     expect(telegram.calls.some((c) => c.method === 'setWebhook')).toBe(false);
   });
 
+  it('keeps bot-flagged orders out of the sheet, but still accepts them', async () => {
+    // A browser a program drives → likely_bot: accepted, but the partner's people never see it.
+    const res = await partnerOrder({ fullName: 'Бот Буюртма', phone: '+998 90 312 45 88', signals: { webdriver: true } }, '203.0.113.88');
+    expect(((await res.json()) as { status: string }).status).toBe('accepted');
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows).toHaveLength(0);
+    // A plain order with no bot flag still reaches the sheet.
+    await partnerOrder({ fullName: 'Ҳақиқий Мижоз', phone: '+998 90 312 45 89' }, '203.0.113.89');
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows).toHaveLength(1);
+    expect(sheets.rows[0]!.row[2]).toBe('Ҳақиқий Мижоз');
+  });
+
   it('numbers its own orders, and is no repeat of a main-site order', async () => {
     expect((await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' })).status).toBe(201);
     // The same customer on the partner site: theirs, not a repeat of ours.
@@ -1244,22 +1257,23 @@ describe('the partner site (sites.ts t2)', () => {
     sheets.statuses = [[1, 'keraksiz '], ['', 'Keraksiz'], [99, 'Spam']];
     await readSheet();
 
-    // Same phone, another network: flagged in the sheet, and the ads are not told.
+    // Same phone, another network: now a known-spam device, so it is kept out of the sheet
+    // altogether (the ads are not told either). The order is still accepted.
     expect((await partnerOrder({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 87', deviceId: DEVICE }, '198.51.100.87')).status).toBe(201);
-    await until(() => sheets.rows.length >= 2);
-    expect(sheets.rows[1]!.row[7]).toBe('bu qurilmadan avval spam belgilangan');
     await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows).toHaveLength(1);
     expect(meta.bodies).toHaveLength(1);
     // The operators see it too, on the main site.
     expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
 
-    // Picked something else after all: forgotten at the next read.
+    // Picked something else after all: forgotten at the next read, so the next order from that
+    // device (no longer flagged) reaches the sheet again, clean.
     sheets.statuses = [[1, 'Kerakli']];
     await readSheet();
     expect((await partnerOrder({ fullName: 'Учинчи Исм', phone: '+998 90 312 45 89', deviceId: DEVICE }, '192.0.2.89')).status).toBe(201);
-    await until(() => sheets.rows.length >= 3);
-    expect(sheets.rows[2]!.row[7]).toBe('');
+    await until(() => sheets.rows.length >= 2);
+    expect(sheets.rows[1]!.row[7]).toBe('');
   });
 
   it("an operator's 🚫 marks the device: its next order is flagged even from another network", async () => {
@@ -1306,10 +1320,10 @@ describe('the partner site (sites.ts t2)', () => {
     // Another phone altogether: nothing.
     expect((await order({ phone: '+998 90 312 45 96', deviceId: device(3), fingerprint: 'cd'.repeat(32) }, { ip: '192.0.2.96' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('спам');
-    // On the partner site too, in its sheet.
+    // On the partner site, a look-alike order is a likely bot, so it is kept out of the sheet.
     expect((await partnerOrder({ fullName: 'Ўхшаш Исм', phone: '+998 90 312 45 97', deviceId: device(4), fingerprint: LOOKS }, '192.0.2.97')).status).toBe(201);
-    await until(() => sheets.rows.length >= 1);
-    expect(sheets.rows[0]!.row[7]).toBe("avval spam bo'lgan qurilmaga o'xshaydi");
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows).toHaveLength(0);
   });
 
   it('opens nothing but the order form to the partner site', async () => {

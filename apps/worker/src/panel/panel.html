@@ -4,415 +4,378 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Зейнара · Лидлар ва Таргет CRM Жадвали</title>
+<title>Зейнара · Лидлар жадвали</title>
 <style>
+  /*
+   * The operators' CRM, drawn like a spreadsheet: column letters, row numbers, cell grid,
+   * a frozen header row, a formula bar showing the selected cell and sheet tabs at the bottom.
+   * The owner reads the partner site's Google Sheet every day, so the panel copies that look:
+   * nothing new to learn, and the same columns in the same order.
+   */
   :root {
-    --bg: #ffffff;
-    --bg2: #f4f6f9;
-    --bg-hover: #f8fafc;
-    --bg-selected: #e5e5e5;
-    --text: #0f172a;
-    --hint: #64748b;
-    --link: #000000;
-    --btn: #000000;
-    --btn-text: #ffffff;
-    --line: #e2e8f0;
-    --ok: #000000;
-    --ok-bg: #e5e5e5;
-    --warn: #000000;
-    --warn-bg: #e5e5e5;
-    --bad: #000000;
-    --bad-bg: #d4d4d4;
-    --spam: #ffffff;
-    --spam-bg: #000000;
-    --wait: #525252;
-    --wait-bg: #f1f1f1;
-    --info: #000000;
-    --info-bg: #ebebeb;
-    --cb: #000000;
-    --cb-bg: #e5e5e5;
-    --grid: #d4d4d4;
-    --head: #000000;
-    --head-hover: #262626;
+    --paper: #ffffff;
+    --chrome: #f9fbfd;      /* the area around the grid */
+    --bar: #ffffff;
+    --grid: #e1e3e1;        /* cell lines */
+    --grid-strong: #c0c0c0; /* frozen-row line */
+    --head-bg: #f8f9fa;     /* column letters / row numbers */
+    --head-text: #5f6368;
+    --head-sel: #d3e3fd;
+    --ink: #202124;
+    --ink2: #5f6368;
+    --line: #dadce0;
+    --accent: #1a73e8;      /* selection blue */
+    --green: #0d652d;
+    --green-bg: #e6f4ea;
+    --red: #c5221f;
+    --red-bg: #fce8e6;
+    --amber: #b06000;
+    --amber-bg: #fef7e0;
+    --blue: #1967d2;
+    --blue-bg: #e8f0fe;
+    --violet: #8430ce;
+    --violet-bg: #f3e8fd;
+    --gray: #3c4043;
+    --gray-bg: #e8eaed;
+    --flag-row: #fff8e1;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0;
-    background: var(--bg2);
-    color: var(--text);
-    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--chrome);
+    color: var(--ink);
+    font: 13px/1.35 Roboto, Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
   }
-  body { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
 
-  /* Header */
-  header {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: var(--bg);
-    border-bottom: 1px solid var(--line);
-    padding: 10px 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  }
-  .header-inner {
-    max-width: 1480px;
-    margin: 0 auto;
+  /* ── Window chrome ─────────────────────────────────────────────── */
+  .app { display: flex; flex-direction: column; height: 100%; }
+
+  .titlebar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
     gap: 10px;
+    padding: 6px 12px 2px;
+    background: var(--bar);
   }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand h1 { font-size: 18px; font-weight: 700; margin: 0; }
-  .brand .meta { color: var(--hint); font-size: 12px; }
-  .header-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .seg { display: inline-flex; background: var(--bg2); border-radius: 10px; padding: 3px; gap: 2px; }
-  .seg button {
+  .logo { width: 26px; height: 26px; flex: none; }
+  .title-main { min-width: 0; flex: 1; }
+  .docname {
+    font-size: 16px;
+    line-height: 20px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .menubar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-top: 1px; }
+  .menubar .label { font-size: 12px; color: var(--ink2); padding: 0 4px; }
+  .menubar button {
     border: 0;
     background: transparent;
-    color: var(--text);
-    border-radius: 8px;
-    padding: 6px 11px;
+    color: var(--ink2);
     font: inherit;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
   }
-  .seg button.on { background: var(--btn); color: var(--btn-text); font-weight: 600; }
-  .tool-btn {
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 9px;
-    padding: 6px 12px;
+  .menubar button:hover { background: #f1f3f4; }
+  .menubar button.on { background: var(--green-bg); color: var(--green); font-weight: 500; }
+  .whoami { font-size: 12px; color: var(--ink2); white-space: nowrap; text-align: right; }
+
+  /* ── Toolbar ───────────────────────────────────────────────────── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 5px 10px;
+    background: var(--bar);
+    border-bottom: 1px solid var(--line);
+  }
+  .tbtn {
+    border: 0;
+    background: transparent;
+    color: var(--ink);
     font: inherit;
     font-size: 13px;
-    font-weight: 500;
+    padding: 5px 9px;
+    border-radius: 4px;
     cursor: pointer;
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     gap: 5px;
   }
-  .tool-btn:hover { background: var(--bg-hover); }
-  .tool-btn[hidden] { display: none; }
-
-  /* Main Container */
-  main {
-    max-width: 1480px;
-    margin: 0 auto;
-    padding: 14px 16px;
-  }
-
-  /* Summary KPI Grid */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .stat {
-    background: var(--bg);
+  .tbtn:hover { background: #f1f3f4; }
+  .tbtn.on { background: var(--blue-bg); color: var(--blue); }
+  .tbtn[hidden] { display: none; }
+  .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; flex: none; }
+  .find {
+    flex: 1 1 180px;
+    min-width: 140px;
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px 14px;
+    border-radius: 4px;
+    padding: 5px 9px;
+    font: inherit;
+    font-size: 13px;
+    background: var(--paper);
+    color: var(--ink);
   }
-  .stat b { display: block; font-size: 22px; font-weight: 700; line-height: 1.15; }
-  .stat span { font-size: 12px; color: var(--hint); display: block; margin-top: 3px; }
-  .stat.ok b { color: var(--ok); }
-  .stat.warn b { color: var(--warn); }
-  .stat.bad b { color: var(--bad); }
-  .stat.spam b { color: var(--spam); }
-
-  /* Section Box */
-  .section-box {
-    background: var(--bg);
+  .find:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .pick {
     border: 1px solid var(--line);
-    border-radius: 14px;
-    margin-bottom: 16px;
-    overflow: hidden;
+    border-radius: 4px;
+    padding: 5px 6px;
+    font: inherit;
+    font-size: 12px;
+    background: var(--paper);
+    color: var(--ink);
+    max-width: 180px;
   }
-  .section-head {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--line);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .section-title {
-    font-size: 15px;
-    font-weight: 700;
-    margin: 0;
+
+  /* ── Formula bar ───────────────────────────────────────────────── */
+  .fxbar {
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-  .section-sub { font-size: 12px; color: var(--hint); font-weight: 400; }
-
-  /* Tabs & Filter Bar */
-  .tabs {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 10px 16px;
+    padding: 4px 10px;
+    background: var(--paper);
     border-bottom: 1px solid var(--line);
-    background: var(--bg2);
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tabs button {
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 999px;
-    padding: 6px 12px;
-    font: inherit;
     font-size: 13px;
-    font-weight: 500;
+    min-height: 30px;
+  }
+  .fxcell {
+    font-size: 12px;
+    color: var(--ink2);
+    min-width: 46px;
+    border-right: 1px solid var(--line);
+    padding-right: 8px;
     white-space: nowrap;
-    cursor: pointer;
   }
-  .tabs button.on { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
-  .tabs .n {
-    display: inline-block;
-    margin-left: 5px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 11px;
-    background: rgba(0,0,0,.07);
-  }
-  .tabs button.on .n { background: rgba(255,255,255,.22); color: #fff; }
-
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--line);
-    align-items: center;
-  }
-  .search {
-    flex: 1 1 240px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 9px;
-    padding: 8px 12px;
-    font: inherit;
-    font-size: 13px;
-  }
-  .select {
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 9px;
-    padding: 8px 10px;
-    font: inherit;
-    font-size: 13px;
-    max-width: 220px;
-  }
-  .active-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--info-bg);
-    color: var(--info);
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .active-filter-chip button {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    padding: 0 2px;
-  }
-
-  /* Data Tables */
-  .table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  /* Google Sheets ko‘rinishi: to‘q ko‘k sarlavha qatori va katak chiziqlari (grid) */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-    font-size: 13px;
-    border: 1px solid var(--grid);
-    background: var(--bg);
-  }
-  th, td {
-    padding: 7px 10px;
-    border: 1px solid var(--grid);
-    vertical-align: middle;
-  }
-  th {
-    background: var(--head);
-    color: #ffffff;
-    font-weight: 600;
-    font-size: 12px;
+  .fxfx { color: var(--ink2); font-style: italic; }
+  .fxval {
+    flex: 1;
+    min-width: 0;
     white-space: nowrap;
-    user-select: none;
-    cursor: pointer;
-    position: sticky;
-    top: 0;
-  }
-  th:hover { background: var(--head-hover); }
-  th.active-sort { background: var(--head-hover); color: #ffffff; }
-  /* Sheet kabi juft/toq qatorlar */
-  tbody tr:nth-child(even) { background: #f8fafc; }
-  tbody tr:hover { background: var(--bg-hover); }
-  tbody tr.selected-row { background: var(--bg-selected); }
-  tbody tr.flagged-row { background: #ececec; }
-  .num-cell { font-weight: 700; white-space: nowrap; color: var(--text); }
-  .time-cell { white-space: nowrap; color: var(--hint); font-size: 12px; }
-  .name-cell { font-weight: 600; min-width: 140px; }
-  .flag-note { color: var(--warn); font-size: 11px; font-weight: 500; margin-top: 2px; }
-  .phone-cell { white-space: nowrap; }
-  .phone-wrap { display: inline-flex; align-items: center; gap: 6px; }
-  .phone-wrap a {
-    font-weight: 600;
-    color: var(--link);
-    text-decoration: none;
-    font-variant-numeric: tabular-nums;
-  }
-  .phone-wrap a:hover { text-decoration: underline; }
-  .copy-btn {
-    border: 1px solid var(--line);
-    background: var(--bg2);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 2px 7px;
-    font: inherit;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .copy-btn:hover { background: var(--line); }
-
-  /* Tag / Target pills */
-  .tag {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    background: var(--bg2);
-    color: var(--text);
-    max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: middle;
+    color: var(--ink);
   }
-  .tag.camp { background: #ebebeb; color: #000000; }
-  .tag.adset { background: #e5e5e5; color: #000000; }
-  .tag.video { background: #000000; color: #ffffff; font-weight: 700; }
-  .tag.empty-tag { background: transparent; color: var(--hint); padding: 0; }
 
-  /* Device model («Qurilma») and browser signals («Tafsilot») */
-  .device-cell { white-space: nowrap; font-size: 12px; color: var(--ink); }
-  .details-cell { max-width: 260px; white-space: normal; font-size: 11px; line-height: 1.35; color: var(--hint); }
-  .details-cell.suspect { color: #000000; font-weight: 700; background: #e5e5e5; }
-
-  /* Status Badges */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+  /* ── Grid ──────────────────────────────────────────────────────── */
+  .gridwrap {
+    flex: 1;
+    overflow: auto;
+    background: var(--chrome);
+    -webkit-overflow-scrolling: touch;
+  }
+  .notice {
+    background: var(--amber-bg);
+    color: var(--amber);
+    padding: 7px 12px;
     font-size: 12px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 999px;
-    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
   }
-  .b-wait { background: var(--wait-bg); color: var(--wait); }
-  .b-work { background: var(--warn-bg); color: var(--warn); }
-  .b-sold { background: var(--ok-bg); color: var(--ok); }
-  .b-noanswer { background: var(--info-bg); color: var(--info); }
-  .b-callback { background: var(--cb-bg); color: var(--cb); }
-  .b-rejected { background: var(--bad-bg); color: var(--bad); }
-  .b-spam { background: var(--spam-bg); color: var(--spam); }
-
-  /* Conversion bar in Target table */
-  .conv-wrap { display: flex; align-items: center; gap: 8px; min-width: 110px; }
-  .conv-bar { flex: 1; height: 7px; background: var(--bg2); border-radius: 999px; overflow: hidden; }
-  .conv-fill { height: 100%; background: var(--ok); border-radius: 999px; }
-  .conv-val { font-weight: 700; font-size: 12px; min-width: 36px; text-align: right; }
-
-  /* Row Action Buttons */
-  .row-acts { display: flex; flex-wrap: wrap; gap: 4px; min-width: 210px; }
-  .act-btn {
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 7px;
-    padding: 4px 8px;
+  .sheet-title {
+    padding: 10px 12px 4px;
+    font-size: 12px;
+    color: var(--ink2);
+  }
+  table.grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    background: var(--paper);
+    font-size: 13px;
+  }
+  table.grid td, table.grid th {
+    border-right: 1px solid var(--grid);
+    border-bottom: 1px solid var(--grid);
+    padding: 4px 6px;
+    text-align: left;
+    font-weight: 400;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    height: 26px;
+  }
+  /* column letters (A, B, C …) */
+  table.grid thead tr.letters th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--head-bg);
+    color: var(--head-text);
+    font-size: 11px;
+    text-align: center;
+    height: 20px;
+    padding: 1px 2px;
+    cursor: default;
+    user-select: none;
+  }
+  table.grid thead tr.letters th.sel { background: var(--head-sel); color: var(--accent); font-weight: 500; }
+  /* the frozen header row (sheet row 1) */
+  table.grid thead tr.names th {
+    position: sticky;
+    top: 20px;
+    z-index: 3;
+    background: var(--head-bg);
+    color: var(--ink);
+    font-weight: 500;
+    font-size: 12px;
+    border-bottom: 2px solid var(--grid-strong);
+    cursor: pointer;
+    user-select: none;
+  }
+  table.grid thead tr.names th:hover { background: #f1f3f4; }
+  table.grid thead tr.names th .sortmark { color: var(--accent); font-size: 10px; }
+  /* row numbers (1, 2, 3 …) */
+  table.grid .gut {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--head-bg);
+    color: var(--head-text);
+    font-size: 11px;
+    text-align: center;
+    width: 44px;
+    padding: 1px 2px;
+    user-select: none;
+    cursor: default;
+  }
+  table.grid .gut.sel { background: var(--head-sel); color: var(--accent); font-weight: 500; }
+  table.grid thead .gut { z-index: 4; }
+  table.grid tbody td.cell { cursor: cell; }
+  table.grid tbody tr.flagged td.cell { background: var(--flag-row); }
+  table.grid tbody tr.picked td.cell { background: #f0f5fb; }
+  table.grid td.cell.sel {
+    box-shadow: inset 0 0 0 2px var(--accent);
+    background: var(--paper) !important;
+  }
+  body.wrap table.grid tbody td.cell { white-space: normal; vertical-align: top; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: #9aa0a6; }
+  .strong { font-weight: 500; }
+  .link { color: var(--accent); text-decoration: none; }
+  .link:hover { text-decoration: underline; }
+  .copy {
+    border: 0;
+    background: transparent;
+    color: var(--ink2);
     font: inherit;
     font-size: 12px;
-    font-weight: 600;
+    padding: 0 3px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .copy:hover { background: #f1f3f4; color: var(--ink); }
+  .warnmark { color: var(--amber); }
+  .suspect { color: var(--red); }
+
+  /* A cell that behaves like a Sheets data-validation dropdown */
+  .chip {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    border-radius: 999px;
+    padding: 3px 20px 3px 9px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    max-width: 100%;
+    cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: right 9px center, right 5px center;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+  }
+  .chip:disabled { opacity: .75; cursor: default; }
+  .c-wait { background-color: var(--amber-bg); color: var(--amber); }
+  .c-work { background-color: var(--blue-bg); color: var(--blue); }
+  .c-callback { background-color: var(--violet-bg); color: var(--violet); }
+  .c-noanswer { background-color: var(--gray-bg); color: var(--gray); }
+  .c-sold { background-color: var(--green-bg); color: var(--green); }
+  .c-rejected { background-color: var(--red-bg); color: var(--red); }
+  .c-spam { background-color: #3c4043; color: #ffffff; }
+
+  /* conversion bar inside a cell */
+  .bar { display: flex; align-items: center; gap: 6px; }
+  .bar .track { flex: 1; height: 6px; background: var(--gray-bg); border-radius: 999px; overflow: hidden; min-width: 28px; }
+  .bar .fill { height: 100%; background: #34a853; }
+  .bar .val { font-variant-numeric: tabular-nums; font-weight: 500; min-width: 34px; text-align: right; }
+
+  /* ── Sheet tabs + status bar ───────────────────────────────────── */
+  .sheetbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: var(--bar);
+    border-top: 1px solid var(--line);
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sheetbar::-webkit-scrollbar { display: none; }
+  .tabs { display: flex; gap: 2px; flex: none; }
+  .tabs button {
+    border: 0;
+    background: transparent;
+    color: var(--ink2);
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 6px 6px 0 0;
     cursor: pointer;
     white-space: nowrap;
   }
-  .act-btn:hover { background: var(--bg2); }
-  .act-btn.take { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
-  .act-btn.sold { background: var(--ok); color: #fff; border-color: var(--ok); }
-  .act-btn.rejected { color: var(--bad); border-color: #a3a3a3; }
-  .act-btn.spam { background: var(--spam-bg); color: var(--spam); border-color: #000000; }
+  .tabs button:hover { background: #f1f3f4; }
+  .tabs button.on { background: var(--green-bg); color: var(--green); font-weight: 500; }
+  .sum {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--ink2);
+    white-space: nowrap;
+    display: flex;
+    gap: 10px;
+    flex: none;
+    padding-left: 10px;
+  }
+  .sum b { color: var(--ink); font-weight: 500; }
 
-  /* Auth / Empty States */
-  .empty, .msg { text-align: center; color: var(--hint); padding: 36px 16px; }
-  .login-box {
+  /* ── Sign-in / messages / toast ────────────────────────────────── */
+  .msg { padding: 28px 16px; text-align: center; color: var(--ink2); }
+  .login {
     max-width: 520px;
-    margin: 48px auto;
-    background: var(--bg);
+    margin: 40px auto;
+    background: var(--paper);
     border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 24px;
+    border-radius: 8px;
+    padding: 22px;
     text-align: center;
   }
-  .login-box h2 { margin: 0 0 8px; font-size: 18px; }
-  .login-box p { color: var(--hint); font-size: 14px; margin: 0 0 16px; line-height: 1.5; }
-  .login-row { display: flex; gap: 8px; }
-  .login-row input {
-    flex: 1;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    padding: 10px 12px;
-    font: inherit;
-  }
-  .login-row button {
-    border: 0;
-    background: var(--btn);
-    color: var(--btn-text);
-    border-radius: 9px;
-    padding: 10px 16px;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
+  .login h2 { margin: 0 0 8px; font-size: 17px; font-weight: 500; }
+  .login p { color: var(--ink2); margin: 0 0 14px; line-height: 1.5; }
+  .login .row { display: flex; gap: 8px; }
+  .login input { flex: 1; border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px; font: inherit; }
+  .login button { border: 0; background: #0b8043; color: #fff; border-radius: 4px; padding: 9px 16px; font: inherit; font-weight: 500; cursor: pointer; }
   .toast {
     position: fixed;
     left: 50%;
-    bottom: calc(18px + env(safe-area-inset-bottom));
+    bottom: calc(56px + env(safe-area-inset-bottom));
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, .9);
+    background: #3c4043;
     color: #fff;
     padding: 10px 16px;
-    border-radius: 12px;
+    border-radius: 4px;
     font-size: 13px;
-    font-weight: 500;
     max-width: 90vw;
     opacity: 0;
-    transition: opacity .2s;
+    transition: opacity .18s;
     pointer-events: none;
     z-index: 50;
   }
@@ -421,28 +384,64 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="header-inner">
-    <div class="brand">
-      <h1>📊 Зейнара · Лидлар ва Таргет CRM</h1>
-      <span class="meta" id="updated"></span>
-    </div>
-    <div class="header-controls">
-      <div class="seg" id="period">
-        <button data-days="1" class="on">Бугун</button>
-        <button data-days="3">3 кун</button>
-        <button data-days="7">7 кун</button>
-        <button data-days="14">14 кун</button>
-        <button data-days="30">30 кун</button>
+<div class="app">
+  <div class="titlebar">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="3" fill="#0f9d58"></rect>
+      <g fill="#ffffff">
+        <rect x="5.5" y="6" width="13" height="2"></rect>
+        <rect x="5.5" y="10" width="13" height="1.6"></rect>
+        <rect x="5.5" y="13.4" width="13" height="1.6"></rect>
+        <rect x="5.5" y="16.8" width="13" height="1.6"></rect>
+        <rect x="11.2" y="6" width="1.6" height="12"></rect>
+      </g>
+    </svg>
+    <div class="title-main">
+      <div class="docname">Зейнара · Лидлар жадвали</div>
+      <div class="menubar" id="period">
+        <span class="label">Давр:</span>
+        <button type="button" data-days="1" class="on">Бугун</button>
+        <button type="button" data-days="3">3 кун</button>
+        <button type="button" data-days="7">7 кун</button>
+        <button type="button" data-days="14">14 кун</button>
+        <button type="button" data-days="30">30 кун</button>
       </div>
-      <button class="tool-btn" id="refreshBtn" type="button">🔄 Янгилаш</button>
-      <button class="tool-btn" id="csvBtn" type="button">📥 CSV (Excel)</button>
-      <button class="tool-btn" id="archiveViewBtn" type="button">🗄 Архив</button>
-      <button class="tool-btn" id="archiveBtn" type="button">🧹 Панелни тозалаш</button>
     </div>
+    <div class="whoami" id="updated"></div>
   </div>
-</header>
-<main id="main"><div class="msg">Юкланмоқда…</div></main>
+
+  <div class="toolbar">
+    <button class="tbtn" id="refreshBtn" type="button" title="Янгилаш">🔄 Янгилаш</button>
+    <button class="tbtn" id="csvBtn" type="button" title="CSV (Excel / Google Sheets)">📥 CSV</button>
+    <button class="tbtn" id="wrapBtn" type="button" title="Матнни ўраш">↕ Матнни ўраш</button>
+    <button class="tbtn" id="archiveBtn" type="button" title="Жорий буюртмаларни архивга ўтказиш">🧹 Тозалаш</button>
+    <span class="sep"></span>
+    <input class="find" id="find" type="search" placeholder="🔍 Исм, телефон, №, видео, ad set…">
+    <select class="pick" id="fStatus" title="Ҳолат бўйича фильтр"></select>
+    <select class="pick" id="fCampaign" title="Кампания бўйича фильтр"></select>
+    <select class="pick" id="fAdset" title="Ad set бўйича фильтр"></select>
+    <select class="pick" id="fAd" title="Видео бўйича фильтр"></select>
+    <select class="pick" id="fOperator" title="Оператор бўйича фильтр"></select>
+    <button class="tbtn" id="clearBtn" type="button" hidden>✖ Фильтрни тозалаш</button>
+  </div>
+
+  <div class="fxbar">
+    <span class="fxcell" id="fxCell">A1</span>
+    <span class="fxfx">fx</span>
+    <span class="fxval" id="fxVal">Катакни босинг — тўлиқ матни шу ерда кўринади</span>
+  </div>
+
+  <div class="gridwrap" id="gridwrap"><div class="msg">Юкланмоқда…</div></div>
+
+  <div class="sheetbar">
+    <div class="tabs" id="tabs">
+      <button type="button" data-sheet="leads" class="on">📋 Лидлар</button>
+      <button type="button" data-sheet="target">🎯 Таргет</button>
+      <button type="button" data-sheet="archive">🗄 Архив</button>
+    </div>
+    <div class="sum" id="sum"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script nonce="{{NONCE}}">
@@ -455,7 +454,7 @@
       if (window.TelegramWebviewProxy && window.TelegramWebviewProxy.postEvent) window.TelegramWebviewProxy.postEvent(type, JSON.stringify(payload));
       else if (window.external && 'notify' in window.external) window.external.notify(JSON.stringify({ eventType: type, eventData: payload }));
       else if (window.parent !== window) window.parent.postMessage(JSON.stringify({ eventType: type, eventData: payload }), '*');
-    } catch (e) { /* browser tab */ }
+    } catch (e) { /* plain browser tab */ }
   }
 
   var hash = new URLSearchParams(location.hash.slice(1));
@@ -476,25 +475,30 @@
     }
   } catch (e) { /* storage blocked */ }
 
-  try {
-    var theme = JSON.parse(hash.get('tgWebAppThemeParams') || '{}');
-    var map = { bg_color: '--bg', secondary_bg_color: '--bg2', text_color: '--text', hint_color: '--hint', link_color: '--link', button_color: '--btn', button_text_color: '--btn-text' };
-    Object.keys(map).forEach(function (k) { if (theme[k]) document.documentElement.style.setProperty(map[k], theme[k]); });
-  } catch (e) { /* default colours */ }
+  // A spreadsheet is white paper: Telegram's theme colours are deliberately not applied here.
   post('web_app_ready'); post('web_app_expand');
 
   var STATUS = {
-    wait: ['⏳ Олинмаган', 'b-wait', 1],
-    work: ['📞 Жараёнда', 'b-work', 2],
-    callback: ['⏰ Кейинроқ', 'b-callback', 3],
-    noanswer: ['🔁 Кўтармади', 'b-noanswer', 4],
-    sold: ['✅ Сотилди', 'b-sold', 5],
-    rejected: ['❌ Рад этди', 'b-rejected', 6],
-    spam: ['🚫 Спам', 'b-spam', 7]
+    wait: ['⏳ Олинмаган', 'c-wait', 1],
+    work: ['📞 Жараёнда', 'c-work', 2],
+    callback: ['⏰ Кейинроқ', 'c-callback', 3],
+    noanswer: ['🔁 Кўтармади', 'c-noanswer', 4],
+    sold: ['✅ Сотилди', 'c-sold', 5],
+    rejected: ['❌ Рад этди', 'c-rejected', 6],
+    spam: ['🚫 Спам', 'c-spam', 7]
   };
-
-  var TABS = [
-    ['all', 'Ҳаммаси'],
+  // What an operator can choose in the «Ҳолат» cell, in the order of a real call.
+  var CHOICES = [
+    ['take', '📞 Жараёнда (мен оламан)'],
+    ['sold', '✅ Сотилди'],
+    ['rejected', '❌ Рад этди'],
+    ['noanswer', '🔁 Кўтармади'],
+    ['callback', '⏰ Кейинроқ'],
+    ['spam', '🚫 Спам'],
+    ['release', '⏳ Олинмаган (бўшатиш)']
+  ];
+  var STATUS_FILTERS = [
+    ['', 'Ҳолат: Ҳаммаси'],
     ['wait', '⏳ Олинмаган'],
     ['mine', '👤 Менда'],
     ['work', '📞 Жараёнда'],
@@ -507,21 +511,22 @@
 
   var state = {
     days: 1,
-    archive: false, // true: the orders moved out by «🧹 Панелни тозалаш»
-    tab: 'all',
+    sheet: 'leads',      // 'leads' | 'target' | 'archive'
     q: '',
+    fStatus: '',
     fCampaign: '',
     fAdset: '',
     fAd: '',
     fOperator: '',
-    targetGroup: 'all', // 'all' | 'adset' | 'ad' | 'campaign'
+    targetGroup: 'all',  // 'all' | 'adset' | 'ad' | 'campaign'
     targetSortBy: 'sold',
     targetSortDir: 'desc',
     leadSortBy: 'number',
     leadSortDir: 'desc',
+    wrap: false,
     data: null,
     busy: false,
-    open: {}
+    sel: null            // { r, c } inside the current grid
   };
 
   function el(tag, cls, text) {
@@ -530,14 +535,23 @@
     if (text != null) e.textContent = text;
     return e;
   }
-
+  function letter(i) {
+    var s = '';
+    i += 1;
+    while (i > 0) {
+      var r = (i - 1) % 26;
+      s = String.fromCharCode(65 + r) + s;
+      i = Math.floor((i - 1) / 26);
+    }
+    return s;
+  }
   function statusOf(l) { return l.outcome || (l.takerId ? 'work' : 'wait'); }
 
   var timeFmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' });
-  var dayFmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' });
+  var dayFmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' });
   function when(ms) {
     var d = new Date(ms);
-    return dayFmt.format(d) + ' ' + timeFmt.format(d);
+    return dayFmt.format(d) + ', ' + timeFmt.format(d);
   }
   function prettyPhone(p) {
     var d = p.replace(/\D/g, '');
@@ -591,23 +605,28 @@
     });
   }
 
+  function fx(cellName, value) {
+    document.getElementById('fxCell').textContent = cellName;
+    document.getElementById('fxVal').textContent = value;
+  }
+
   function showLoginPrompt(errMsg) {
-    var m = document.getElementById('main');
+    var m = document.getElementById('gridwrap');
     m.textContent = '';
-    var box = el('div', 'login-box');
-    box.appendChild(el('h2', '', '🔐 Жадвал CRM га кириш'));
+    var box = el('div', 'login');
+    box.appendChild(el('h2', '', '🔐 Жадвалга кириш'));
     box.appendChild(
       el(
         'p',
         '',
         errMsg ||
-          'Бу панелни катта экранда (компьютер ёки браузерда) очиш учун Telegram гуруҳида ёки ботга шахсий хабарда /panel деб ёзинг ва «🖥 Катта экранда очиш» тугмасини босинг (ёки ҳаволани шу ерга ташланг).'
+          'Жадвални катта экранда (компьютер ёки браузерда) очиш учун Telegram гуруҳида ёки ботга шахсий хабарда /panel деб ёзинг ва «🖥 Катта экранда очиш» тугмасини босинг.'
       )
     );
-    var row = el('div', 'login-row');
+    var row = el('div', 'row');
     var inp = el('input');
     inp.type = 'text';
-    inp.placeholder = 'Ҳавола ёки калитни киритинг (?key=...)';
+    inp.placeholder = 'Ҳавола ёки калит (?key=…)';
     var btn = el('button', '', 'Кириш');
     btn.onclick = function () {
       var val = inp.value.trim();
@@ -617,13 +636,10 @@
           var u = new URL(val, location.origin);
           val = u.searchParams.get('key') || val;
         }
-        webKey = val;
-        localStorage.setItem('bx_crm_key', webKey);
-        load();
-      } catch (e) {
-        webKey = val;
-        load();
-      }
+      } catch (e) { /* not a URL */ }
+      webKey = val;
+      try { localStorage.setItem('bx_crm_key', webKey); } catch (e) {}
+      load();
     };
     row.appendChild(inp);
     row.appendChild(btn);
@@ -632,22 +648,23 @@
   }
 
   function load() {
-    api('/api/panel/data?days=' + state.days + (state.archive ? '&archive=1' : ''))
+    var archive = state.sheet === 'archive';
+    api('/api/panel/data?days=' + state.days + (archive ? '&archive=1' : ''))
       .then(function (d) {
         state.data = d;
+        state.sel = null;
         render();
-        var av = document.getElementById('archiveViewBtn');
-        av.textContent = state.archive ? '↩️ Жорий панелга қайтиш' : '🗄 Архив' + (d.archived ? ' (' + d.archived + ')' : '');
-        document.getElementById('archiveBtn').hidden = state.archive;
-        document.getElementById('updated').textContent = 'Янгиланди: ' + timeFmt.format(new Date()) + (d.me && d.me.name ? ' · 👤 ' + d.me.name : '');
+        var tabBtn = document.querySelector('#tabs button[data-sheet="archive"]');
+        if (tabBtn) tabBtn.textContent = '🗄 Архив' + (d.archived ? ' (' + d.archived + ')' : '');
+        document.getElementById('archiveBtn').hidden = archive;
+        document.getElementById('updated').textContent =
+          (d.me && d.me.name ? '👤 ' + d.me.name + ' · ' : '') + 'янгиланди ' + timeFmt.format(new Date());
       })
       .catch(function (e) {
         if (e && (e._status === 401 || e.error === 'unauthorized')) {
-          showLoginPrompt(
-            'Панелни Telegram ичида гуруҳдаги тугма орқали очинг ёки ботга /panel деб ёзиб «🖥 Катта экранда очиш» ҳаволасини олинг.'
-          );
+          showLoginPrompt('Жадвални Telegram ичида гуруҳдаги тугма орқали очинг ёки ботга /panel деб ёзиб «🖥 Катта экранда очиш» ҳаволасини олинг.');
         } else {
-          var m = document.getElementById('main');
+          var m = document.getElementById('gridwrap');
           m.textContent = '';
           m.appendChild(el('div', 'msg', (e && e.message) || 'Маълумотни олиб бўлмади. Интернетни текширинг.'));
         }
@@ -669,17 +686,17 @@
   }
 
   function resetFilters() {
+    state.fStatus = '';
     state.fCampaign = '';
     state.fAdset = '';
     state.fAd = '';
     state.fOperator = '';
     state.q = '';
-    state.tab = 'all';
   }
 
   function archiveAll() {
     if (state.busy) return;
-    if (!window.confirm('Ҳозирги барча буюртмалар архивга ўтказилсинми?\n\nПанел тозаланади, янги ad set лар бўйича статистика нолдан бошланади. Архивдаги буюртмаларни «🗄 Архив» тугмаси орқали кўриш ва ҳолатини ўзгартириш мумкин. Telegram гуруҳдаги хабарлар ўзгармайди.')) return;
+    if (!window.confirm('Ҳозирги барча буюртмалар архивга ўтказилсинми?\n\nЖадвал тозаланади, янги ad set лар бўйича статистика нолдан бошланади. Архивдаги буюртмаларни пастдаги «🗄 Архив» варағида кўриш ва ҳолатини ўзгартириш мумкин. Telegram гуруҳдаги хабарлар ўзгармайди.')) return;
     state.busy = true;
     api('/api/panel/archive', { method: 'POST' })
       .then(function (r) {
@@ -696,9 +713,9 @@
 
     var list = leads.filter(function (l) {
       var s = statusOf(l);
-      if (state.tab === 'mine' && l.takerId !== me) return false;
-      if (state.tab === 'spam' && !(s === 'spam' || l.flagged)) return false;
-      if (['wait', 'work', 'sold', 'noanswer', 'callback', 'rejected'].indexOf(state.tab) >= 0 && s !== state.tab) return false;
+      if (state.fStatus === 'mine' && l.takerId !== me) return false;
+      if (state.fStatus === 'spam' && !(s === 'spam' || l.flagged)) return false;
+      if (['wait', 'work', 'sold', 'noanswer', 'callback', 'rejected'].indexOf(state.fStatus) >= 0 && s !== state.fStatus) return false;
 
       if (state.fCampaign && (l.campaign || '—') !== state.fCampaign) return false;
       if (state.fAdset && (l.adset || '—') !== state.fAdset) return false;
@@ -707,17 +724,8 @@
 
       if (q) {
         var hay = [
-          l.name,
-          l.phone,
-          String(l.number),
-          l.source || '',
-          l.platform || '',
-          l.campaign || '',
-          l.adset || '',
-          l.ad || '',
-          l.device || '',
-          l.details || '',
-          l.takerName || ''
+          l.name, l.phone, String(l.number), l.source || '', l.platform || '',
+          l.campaign || '', l.adset || '', l.ad || '', l.device || '', l.details || '', l.takerName || ''
         ].join(' ').toLowerCase();
         var matchText = hay.indexOf(q) >= 0;
         var matchDigits = digits.length >= 3 && l.phone.indexOf(digits) >= 0;
@@ -734,18 +742,20 @@
       if (col === 'number') { va = a.number; vb = b.number; }
       else if (col === 'createdAt') { va = a.createdAt; vb = b.createdAt; }
       else if (col === 'name') { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+      else if (col === 'phone') { va = a.phone; vb = b.phone; }
       else if (col === 'campaign') { va = (a.campaign || '').toLowerCase(); vb = (b.campaign || '').toLowerCase(); }
       else if (col === 'adset') { va = (a.adset || '').toLowerCase(); vb = (b.adset || '').toLowerCase(); }
       else if (col === 'ad') { va = (a.ad || '').toLowerCase(); vb = (b.ad || '').toLowerCase(); }
       else if (col === 'platform') { va = (a.platform || a.source || '').toLowerCase(); vb = (b.platform || b.source || '').toLowerCase(); }
       else if (col === 'device') { va = (a.device || '').toLowerCase(); vb = (b.device || '').toLowerCase(); }
       else if (col === 'details') { va = (a.details || '').toLowerCase(); vb = (b.details || '').toLowerCase(); }
+      else if (col === 'flag') { va = a.flagged ? 1 : 0; vb = b.flagged ? 1 : 0; }
       else if (col === 'status') { va = STATUS[statusOf(a)][2]; vb = STATUS[statusOf(b)][2]; }
       else if (col === 'operator') { va = (a.takerName || '').toLowerCase(); vb = (b.takerName || '').toLowerCase(); }
       else { va = a.number; vb = b.number; }
       if (va < vb) return -1 * dir;
       if (va > vb) return 1 * dir;
-      return (b.number - a.number);
+      return b.number - a.number;
     });
     return list;
   }
@@ -767,26 +777,11 @@
         ad = 'Барчаси';
       } else if (state.targetGroup === 'ad') {
         key = platform + '\0' + ad;
-        campaign = l.campaign || '—';
-        adset = l.adset || '—';
       } else {
         key = platform + '\0' + campaign + '\0' + adset + '\0' + ad;
       }
       if (!map[key]) {
-        map[key] = {
-          platform: platform,
-          campaign: campaign,
-          adset: adset,
-          ad: ad,
-          total: 0,
-          wait: 0,
-          work: 0,
-          sold: 0,
-          rejected: 0,
-          noanswer: 0,
-          callback: 0,
-          spam: 0
-        };
+        map[key] = { platform: platform, campaign: campaign, adset: adset, ad: ad, total: 0, wait: 0, work: 0, sold: 0, rejected: 0, noanswer: 0, callback: 0, spam: 0 };
       }
       var r = map[key];
       r.total++;
@@ -802,10 +797,9 @@
 
     var rows = Object.keys(map).map(function (k) {
       var r = map[k];
-      var real = r.total - r.spam;
-      r.real = real;
+      r.real = r.total - r.spam;
       r.pending = r.wait + r.work + r.noanswer + r.callback;
-      r.conversion = real > 0 ? Math.round((r.sold / real) * 100) : 0;
+      r.conversion = r.real > 0 ? Math.round((r.sold / r.real) * 100) : 0;
       return r;
     });
 
@@ -813,7 +807,7 @@
     var col = state.targetSortBy;
     rows.sort(function (a, b) {
       var va = a[col], vb = b[col];
-      if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = String(vb).toLowerCase(); }
       if (va < vb) return -1 * dir;
       if (va > vb) return 1 * dir;
       return b.sold - a.sold || b.total - a.total;
@@ -823,37 +817,463 @@
 
   function uniqueValues(leads, field) {
     var set = {};
-    leads.forEach(function (l) {
-      var v = l[field];
-      if (v) set[v] = true;
-    });
+    leads.forEach(function (l) { if (l[field]) set[l[field]] = true; });
     return Object.keys(set).sort();
+  }
+
+  /* ── The spreadsheet renderer ────────────────────────────────────
+   * cols: [{ key, label, w, sortable }]
+   * rows: [{ cls, cells: [{ text, cls, node, title, fxText }] }]
+   * Draws column letters, row numbers, a frozen header row and a selectable cell grid.
+   */
+  function drawGrid(container, cols, rows, onSort, sortBy, sortDir, primary) {
+    var table = el('table', 'grid');
+    var cg = el('colgroup');
+    var gutCol = el('col');
+    gutCol.style.width = '44px';
+    cg.appendChild(gutCol);
+    cols.forEach(function (c) {
+      var col = el('col');
+      col.style.width = (c.w || 120) + 'px';
+      cg.appendChild(col);
+    });
+    table.appendChild(cg);
+
+    var thead = el('thead');
+    var lr = el('tr', 'letters');
+    var corner = el('th', 'gut');
+    lr.appendChild(corner);
+    cols.forEach(function (c, i) {
+      var th = el('th', '', letter(i));
+      th.setAttribute('data-letter', String(i));
+      lr.appendChild(th);
+    });
+    thead.appendChild(lr);
+
+    var nr = el('tr', 'names');
+    nr.appendChild(el('th', 'gut', ''));
+    cols.forEach(function (c, i) {
+      var th = el('th');
+      th.appendChild(document.createTextNode(c.label));
+      if (sortBy === c.key) {
+        var m = el('span', 'sortmark', sortDir === 'asc' ? ' ▲' : ' ▼');
+        th.appendChild(m);
+      }
+      th.title = c.sortable === false ? c.label : c.label + ' — саралаш учун босинг';
+      if (c.sortable !== false && onSort) th.onclick = function () { onSort(c.key); };
+      else th.style.cursor = 'default';
+      nr.appendChild(th);
+    });
+    thead.appendChild(nr);
+    table.appendChild(thead);
+
+    var tbody = el('tbody');
+    if (!rows.length) {
+      var tr0 = el('tr');
+      tr0.appendChild(el('td', 'gut', '2'));
+      var td0 = el('td', 'muted', 'Маълумот йўқ.');
+      td0.colSpan = cols.length;
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+    }
+    rows.forEach(function (row, ri) {
+      var tr = el('tr', row.cls || '');
+      var gut = el('td', 'gut', String(ri + 2)); // sheet row 1 is the header
+      gut.setAttribute('data-row', String(ri));
+      tr.appendChild(gut);
+      row.cells.forEach(function (cell, ci) {
+        var td = el('td', 'cell' + (cell.cls ? ' ' + cell.cls : ''));
+        if (cell.node) td.appendChild(cell.node);
+        else td.textContent = cell.text == null ? '' : String(cell.text);
+        var full = cell.fxText != null ? cell.fxText : (cell.text == null ? '' : String(cell.text));
+        td.title = cell.title != null ? cell.title : full;
+        td.setAttribute('data-r', String(ri));
+        td.setAttribute('data-c', String(ci));
+        td.setAttribute('data-fx', full);
+        tr.appendChild(td);
+      });
+      if (row.onOpen) tr.addEventListener('dblclick', row.onOpen);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    table.addEventListener('click', function (e) {
+      var td = e.target.closest ? e.target.closest('td.cell') : null;
+      if (!td) return;
+      select(table, Number(td.getAttribute('data-r')), Number(td.getAttribute('data-c')));
+    });
+
+    table.setAttribute('data-primary', primary === false ? '0' : '1');
+    container.appendChild(table);
+    if (primary !== false && state.sel) select(table, state.sel.r, state.sel.c, true);
+    return table;
+  }
+
+  function select(table, r, c, quiet) {
+    Array.prototype.forEach.call(table.querySelectorAll('.sel'), function (x) { x.classList.remove('sel'); });
+    Array.prototype.forEach.call(table.querySelectorAll('tr.picked'), function (x) { x.classList.remove('picked'); });
+    var td = table.querySelector('td.cell[data-r="' + r + '"][data-c="' + c + '"]');
+    if (!td) { state.sel = null; return; }
+    state.sel = { r: r, c: c };
+    td.classList.add('sel');
+    var tr = td.parentNode;
+    tr.classList.add('picked');
+    var gut = tr.querySelector('.gut');
+    if (gut) gut.classList.add('sel');
+    var lh = table.querySelector('tr.letters th[data-letter="' + c + '"]');
+    if (lh) lh.classList.add('sel');
+    fx(letter(c) + (r + 2), td.getAttribute('data-fx') || '');
+    if (!quiet) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  /* ── Sheet 1 and 3: the leads ───────────────────────────────── */
+  var LEAD_COLS = [
+    { key: 'number', label: '№', w: 56 },
+    { key: 'createdAt', label: 'Сана', w: 130 },
+    { key: 'name', label: 'Исм', w: 150 },
+    { key: 'phone', label: 'Телефон', w: 150 },
+    { key: 'campaign', label: 'Кампания', w: 190 },
+    { key: 'adset', label: 'Ad set', w: 110 },
+    { key: 'ad', label: 'Видео', w: 90 },
+    { key: 'flag', label: 'Белги', w: 190 },
+    { key: 'status', label: 'Ҳолат', w: 180 },
+    { key: 'operator', label: 'Оператор', w: 130 },
+    { key: 'device', label: 'Қурилма', w: 160 },
+    { key: 'details', label: 'Тафсилот', w: 260 },
+    { key: 'platform', label: 'Манба', w: 110 }
+  ];
+
+  function statusCell(l, me) {
+    var s = statusOf(l);
+    var mine = l.takerId === me;
+    var sel = el('select', 'chip ' + STATUS[s][1]);
+    var cur = el('option', '', STATUS[s][0]);
+    cur.value = '';
+    sel.appendChild(cur);
+    if (l.takerId && !mine) {
+      // Someone else is on this call: only give it back, never overwrite their outcome.
+      var rel = el('option', '', '⏳ Олинмаган (бўшатиш)');
+      rel.value = 'release';
+      sel.appendChild(rel);
+      sel.title = 'Бу буюртмани ' + l.takerName + ' олган';
+    } else {
+      CHOICES.forEach(function (ch) {
+        if (ch[0] === 'take' && (s === 'work' || mine)) return;
+        if (ch[0] === 'release' && !l.takerId) return;
+        if (ch[0] === s) return;
+        var o = el('option', '', ch[1]);
+        o.value = ch[0];
+        sel.appendChild(o);
+      });
+    }
+    sel.onchange = function () {
+      var v = sel.value;
+      sel.value = '';
+      if (v) act(l, v);
+    };
+    return sel;
+  }
+
+  function phoneCell(l) {
+    var wrap = document.createDocumentFragment();
+    var a = el('a', 'link', prettyPhone(l.phone));
+    a.href = 'tel:' + l.phone;
+    var cp = el('button', 'copy', '⧉');
+    cp.title = 'Рақамни нусхалаш';
+    cp.onclick = function (e) { e.stopPropagation(); copy(l.phone); };
+    wrap.appendChild(a);
+    wrap.appendChild(cp);
+    return wrap;
+  }
+
+  function flagText(l) {
+    if (!l.flagged) return '';
+    return '⚠️ Шубҳали';
+  }
+
+  function renderLeads(container) {
+    var d = state.data;
+    var leads = d.leads || [];
+    var me = d.me ? d.me.id : 0;
+    var list = filteredLeads(leads);
+
+    var rows = list.map(function (l) {
+      var s = statusOf(l);
+      // The lines that mean "a program, not a person": a driven browser, a faked Chrome version,
+      // a form nobody typed into. The rest of «Тафсилот» is ordinary device talk.
+      var suspect = l.details && /webdriver|аслида|ҳеч нарса ёзилмаган/i.test(l.details);
+      return {
+        cls: l.flagged ? 'flagged' : '',
+        cells: [
+          { text: l.number, cls: 'num strong' },
+          { text: when(l.createdAt) },
+          { text: l.name, cls: 'strong' },
+          { node: phoneCell(l), fxText: prettyPhone(l.phone) },
+          { text: l.campaign || '', cls: l.campaign ? '' : 'muted' },
+          { text: l.adset || '', cls: l.adset ? '' : 'muted' },
+          { text: l.ad || '', cls: l.ad ? '' : 'muted' },
+          { text: flagText(l), cls: 'warnmark' },
+          { node: statusCell(l, me), fxText: STATUS[s][0] + (l.takerName ? ' · ' + l.takerName : '') },
+          { text: l.takerName || '', cls: l.takerName ? '' : 'muted' },
+          { text: l.device || '', cls: l.device ? '' : 'muted' },
+          { text: l.details || '', cls: suspect ? 'suspect' : 'muted' },
+          { text: l.platform || (l.source ? l.source.split(' · ')[0] : ''), cls: 'muted' }
+        ]
+      };
+    });
+
+    if (state.sheet === 'archive') {
+      container.appendChild(el('div', 'notice', '🗄 Архив варағи: жадвал тозаланганда бу ерга ўтган буюртмалар (30 кундан кейин ўчирилади).'));
+    }
+    if (d.truncated) {
+      container.appendChild(el('div', 'notice', '⚠️ Бу даврда буюртмалар жуда кўп — фақат охирги ' + leads.length + ' таси кўрсатилмоқда. Қисқароқ даврни танланг.'));
+    }
+
+    drawGrid(
+      container,
+      LEAD_COLS,
+      rows,
+      function (key) {
+        if (state.leadSortBy === key) state.leadSortDir = state.leadSortDir === 'asc' ? 'desc' : 'asc';
+        else { state.leadSortBy = key; state.leadSortDir = key === 'name' ? 'asc' : 'desc'; }
+        render();
+      },
+      state.leadSortBy,
+      state.leadSortDir
+    );
+  }
+
+  /* ── Sheet 2: the target report ─────────────────────────────── */
+  var TARGET_COLS = [
+    { key: 'platform', label: 'Манба', w: 110 },
+    { key: 'campaign', label: 'Кампания', w: 210 },
+    { key: 'adset', label: 'Ad set', w: 120 },
+    { key: 'ad', label: 'Видео', w: 100 },
+    { key: 'total', label: 'Жами лид', w: 90 },
+    { key: 'pending', label: '⏳ Кутилмоқда', w: 120 },
+    { key: 'sold', label: '✅ Сотилди', w: 100 },
+    { key: 'rejected', label: '❌ Рад этди', w: 105 },
+    { key: 'spam', label: '🚫 Спам', w: 90 },
+    { key: 'conversion', label: 'Конверсия', w: 130 }
+  ];
+  var SUMMARY_COLS = [
+    { key: 'a', label: 'Жами буюртма', w: 120, sortable: false },
+    { key: 'b', label: '⏳ Олинмаган', w: 120, sortable: false },
+    { key: 'c', label: '📞 Жараёнда', w: 120, sortable: false },
+    { key: 'd', label: '✅ Сотилди', w: 110, sortable: false },
+    { key: 'e', label: '❌ Рад этди', w: 110, sortable: false },
+    { key: 'f', label: '🚫 Спам', w: 100, sortable: false },
+    { key: 'g', label: '📈 Конверсия', w: 120, sortable: false }
+  ];
+
+  function totals(leads) {
+    var count = function (f) { return leads.filter(f).length; };
+    var sold = count(function (l) { return l.outcome === 'sold'; });
+    var spam = count(function (l) { return l.outcome === 'spam'; });
+    var real = leads.length - spam;
+    return {
+      total: leads.length,
+      wait: count(function (l) { return !l.takerId && !l.outcome; }),
+      work: count(function (l) { var s = statusOf(l); return s === 'work' || s === 'callback' || s === 'noanswer'; }),
+      sold: sold,
+      rejected: count(function (l) { return l.outcome === 'rejected'; }),
+      spam: spam,
+      conv: real > 0 ? Math.round((sold / real) * 100) + '%' : '—'
+    };
+  }
+
+  function renderTarget(container) {
+    var leads = state.data.leads || [];
+    var t = totals(leads);
+
+    container.appendChild(el('div', 'sheet-title', 'Хулоса — танланган давр бўйича'));
+    drawGrid(container, SUMMARY_COLS, [{
+      cells: [
+        { text: t.total, cls: 'num strong' },
+        { text: t.wait, cls: 'num' },
+        { text: t.work, cls: 'num' },
+        { text: t.sold, cls: 'num strong' },
+        { text: t.rejected, cls: 'num' },
+        { text: t.spam, cls: 'num' },
+        { text: t.conv, cls: 'num strong' }
+      ]
+    }], null, null, null, false);
+
+    var head = el('div', 'sheet-title');
+    head.appendChild(document.createTextNode('Кампания · Ad set · Видео самарадорлиги (қаторни 2 марта боссангиз — «Лидлар» варағи шу таргет бўйича фильтрланади) — гуруҳлаш: '));
+    var seg = el('span');
+    [
+      ['all', 'Ҳаммаси'],
+      ['adset', 'Ad set бўйича'],
+      ['ad', 'Видео бўйича'],
+      ['campaign', 'Кампания бўйича']
+    ].forEach(function (g) {
+      var b = el('button', 'tbtn' + (state.targetGroup === g[0] ? ' on' : ''), g[1]);
+      b.onclick = function () { state.targetGroup = g[0]; state.sel = null; render(); };
+      seg.appendChild(b);
+    });
+    head.appendChild(seg);
+    container.appendChild(head);
+
+    var rows = buildTargetRows(leads).map(function (r) {
+      var bar = el('div', 'bar');
+      var track = el('div', 'track');
+      var fill = el('div', 'fill');
+      fill.style.width = Math.min(100, r.conversion) + '%';
+      track.appendChild(fill);
+      bar.appendChild(track);
+      bar.appendChild(el('span', 'val', r.real > 0 ? r.conversion + '%' : '—'));
+      return {
+        // Two clicks on a target row open the leads sheet filtered to it.
+        onOpen: function () {
+          state.fCampaign = r.campaign !== 'Барчаси' && r.campaign !== '—' ? r.campaign : '';
+          state.fAdset = r.adset !== 'Барчаси' && r.adset !== '—' ? r.adset : '';
+          state.fAd = r.ad !== 'Барчаси' && r.ad !== '—' ? r.ad : '';
+          state.fStatus = '';
+          state.q = '';
+          state.sheet = 'leads';
+          state.sel = null;
+          render();
+          toast('Лидлар варағи шу таргет бўйича фильтрланди');
+        },
+        cells: [
+          { text: r.platform, cls: 'muted' },
+          { text: r.campaign === '—' ? '' : r.campaign, cls: r.campaign === '—' ? 'muted' : '' },
+          { text: r.adset === '—' ? '' : r.adset },
+          { text: r.ad === '—' ? '' : r.ad, cls: 'strong' },
+          { text: r.total, cls: 'num strong' },
+          { text: r.pending, cls: 'num' },
+          { text: r.sold, cls: 'num strong' },
+          { text: r.rejected, cls: 'num' },
+          { text: r.spam, cls: 'num' },
+          { node: bar, cls: 'num', fxText: r.real > 0 ? r.conversion + '%' : '—' }
+        ]
+      };
+    });
+
+    drawGrid(
+      container,
+      TARGET_COLS,
+      rows,
+      function (key) {
+        if (state.targetSortBy === key) state.targetSortDir = state.targetSortDir === 'asc' ? 'desc' : 'asc';
+        else { state.targetSortBy = key; state.targetSortDir = 'desc'; }
+        render();
+      },
+      state.targetSortBy,
+      state.targetSortDir
+    );
+  }
+
+  /* ── Toolbar / tabs / status bar ────────────────────────────── */
+  function fillSelect(id, placeholder, values, current, onChange) {
+    var sel = document.getElementById(id);
+    sel.textContent = '';
+    var o0 = el('option', '', placeholder);
+    o0.value = '';
+    sel.appendChild(o0);
+    values.forEach(function (v) {
+      var o = el('option', '', Array.isArray(v) ? v[1] : v);
+      o.value = Array.isArray(v) ? v[0] : v;
+      sel.appendChild(o);
+    });
+    if (current && !Array.prototype.some.call(sel.options, function (o) { return o.value === current; })) {
+      var oc = el('option', '', current);
+      oc.value = current;
+      sel.appendChild(oc);
+    }
+    sel.value = current || '';
+    sel.onchange = function () { onChange(sel.value); state.sel = null; render(); };
+  }
+
+  function renderToolbar() {
+    var leads = (state.data && state.data.leads) || [];
+    var onLeads = state.sheet !== 'target';
+    ['fStatus', 'fCampaign', 'fAdset', 'fAd', 'fOperator'].forEach(function (id) {
+      document.getElementById(id).hidden = !onLeads;
+    });
+    document.getElementById('find').hidden = !onLeads;
+    document.getElementById('csvBtn').hidden = !onLeads;
+
+    var me = state.data && state.data.me ? state.data.me.id : 0;
+    var statusOptions = STATUS_FILTERS.slice(1).map(function (f) {
+      var n = leads.filter(function (l) {
+        var s = statusOf(l);
+        if (f[0] === 'mine') return l.takerId === me;
+        if (f[0] === 'spam') return s === 'spam' || l.flagged;
+        return s === f[0];
+      }).length;
+      return [f[0], f[1] + ' (' + n + ')'];
+    });
+    fillSelect('fStatus', 'Ҳолат: Ҳаммаси (' + leads.length + ')', statusOptions, state.fStatus, function (v) { state.fStatus = v; });
+    fillSelect('fCampaign', 'Кампания: Ҳаммаси', uniqueValues(leads, 'campaign'), state.fCampaign, function (v) { state.fCampaign = v; });
+    fillSelect('fAdset', 'Ad set: Ҳаммаси', uniqueValues(leads, 'adset'), state.fAdset, function (v) { state.fAdset = v; });
+    fillSelect('fAd', 'Видео: Ҳаммаси', uniqueValues(leads, 'ad'), state.fAd, function (v) { state.fAd = v; });
+    fillSelect('fOperator', 'Оператор: Ҳаммаси', uniqueValues(leads, 'takerName'), state.fOperator, function (v) { state.fOperator = v; });
+
+    var dirty = Boolean(state.q || state.fStatus || state.fCampaign || state.fAdset || state.fAd || state.fOperator);
+    document.getElementById('clearBtn').hidden = !(dirty && onLeads);
+    var find = document.getElementById('find');
+    if (find.value !== state.q) find.value = state.q;
+  }
+
+  function renderSum() {
+    var leads = (state.data && state.data.leads) || [];
+    var shown = state.sheet === 'target' ? leads : filteredLeads(leads);
+    var t = totals(shown);
+    var bar = document.getElementById('sum');
+    bar.textContent = '';
+    [
+      ['Қатор', t.total],
+      ['⏳', t.wait],
+      ['📞', t.work],
+      ['✅', t.sold],
+      ['❌', t.rejected],
+      ['🚫', t.spam],
+      ['📈', t.conv]
+    ].forEach(function (p) {
+      var s = el('span', '', p[0] + ': ');
+      s.appendChild(el('b', '', String(p[1])));
+      bar.appendChild(s);
+    });
+  }
+
+  function render() {
+    if (!state.data) return;
+    var wrap = document.getElementById('gridwrap');
+    wrap.textContent = '';
+    renderToolbar();
+    if (state.sheet === 'target') renderTarget(wrap);
+    else renderLeads(wrap);
+    renderSum();
+    Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-sheet') === state.sheet);
+    });
   }
 
   function exportCsv() {
     if (!state.data || !state.data.leads) return;
     var list = filteredLeads(state.data.leads);
-    var headers = ['№', 'Вақт', 'Исм', 'Телефон', 'Ҳолат', 'Оператор', 'Манба', 'Кампания', 'Ad Set (Таргет)', 'Видео (Реклама)', 'Қурилма', 'Тафсилот', 'Шубҳали'];
+    var headers = LEAD_COLS.map(function (c) { return c.label; });
     var rows = [headers.join(',')];
     list.forEach(function (l) {
-      var s = STATUS[statusOf(l)][0];
       var cols = [
         l.number,
         when(l.createdAt),
         l.name,
         l.phone,
-        s,
-        l.takerName || '',
-        l.platform || l.source || '',
         l.campaign || '',
         l.adset || '',
         l.ad || '',
+        l.flagged ? 'Шубҳали' : '',
+        STATUS[statusOf(l)][0],
+        l.takerName || '',
         l.device || '',
         l.details || '',
-        l.flagged ? 'Ҳа' : ''
+        l.platform || l.source || ''
       ].map(function (c) {
         var str = String(c == null ? '' : c);
-        // A customer can type a name like =HYPERLINK(...): never let Excel read a cell as a formula.
+        // A customer can type a name like =HYPERLINK(...): never let a spreadsheet read a cell as a formula.
         if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
         str = str.replace(/"/g, '""');
         return '"' + str + '"';
@@ -864,432 +1284,72 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'zeynara-leads-' + (state.archive ? 'arxiv-' : '') + state.days + 'kun.csv';
+    a.download = 'zeynara-lidlar-' + (state.sheet === 'archive' ? 'arxiv-' : '') + state.days + 'kun.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast('CSV жадвал юклаб олинди');
+    toast('CSV юклаб олинди — Google Sheets да очиш мумкин');
   }
 
-  function render() {
-    var d = state.data, leads = d.leads || [];
-    var main = document.getElementById('main');
-    main.textContent = '';
-
-    if (state.archive) main.appendChild(el('div', 'msg', '🗄 Архив: панел тозаланганда бу ерга ўтган буюртмалар (30 кундан кейин ўчирилади).'));
-    if (d.truncated) main.appendChild(el('div', 'msg', '⚠️ Бу даврда буюртмалар жуда кўп — фақат охирги ' + leads.length + ' таси кўрсатилмоқда. Қисқароқ даврни танланг.'));
-
-    // 1. Top KPI Summary Cards
-    var count = function (f) { return leads.filter(f).length; };
-    var sold = count(function (l) { return l.outcome === 'sold'; });
-    var rejected = count(function (l) { return l.outcome === 'rejected'; });
-    var spam = count(function (l) { return l.outcome === 'spam'; });
-    var untaken = count(function (l) { return !l.takerId && !l.outcome; });
-    var inWork = count(function (l) { var s = statusOf(l); return s === 'work' || s === 'callback' || s === 'noanswer'; });
-    var real = leads.length - spam;
-    var conv = real > 0 ? Math.round((sold / real) * 100) + '%' : '—';
-
-    var stats = el('div', 'stats');
-    [
-      [leads.length, 'Жами буюртма', ''],
-      [untaken, '⏳ Олинмаган', 'warn'],
-      [inWork, '📞 Жараёнда / Қайта алоқа', ''],
-      [sold, '✅ Сотилди', 'ok'],
-      [rejected, '❌ Рад этди', 'bad'],
-      [spam, '🚫 Спам', 'spam'],
-      [conv, '📈 Конверсия (Сотув %)', 'ok']
-    ].forEach(function (s) {
-      var c = el('div', 'stat' + (s[2] ? ' ' + s[2] : ''));
-      c.appendChild(el('b', '', String(s[0])));
-      c.appendChild(el('span', '', s[1]));
-      stats.appendChild(c);
-    });
-    main.appendChild(stats);
-
-    // 2. Target / Campaign / Ad Set / Video Performance Table
-    var targetBox = el('div', 'section-box');
-    var targetHead = el('div', 'section-head');
-    var tTitleWrap = el('div');
-    var tTitle = el('h2', 'section-title', '🎯 Кампания · Ad Set (Таргет) · Видео самарадорлиги');
-    tTitleWrap.appendChild(tTitle);
-    tTitleWrap.appendChild(el('div', 'section-sub', 'Қайси таргет кампания, ad set ва видео кўпроқ лид ва сотув олиб келаётганини солиштиринг (қаторни боссангиз — пастдаги жадвал шу таргет бўйича фильтрланади)'));
-    targetHead.appendChild(tTitleWrap);
-
-    var groupSeg = el('div', 'seg');
-    [
-      ['all', 'Кампания + Ad Set + Видео'],
-      ['adset', 'Ad Set (Таргет) бўйича'],
-      ['ad', 'Видео бўйича'],
-      ['campaign', 'Кампания бўйича']
-    ].forEach(function (g) {
-      var b = el('button', state.targetGroup === g[0] ? 'on' : '', g[1]);
-      b.onclick = function () { state.targetGroup = g[0]; render(); };
-      groupSeg.appendChild(b);
-    });
-    targetHead.appendChild(groupSeg);
-    targetBox.appendChild(targetHead);
-
-    var targetWrap = el('div', 'table-wrap');
-    var tTable = el('table');
-    var tThead = el('thead'), tHr = el('tr');
-    var tCols = [
-      ['platform', 'Манба'],
-      ['campaign', 'Кампания (utm_campaign)'],
-      ['adset', 'Ad Set / Таргет (utm_term)'],
-      ['ad', 'Видео / Реклама (utm_content)'],
-      ['total', 'Жами лид'],
-      ['pending', '⏳ Кутилмоқда'],
-      ['sold', '✅ Сотилди'],
-      ['rejected', '❌ Рад этди'],
-      ['spam', '🚫 Спам'],
-      ['conversion', 'Конверсия %']
-    ];
-    tCols.forEach(function (c) {
-      var active = state.targetSortBy === c[0];
-      var arrow = active ? (state.targetSortDir === 'asc' ? ' ↑' : ' ↓') : '';
-      var th = el('th', active ? 'active-sort' : '', c[1] + arrow);
-      th.onclick = function () {
-        if (state.targetSortBy === c[0]) state.targetSortDir = state.targetSortDir === 'asc' ? 'desc' : 'asc';
-        else { state.targetSortBy = c[0]; state.targetSortDir = 'desc'; }
-        render();
-      };
-      tHr.appendChild(th);
-    });
-    tThead.appendChild(tHr);
-    tTable.appendChild(tThead);
-
-    var tTbody = el('tbody');
-    var tRows = buildTargetRows(leads);
-    if (!tRows.length) {
-      var emptyTr = el('tr');
-      var emptyTd = el('td', 'empty', 'Бу даврда ҳозирча маълумот йўқ.');
-      emptyTd.colSpan = tCols.length;
-      emptyTr.appendChild(emptyTd);
-      tTbody.appendChild(emptyTr);
-    } else {
-      tRows.forEach(function (r) {
-        // Highlighted when every active target filter matches this row (and at least one is on).
-        var isSelected =
-          Boolean(state.fCampaign || state.fAdset || state.fAd) &&
-          (!state.fCampaign || state.fCampaign === r.campaign) &&
-          (!state.fAdset || r.adset === 'Барчаси' || state.fAdset === r.adset) &&
-          (!state.fAd || r.ad === 'Барчаси' || state.fAd === r.ad);
-        var tr = el('tr', isSelected ? 'selected-row' : '');
-        tr.style.cursor = 'pointer';
-        tr.title = 'Шу таргетдаги лидларни фильтрлаш учун босинг';
-        tr.onclick = function () {
-          if (state.targetGroup === 'campaign') {
-            state.fCampaign = state.fCampaign === r.campaign ? '' : r.campaign;
-            state.fAdset = '';
-            state.fAd = '';
-          } else if (state.targetGroup === 'adset') {
-            state.fCampaign = r.campaign !== 'Барчаси' ? r.campaign : '';
-            state.fAdset = state.fAdset === r.adset ? '' : r.adset;
-            state.fAd = '';
-          } else if (state.targetGroup === 'ad') {
-            state.fAd = state.fAd === r.ad ? '' : r.ad;
-            state.fCampaign = '';
-            state.fAdset = '';
-          } else {
-            var same = state.fCampaign === r.campaign && state.fAdset === r.adset && state.fAd === r.ad;
-            state.fCampaign = same ? '' : r.campaign;
-            state.fAdset = same ? '' : r.adset;
-            state.fAd = same ? '' : r.ad;
-          }
-          render();
-        };
-
-        tr.appendChild(el('td', '', r.platform));
-        var tdCamp = el('td');
-        tdCamp.appendChild(el('span', r.campaign === '—' ? 'tag empty-tag' : 'tag camp', r.campaign));
-        tr.appendChild(tdCamp);
-
-        var tdAdset = el('td');
-        tdAdset.appendChild(el('span', r.adset === '—' ? 'tag empty-tag' : 'tag adset', r.adset));
-        tr.appendChild(tdAdset);
-
-        var tdAd = el('td');
-        tdAd.appendChild(el('span', r.ad === '—' ? 'tag empty-tag' : 'tag video', r.ad));
-        tr.appendChild(tdAd);
-
-        tr.appendChild(el('td', 'num-cell', String(r.total)));
-        tr.appendChild(el('td', '', String(r.pending)));
-
-        var tdSold = el('td');
-        tdSold.appendChild(el('span', 'badge b-sold', '✅ ' + r.sold));
-        tr.appendChild(tdSold);
-
-        tr.appendChild(el('td', '', String(r.rejected)));
-        tr.appendChild(el('td', '', String(r.spam)));
-
-        var tdConv = el('td');
-        var cw = el('div', 'conv-wrap');
-        var cb = el('div', 'conv-bar');
-        var cf = el('div', 'conv-fill');
-        cf.style.width = Math.min(100, r.conversion) + '%';
-        cb.appendChild(cf);
-        cw.appendChild(cb);
-        cw.appendChild(el('span', 'conv-val', r.real > 0 ? r.conversion + '%' : '—'));
-        tdConv.appendChild(cw);
-        tr.appendChild(tdConv);
-
-        tTbody.appendChild(tr);
-      });
-    }
-    tTable.appendChild(tTbody);
-    targetWrap.appendChild(tTable);
-    targetBox.appendChild(targetWrap);
-    main.appendChild(targetBox);
-
-    // 3. Sortable Leads CRM Table Section
-    var leadsBox = el('div', 'section-box');
-    var leadsHead = el('div', 'section-head');
-    var lTitleWrap = el('div');
-    lTitleWrap.appendChild(el('h2', 'section-title', '📋 Лидлар жадвали (CRM)'));
-    lTitleWrap.appendChild(el('div', 'section-sub', 'Устун номини босиб сараланг (sort). Ҳолатни ўзгартирсангиз, Telegram гуруҳдаги хабар ҳам автоматик янгиланади.'));
-    leadsHead.appendChild(lTitleWrap);
-    leadsBox.appendChild(leadsHead);
-
-    // Status tabs
-    var tabs = el('div', 'tabs');
-    var me = d.me ? d.me.id : 0;
-    TABS.forEach(function (t) {
-      var n = leads.filter(function (l) {
-        var s = statusOf(l);
-        if (t[0] === 'all') return true;
-        if (t[0] === 'mine') return l.takerId === me;
-        if (t[0] === 'spam') return s === 'spam' || l.flagged;
-        return s === t[0];
-      }).length;
-      var b = el('button', state.tab === t[0] ? 'on' : '', t[1]);
-      b.appendChild(el('span', 'n', String(n)));
-      b.onclick = function () { state.tab = t[0]; render(); };
-      tabs.appendChild(b);
-    });
-    leadsBox.appendChild(tabs);
-
-    // Filter controls bar (Search + Campaign / Ad Set / Video / Operator dropdowns)
-    var filters = el('div', 'filters');
-    var search = el('input', 'search');
-    search.type = 'search';
-    search.placeholder = '🔍 Исм, телефон, №, видео, ad set ёки кампания бўйича қидирув…';
-    search.value = state.q;
-    search.oninput = function () {
-      state.q = search.value;
-      renderLeadsTable(leadsTableContainer);
-    };
-    filters.appendChild(search);
-
-    function makeSelect(placeholder, values, current, onChange) {
-      var sel = el('select', 'select');
-      var opt0 = el('option', '', placeholder);
-      opt0.value = '';
-      sel.appendChild(opt0);
-      values.forEach(function (v) {
-        var o = el('option', '', v);
-        o.value = v;
-        if (v === current) o.selected = true;
-        sel.appendChild(o);
-      });
-      if (current && values.indexOf(current) < 0) {
-        var oc = el('option', '', current);
-        oc.value = current;
-        oc.selected = true;
-        sel.appendChild(oc);
-      }
-      sel.onchange = function () { onChange(sel.value); render(); };
-      return sel;
-    }
-
-    filters.appendChild(makeSelect('Кампания: Барчаси', uniqueValues(leads, 'campaign'), state.fCampaign, function (v) { state.fCampaign = v; }));
-    filters.appendChild(makeSelect('Ad Set: Барчаси', uniqueValues(leads, 'adset'), state.fAdset, function (v) { state.fAdset = v; }));
-    filters.appendChild(makeSelect('Видео: Барчаси', uniqueValues(leads, 'ad'), state.fAd, function (v) { state.fAd = v; }));
-    filters.appendChild(makeSelect('Оператор: Барчаси', uniqueValues(leads, 'takerName'), state.fOperator, function (v) { state.fOperator = v; }));
-
-    if (state.fCampaign || state.fAdset || state.fAd || state.fOperator || state.q || state.tab !== 'all') {
-      var resetBtn = el('button', 'tool-btn', '✖ Фильтрни тозалаш');
-      resetBtn.onclick = function () {
-        resetFilters();
-        render();
-      };
-      filters.appendChild(resetBtn);
-    }
-    leadsBox.appendChild(filters);
-
-    var leadsTableContainer = el('div', 'table-wrap');
-    leadsBox.appendChild(leadsTableContainer);
-    renderLeadsTable(leadsTableContainer);
-    main.appendChild(leadsBox);
-  }
-
-  function renderLeadsTable(container) {
-    container.textContent = '';
-    var list = filteredLeads(state.data.leads || []);
-    var me = state.data && state.data.me ? state.data.me.id : 0;
-
-    var table = el('table');
-    var thead = el('thead'), hr = el('tr');
-    var cols = [
-      ['number', '№'],
-      ['createdAt', 'Вақт'],
-      ['name', 'Мижоз исми'],
-      ['phone', 'Телефон'],
-      ['campaign', 'Кампания'],
-      ['adset', 'Ad Set (Таргет)'],
-      ['ad', 'Видео / Реклама'],
-      ['device', 'Қурилма'],
-      ['details', 'Тафсилот'],
-      ['platform', 'Манба'],
-      ['status', 'Ҳолат (Telegram)'],
-      ['operator', 'Оператор'],
-      ['actions', 'Ҳолатни белгилаш']
-    ];
-    cols.forEach(function (c) {
-      var sortable = c[0] !== 'phone' && c[0] !== 'actions';
-      var active = state.leadSortBy === c[0];
-      var arrow = active ? (state.leadSortDir === 'asc' ? ' ↑' : ' ↓') : '';
-      var th = el('th', active ? 'active-sort' : '', c[1] + arrow);
-      if (sortable) {
-        th.onclick = function () {
-          if (state.leadSortBy === c[0]) state.leadSortDir = state.leadSortDir === 'asc' ? 'desc' : 'asc';
-          else { state.leadSortBy = c[0]; state.leadSortDir = c[0] === 'name' ? 'asc' : 'desc'; }
-          renderLeadsTable(container);
-        };
-      } else {
-        th.style.cursor = 'default';
-      }
-      hr.appendChild(th);
-    });
-    thead.appendChild(hr);
-    table.appendChild(thead);
-
-    var tbody = el('tbody');
-    if (!list.length) {
-      var tr0 = el('tr');
-      var td0 = el('td', 'empty', 'Бу фильтр бўйича буюртма топилмади.');
-      td0.colSpan = cols.length;
-      tr0.appendChild(td0);
-      tbody.appendChild(tr0);
-    } else {
-      list.forEach(function (l) {
-        var s = statusOf(l);
-        var tr = el('tr', l.flagged ? 'flagged-row' : '');
-
-        // 1. №
-        tr.appendChild(el('td', 'num-cell', '№' + l.number));
-
-        // 2. Time
-        tr.appendChild(el('td', 'time-cell', when(l.createdAt)));
-
-        // 3. Name + flag
-        var tdName = el('td', 'name-cell');
-        tdName.appendChild(el('div', '', l.name));
-        if (l.flagged) tdName.appendChild(el('div', 'flag-note', '⚠️ Шубҳали белги бор'));
-        tr.appendChild(tdName);
-
-        // 4. Phone + Copy
-        var tdPhone = el('td', 'phone-cell');
-        var pw = el('div', 'phone-wrap');
-        var a = el('a', '', prettyPhone(l.phone));
-        a.href = 'tel:' + l.phone;
-        var cp = el('button', 'copy-btn', 'Нусха');
-        cp.onclick = function () { copy(l.phone); };
-        pw.appendChild(a);
-        pw.appendChild(cp);
-        tdPhone.appendChild(pw);
-        tr.appendChild(tdPhone);
-
-        // 5. Campaign
-        var tdCamp = el('td');
-        tdCamp.appendChild(el('span', l.campaign ? 'tag camp' : 'tag empty-tag', l.campaign || '—'));
-        tr.appendChild(tdCamp);
-
-        // 6. Ad Set
-        var tdAdset = el('td');
-        tdAdset.appendChild(el('span', l.adset ? 'tag adset' : 'tag empty-tag', l.adset || '—'));
-        tr.appendChild(tdAdset);
-
-        // 7. Video / Ad
-        var tdAd = el('td');
-        tdAd.appendChild(el('span', l.ad ? 'tag video' : 'tag empty-tag', l.ad || '—'));
-        tr.appendChild(tdAd);
-
-        // 7b. Device model («Qurilma»)
-        tr.appendChild(el('td', 'device-cell', l.device || '—'));
-
-        // 7c. Browser signals («Tafsilot»)
-        var tdDet = el('td', 'details-cell', l.details || '—');
-        if (l.details && /webdriver|бот/i.test(l.details)) tdDet.className = 'details-cell suspect';
-        tr.appendChild(tdDet);
-
-        // 8. Platform / Source
-        var platform = l.platform || (l.source ? l.source.split(' · ')[0] : '—');
-        tr.appendChild(el('td', '', platform));
-
-        // 9. Status badge
-        var tdStatus = el('td');
-        tdStatus.appendChild(el('span', 'badge ' + STATUS[s][1], STATUS[s][0]));
-        tr.appendChild(tdStatus);
-
-        // 10. Operator
-        var tdOp = el('td', '', l.takerName || '—');
-        tr.appendChild(tdOp);
-
-        // 11. Actions
-        var tdActs = el('td');
-        var acts = el('div', 'row-acts');
-        var mine = l.takerId === me;
-        var closed = l.outcome && l.outcome !== 'noanswer' && l.outcome !== 'callback';
-
-        function btn(text, cls, action) {
-          var b = el('button', 'act-btn' + (cls ? ' ' + cls : ''), text);
-          b.onclick = function () { act(l, action); };
-          acts.appendChild(b);
-        }
-
-        if (!l.takerId) {
-          btn('📞 Олиш', 'take', 'take');
-          btn('✅ Сотилди', 'sold', 'sold');
-          btn('🚫 Спам', 'spam', 'spam');
-        } else if (mine && closed && !state.open[l.number]) {
-          var edit = el('button', 'act-btn', '✏️ Ўзгартириш');
-          edit.onclick = function () { state.open[l.number] = true; renderLeadsTable(container); };
-          acts.appendChild(edit);
-        } else if (mine) {
-          btn('✅ Сотилди', 'sold', 'sold');
-          btn('❌ Рад', 'rejected', 'rejected');
-          btn('🔁 Кўтармади', '', 'noanswer');
-          btn('⏰ Кейинроқ', '', 'callback');
-          btn('🚫 Спам', 'spam', 'spam');
-          btn('↩️ Қайтариш', '', 'release');
-        } else {
-          btn('↩️ Қайтариш (' + l.takerName + ')', '', 'release');
-        }
-        tdActs.appendChild(acts);
-        tr.appendChild(tdActs);
-
-        tbody.appendChild(tr);
-      });
-    }
-    table.appendChild(tbody);
-    container.appendChild(table);
-  }
-
+  /* ── Wiring ─────────────────────────────────────────────────── */
   document.getElementById('period').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
     state.days = Number(b.getAttribute('data-days'));
-    Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (x) { x.classList.toggle('on', x === b); });
     load();
+  });
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    var next = b.getAttribute('data-sheet');
+    if (next === state.sheet) return;
+    var reload = (next === 'archive') !== (state.sheet === 'archive');
+    state.sheet = next;
+    state.sel = null;
+    if (reload) { resetFilters(); load(); }
+    else render();
   });
   document.getElementById('refreshBtn').addEventListener('click', function () { load(); });
   document.getElementById('csvBtn').addEventListener('click', function () { exportCsv(); });
   document.getElementById('archiveBtn').addEventListener('click', function () { archiveAll(); });
-  document.getElementById('archiveViewBtn').addEventListener('click', function () {
-    state.archive = !state.archive;
+  document.getElementById('wrapBtn').addEventListener('click', function () {
+    state.wrap = !state.wrap;
+    document.body.classList.toggle('wrap', state.wrap);
+    this.classList.toggle('on', state.wrap);
+  });
+  document.getElementById('clearBtn').addEventListener('click', function () {
     resetFilters();
-    load();
+    state.sel = null;
+    render();
+  });
+  document.getElementById('find').addEventListener('input', function () {
+    state.q = this.value;
+    state.sel = null;
+    render();
+    document.getElementById('find').focus();
+  });
+
+  // Arrow keys walk the grid, as in a spreadsheet.
+  document.addEventListener('keydown', function (e) {
+    if (!state.sel) return;
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    var map = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (e.key === 'Escape') {
+      var t0 = document.querySelector('.gridwrap table.grid[data-primary="1"]');
+      if (t0) Array.prototype.forEach.call(t0.querySelectorAll('.sel, tr.picked'), function (x) { x.classList.remove('sel'); x.classList.remove('picked'); });
+      state.sel = null;
+      fx('—', '');
+      return;
+    }
+    var mv = map[e.key];
+    if (!mv) return;
+    var table = document.querySelector('.gridwrap table.grid[data-primary="1"]');
+    if (!table) return;
+    e.preventDefault();
+    select(table, Math.max(0, state.sel.r + mv[0]), Math.max(0, state.sel.c + mv[1]));
   });
 
   load();

@@ -442,13 +442,21 @@ export class LeadRegistry extends DurableObject<Env> {
     );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
+    // Orders that are almost certainly a bot never reach the partner's sheet, so their people
+    // do not waste calls on them: the hidden field (honeypot), a browser a program drives or a
+    // failed check from outside the Instagram/Facebook app (likely_bot), a phone already marked
+    // spam (spam_device) or one that looks like one (spam_lookalike). A failed check on its own
+    // (no_captcha) is NOT enough — a real customer in an in-app browser can fail it — so those
+    // still go to the sheet. The order is still accepted and still counted; only the sheet skips it.
+    const SHEET_SKIP = ['honeypot', 'likely_bot', 'spam_device', 'spam_lookalike'];
+    const looksLikeBot = flags.some((f) => SHEET_SKIP.includes(f));
     const sheet = sheetsConfig(this.env, site);
-    if (sheet) {
+    if (sheet && !looksLikeBot) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
         sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),
       );
-    } else {
+    } else if (!sheet) {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
     }
     // A script (the hidden field), or a phone already marked as spam: the ads must not learn

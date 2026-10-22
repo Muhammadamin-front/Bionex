@@ -111,6 +111,11 @@ user's Mac.
     and `details` columns, stored on `accept` (main site); `panelData` returns them and the
     operators' Mini App (`panel.html`) renders them as two columns (details wrap, suspect ones
     amber) and in the CSV. Makes the Telegram panel match the partner Google Sheet's layout.
+11. **Bot orders kept out of the partner sheet** (2026-10-22, owner's request): in
+    `acceptPartner`, an order flagged `honeypot`, `likely_bot`, `spam_device` or
+    `spam_lookalike` is accepted and counted but NOT written to the Google Sheet, so the
+    partner's people don't call bots. Bare `no_captcha` still goes (a real in-app-browser
+    customer can fail Turnstile). The Meta Lead gate (principle #3) was NOT changed.
 
 ## Open items
 
