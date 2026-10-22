@@ -219,14 +219,15 @@ describe('numbers and lists for the operators', () => {
     const names = ['Алишер Каримов', 'Дилдора Ҳасанова', 'Рустам Носиров'];
     await order({ fullName: names[0], phone: '+998 90 312 45 41' }, { ip: '203.0.113.31' });
     await order({ fullName: names[0], phone: '+998 90 312 45 41' }, { ip: '203.0.113.31' }); // a repeat: no number, not listed
-    await order({ fullName: names[1], phone: '+998 93 444 55 66', contactFax: 'bot' }, { ip: '203.0.113.32' });
+    // A synthetic-looking phone is flagged (⚠️) but still shown in lists; a honeypot/bot would be hidden.
+    await order({ fullName: names[1], phone: '+998 90 111 11 11' }, { ip: '203.0.113.32' });
     expect(telegram.messages.some((m) => m.text.startsWith('📋'))).toBe(false);
     await order({ fullName: names[2], phone: '+998 97 777 88 99' }, { ip: '203.0.113.33' });
 
     const list = telegram.messages.at(-1)!.text;
     expect(list.startsWith('📋 <b>Рўйхат: №1–№3</b> (3 та буюртма)')).toBe(true);
     expect(list).toMatch(/<b>1\.<\/b> Алишер Каримов · \d\d:\d\d · ⏳ олинмаган\n📞 \+998 90 312 45 41/);
-    expect(list).toMatch(/<b>2\.<\/b> Дилдора Ҳасанова · .* ⚠️\n📞 \+998 93 444 55 66/);
+    expect(list).toMatch(/<b>2\.<\/b> Дилдора Ҳасанова · .* ⚠️\n📞 \+998 90 111 11 11/);
     expect(list).toMatch(/<b>3\.<\/b> Рустам Носиров · .*\n📞 \+998 97 777 88 99/);
     // The phone stands alone on its line, so copying it never takes the time along.
     expect(list.split('\n').filter((l) => l.startsWith('📞')).every((l) => /^📞 \+998 \d\d \d{3} \d\d \d\d$/.test(l))).toBe(true);
@@ -700,6 +701,20 @@ describe("the operators' Mini App panel", () => {
     expect(other.reply_markup).toBeUndefined();
   });
 
+  it('keeps a likely-bot order in the group, but out of the panel', async () => {
+    // A driven browser (webdriver) → likely_bot: operators still see it in the group…
+    expect((await order({ fullName: 'Бот Киши', phone: '+998 90 312 45 70', signals: { webdriver: true } }, { ip: '203.0.113.70' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('Бот Киши');
+    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли катта');
+    // …but it never clutters the panel table.
+    const botData = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
+    expect(botData.leads.some((l) => l.name === 'Бот Киши')).toBe(false);
+    // A normal order still shows in the panel.
+    await order({ fullName: 'Оддий Киши', phone: '+998 90 312 45 71' }, { ip: '203.0.113.71' });
+    const ok = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
+    expect(ok.leads.some((l) => l.name === 'Оддий Киши')).toBe(true);
+  });
+
   it('keeps campaign, ad set (utm_term) and video (utm_content) per lead', async () => {
     await order(
       {
@@ -717,7 +732,7 @@ describe("the operators' Mini App panel", () => {
         phone: '+998 90 312 45 97',
         utm: { source: 'facebook', campaign: 'qon-bosimi', content: 'video3' },
         deviceModel: 'SM-A175F · Android 16',
-        signals: { webdriver: true, touch: 0, gpu: 'NVIDIA GeForce RTX 3060', fillMs: 1500, keys: 0 },
+        signals: { touch: 0, gpu: 'NVIDIA GeForce RTX 3060', fillMs: 1500, keys: 0 },
       },
       { ip: '203.0.113.97' },
     );
@@ -727,7 +742,7 @@ describe("the operators' Mini App panel", () => {
     };
     expect(data.truncated).toBe(false);
     expect(data.leads[0]).toMatchObject({ number: 2, platform: 'Facebook', campaign: 'qon-bosimi', adset: null, ad: 'video3', device: 'Samsung Galaxy A17 (SM-A175F) · Android 16' });
-    expect(data.leads[0]!.details).toContain('webdriver (дастур бошқарган)');
+    expect(data.leads[0]!.details).toContain('GPU: NVIDIA GeForce RTX 3060');
     expect(data.leads[1]).toMatchObject({ number: 1, platform: 'Facebook', campaign: 'qon-bosimi', adset: 'A | Video 1-2 | UZ 30-55', ad: 'video1' });
   });
 

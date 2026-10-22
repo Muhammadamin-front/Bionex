@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 80 tests, Miniflare
+npm test --workspace=@bionex/worker      # 81 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -124,6 +124,11 @@ user's Mac.
     manifest + theme-color and registers the SW; panel.ts CSP gained `manifest-src`/`worker-src`.
     Chrome/Edge then show «Install» in the address bar. start_url `/panel`; the personal key
     still lives in localStorage, so a 7-day-expired install shows the «open from the bot» message.
+13. **Main-site bot/spam orders hidden from the panel & lists** (2026-10-23, owner's request):
+    `LIKELY_BOT_FLAGS` (honeypot, likely_bot, spam_device, spam_lookalike) — shared by `accept`
+    and `acceptPartner`. On the main site such an order still reaches the operators' GROUP (with
+    its buttons) but `list_items.hidden = 1`, so it is left out of `panelData`, `/royxat` lists
+    and the archive; stats (lead_status) still count it. A bare `no_captcha` stays visible.
 
 ## Open items
 

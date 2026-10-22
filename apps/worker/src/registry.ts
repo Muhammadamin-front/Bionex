@@ -40,6 +40,16 @@ const META_WINDOW = 7 * DAY;
 /** At most this many orders reach the panel at once. */
 const PANEL_LIMIT = 1000;
 /**
+ * Flags that mean "almost certainly a bot, not a customer": the hidden field, a browser a
+ * program drives or a failed check from outside the Instagram/Facebook app, a phone already
+ * marked spam, or one that looks like one. Such an order is accepted and recorded, but kept out
+ * of the places people work from — the partner's Google Sheet, and (main site) the operators'
+ * panel and lists — so nobody wastes a call on it. It still reaches the operators' group so they
+ * can see the attempt. A bare failed check (no_captcha) is NOT here: a real customer in an
+ * in-app browser can fail it.
+ */
+const LIKELY_BOT_FLAGS = ['honeypot', 'likely_bot', 'spam_device', 'spam_lookalike'];
+/**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
  * reported — Meta has no field for "this was fake", and withholding the event is the only way
@@ -243,6 +253,8 @@ export class LeadRegistry extends DurableObject<Env> {
     // The phone's model («Qurilma») and the browser's signals («Tafsilot»), for the panel.
     if (!listColumns.includes('device')) this.sql.exec('ALTER TABLE list_items ADD COLUMN device TEXT');
     if (!listColumns.includes('details')) this.sql.exec('ALTER TABLE list_items ADD COLUMN details TEXT');
+    // Main-site bot/spam orders: in the table but kept out of the panel and lists (see accept).
+    if (!listColumns.includes('hidden')) this.sql.exec('ALTER TABLE list_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS partner_leads (
@@ -361,7 +373,10 @@ export class LeadRegistry extends DurableObject<Env> {
         now,
       );
     }
-    const list = this.addToList(leadId, input, now);
+    // Almost certainly a bot: still goes to the group (operators see it) and keeps its buttons,
+    // but is hidden from the panel and the lists so nobody calls it.
+    const looksLikeBot = input.flags.some((f) => LIKELY_BOT_FLAGS.includes(f));
+    const list = this.addToList(leadId, input, now, looksLikeBot);
     const text = formatLead({
       number: leadId,
       fullName: input.fullName,
@@ -448,8 +463,7 @@ export class LeadRegistry extends DurableObject<Env> {
     // spam (spam_device) or one that looks like one (spam_lookalike). A failed check on its own
     // (no_captcha) is NOT enough — a real customer in an in-app browser can fail it — so those
     // still go to the sheet. The order is still accepted and still counted; only the sheet skips it.
-    const SHEET_SKIP = ['honeypot', 'likely_bot', 'spam_device', 'spam_lookalike'];
-    const looksLikeBot = flags.some((f) => SHEET_SKIP.includes(f));
+    const looksLikeBot = flags.some((f) => LIKELY_BOT_FLAGS.includes(f));
     const sheet = sheetsConfig(this.env, site);
     if (sheet && !looksLikeBot) {
       const { campaign, adset, ad } = utmParts(input.utm);
@@ -542,16 +556,19 @@ export class LeadRegistry extends DurableObject<Env> {
    * list, so operators can share out the calls. Each order is still sent the moment it
    * arrives; the list is only a summary. 0 turns the lists off.
    */
-  private addToList(leadId: number, input: OrderInput, now: number): { count: number; size: number; full: boolean } | null {
+  private addToList(leadId: number, input: OrderInput, now: number, hidden = false): { count: number; size: number; full: boolean } | null {
     // Kept for /royxat even when the 10-order lists are turned off.
     this.sql.exec(
-      'INSERT INTO list_items (lead_id, name, phone, at, flagged) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO list_items (lead_id, name, phone, at, flagged, hidden) VALUES (?, ?, ?, ?, ?, ?)',
       leadId,
       input.fullName,
       input.phone,
       now,
       input.flags.length > 0 ? 1 : 0,
+      hidden ? 1 : 0,
     );
+    // A hidden (bot) order never joins the lists and never triggers one.
+    if (hidden) return null;
     const size = this.listSize();
     if (size === 0) return null;
     const count = this.listCount();
@@ -565,7 +582,7 @@ export class LeadRegistry extends DurableObject<Env> {
 
   /** Orders since the last 10-order list. */
   private listCount(): number {
-    return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM list_items WHERE listed = 0').one().n;
+    return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM list_items WHERE listed = 0 AND hidden = 0').one().n;
   }
 
   /** Orders with their current status (who took it, the outcome), oldest first. */
@@ -574,7 +591,7 @@ export class LeadRegistry extends DurableObject<Env> {
       .exec<{ lead_id: number; name: string; phone: string; at: number; flagged: number; taker_name: string | null; outcome: string | null }>(
         `SELECT li.lead_id, li.name, li.phone, li.at, li.flagged, ls.taker_name, ls.outcome
            FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
-          WHERE ${where} ORDER BY li.lead_id`,
+          WHERE li.hidden = 0 AND (${where}) ORDER BY li.lead_id`,
         ...params,
       )
       .toArray()
@@ -594,7 +611,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const items = this.listItems('li.listed = 0').slice(0, this.listSize());
     if (items.length === 0) return;
     for (const text of formatList(batchTitle(items), items)) this.enqueue(text, { now, thread: 'reports' });
-    this.sql.exec('UPDATE list_items SET listed = 1 WHERE lead_id <= ? AND listed = 0', items[items.length - 1]!.number);
+    this.sql.exec('UPDATE list_items SET listed = 1 WHERE lead_id <= ? AND listed = 0 AND hidden = 0', items[items.length - 1]!.number);
   }
 
   /** /royxat in the group: all of today's orders with who has them and the outcome — every time. */
@@ -780,7 +797,7 @@ export class LeadRegistry extends DurableObject<Env> {
         `SELECT li.lead_id, li.name, li.phone, li.at, li.source, li.platform, li.campaign, li.adset, li.ad, li.device, li.details, li.flagged,
                 ls.taker_id, ls.taker_name, ls.outcome, ls.outcome_at
            FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
-          WHERE li.at >= ? AND li.archived_at IS ${input.archive ? 'NOT NULL' : 'NULL'}
+          WHERE li.hidden = 0 AND li.at >= ? AND li.archived_at IS ${input.archive ? 'NOT NULL' : 'NULL'}
           ORDER BY li.lead_id DESC LIMIT ${PANEL_LIMIT}`,
         since,
       )
@@ -824,7 +841,7 @@ export class LeadRegistry extends DurableObject<Env> {
       if (r.outcome === 'sold') d.sold++;
       if (r.outcome === 'spam') d.spam++;
     }
-    const archived = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM list_items WHERE archived_at IS NOT NULL').one().n;
+    const archived = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM list_items WHERE archived_at IS NOT NULL AND hidden = 0').one().n;
     return { leads, truncated: leads.length === PANEL_LIMIT, archived, days };
   }
 
@@ -833,10 +850,10 @@ export class LeadRegistry extends DurableObject<Env> {
     const open = this.sql
       .exec<{ n: number }>(
         `SELECT COUNT(*) AS n FROM list_items li LEFT JOIN lead_status ls ON ls.lead_id = li.lead_id
-          WHERE li.archived_at IS NULL AND (ls.outcome IS NULL OR ls.outcome IN ('noanswer', 'callback'))`,
+          WHERE li.hidden = 0 AND li.archived_at IS NULL AND (ls.outcome IS NULL OR ls.outcome IN ('noanswer', 'callback'))`,
       )
       .one().n;
-    const moved = this.sql.exec('UPDATE list_items SET archived_at = ? WHERE archived_at IS NULL', now).rowsWritten;
+    const moved = this.sql.exec('UPDATE list_items SET archived_at = ? WHERE archived_at IS NULL AND hidden = 0', now).rowsWritten;
     return { moved, open };
   }
 
