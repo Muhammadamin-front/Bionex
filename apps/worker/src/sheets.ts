@@ -58,6 +58,9 @@ const FLAG_TEXT: Record<string, string> = {
 export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз|spam|спам/i.test(String(status ?? ''));
 
 export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
+  // The main site's own sheet («Bionex-Zeynara»): a copy of each order next to the operators'
+  // Telegram group, which stays where the work is done. Off until both values are set.
+  if (site === 'main') return env.SHEETS_URL && env.SHEETS_SECRET ? { url: env.SHEETS_URL, secret: env.SHEETS_SECRET } : null;
   if (site !== 't2' || !env.SHEETS_T2_URL || !env.SHEETS_T2_SECRET) return null;
   return { url: env.SHEETS_T2_URL, secret: env.SHEETS_T2_SECRET };
 }

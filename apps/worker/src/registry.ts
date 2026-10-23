@@ -406,6 +406,25 @@ export class LeadRegistry extends DurableObject<Env> {
     );
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
+    // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
+    // numbered like the Telegram order. Bots stay out of it, as they stay out of the panel.
+    const sheet = sheetsConfig(this.env, 'main');
+    if (sheet && !looksLikeBot) {
+      this.ctx.waitUntil(
+        sendSheetOrder(sheet, {
+          number: leadId,
+          at: now,
+          fullName: input.fullName,
+          phone: input.phone,
+          campaign: input.via ? null : parts.campaign,
+          adset: input.via ? null : parts.adset,
+          ad: input.via ? null : parts.ad,
+          flags: input.flags,
+          model: input.model,
+          details: input.details?.latn,
+        }),
+      );
+    }
     if (list?.full) this.sendList(now);
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
     this.prune(now);

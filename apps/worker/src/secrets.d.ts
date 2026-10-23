@@ -32,6 +32,9 @@ interface WorkerSecrets {
   META_T2_TEST_EVENT_CODE?: string;
   SHEETS_T2_URL?: string;
   SHEETS_T2_SECRET?: string;
+  /** The main site's own Google Sheet («Bionex-Zeynara»): a copy of every order. Off until both are set. */
+  SHEETS_URL?: string;
+  SHEETS_SECRET?: string;
   /** Test overrides for the outside services. */
   TELEGRAM_API_BASE?: string;
   TURNSTILE_VERIFY_URL?: string;
