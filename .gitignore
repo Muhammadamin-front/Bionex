@@ -21,6 +21,6 @@ google-credentials*.json
 
 # Local caches of dev tooling
 .impeccable/hook.cache.json
-.impeccable/review/
-.impeccable/mocks/
-.impeccable/build/
+**/.impeccable/review/
+**/.impeccable/mocks/
+**/.impeccable/build/
