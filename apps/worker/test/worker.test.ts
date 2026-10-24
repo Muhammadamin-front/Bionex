@@ -1120,6 +1120,9 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     const text = leadMessages().at(-1)!.text;
     expect(text).toContain('🔬 реклама босилмаган · webdriver (дастур бошқарган) · GPU: NVIDIA GeForce RTX 3060 · сенсор 0 · 2 сонияда');
     expect(text).toContain('Chrome 141 (аслида 152)');
+    // The time zone is a clock setting, not a city: never "Asia/Tashkent".
+    expect(text).toContain('телефон соати: Ўзбекистон вақти · браузер тили ru-RU');
+    expect(text).not.toContain('Asia/Tashkent');
     expect(text).toContain('бот тузоғига тушди');
     // Nonsense in the signals is dropped, never a refused order.
     expect((await order({ phone: '+998 90 312 45 75', signals: { gpu: 5, touch: 'x', extra: 1 } }, { ip: '203.0.113.75' })).status).toBe(201);

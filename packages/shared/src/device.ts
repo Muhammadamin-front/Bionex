@@ -107,6 +107,8 @@ export function cleanSignals(value: unknown): DeviceSignals | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+const UZ_ZONES = new Set(['Asia/Tashkent', 'Asia/Samarkand']);
+
 const WORDS = {
   latn: {
     noAd: 'reklama bosilmagan',
@@ -119,6 +121,10 @@ const WORDS = {
     noTouch: 'ekranga tegilmagan',
     synthetic: 'dastur bosgan',
     onPage: 'saytda',
+    uzTime: "telefon soati: O'zbekiston vaqti",
+    tz: 'telefon soati',
+    notUz: "O'zbekiston emas",
+    lang: 'brauzer tili',
     really: 'aslida',
   },
   cyrl: {
@@ -132,6 +138,10 @@ const WORDS = {
     noTouch: 'экранга тегилмаган',
     synthetic: 'дастур босган',
     onPage: 'сайтда',
+    uzTime: 'телефон соати: Ўзбекистон вақти',
+    tz: 'телефон соати',
+    notUz: 'Ўзбекистон эмас',
+    lang: 'браузер тили',
     really: 'аслида',
   },
 };
@@ -147,7 +157,8 @@ export function caughtByBotTrap(s: DeviceSignals | undefined): boolean {
 
 /**
  * One short line for the people checking orders, e.g.
- * "reklama bosilmagan · GPU: NVIDIA GeForce RTX 3060 · sensor 0 · 2 soniyada · hech narsa yozilmagan · Asia/Tashkent · ru-RU".
+ * "reklama bosilmagan · GPU: NVIDIA GeForce RTX 3060 · sensor 0 · 2 soniyada · hech narsa yozilmagan ·
+ * telefon soati: O'zbekiston vaqti · brauzer tili ru-RU".
  */
 export function describeSignals(s: DeviceSignals | undefined, userAgent: string | null | undefined, script: 'latn' | 'cyrl'): string {
   if (!s) return '';
@@ -166,7 +177,9 @@ export function describeSignals(s: DeviceSignals | undefined, userAgent: string 
   if (s.pageMs !== undefined) parts.push(`${w.onPage} ${Math.round(s.pageMs / 1000)} ${w.seconds}`);
   const claimed = /Chrome\/(\d+)/.exec(userAgent ?? '')?.[1];
   if (s.chrome && claimed && claimed !== s.chrome) parts.push(`Chrome ${claimed} (${w.really} ${s.chrome})`);
-  if (s.tz) parts.push(s.tz);
-  if (s.lang) parts.push(s.lang);
+  // Only the clock's zone, never a city: Asia/Tashkent is all of Uzbekistan (the west may say
+  // Asia/Samarkand), so the raw name misled people into "the bots are in Tashkent".
+  if (s.tz) parts.push(UZ_ZONES.has(s.tz) ? w.uzTime : `${w.tz}: ${s.tz} (${w.notUz})`);
+  if (s.lang) parts.push(`${w.lang} ${s.lang}`);
   return parts.join(' · ');
 }
