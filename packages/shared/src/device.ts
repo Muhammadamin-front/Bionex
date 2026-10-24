@@ -27,7 +27,7 @@ export function cleanDeviceModel(value: unknown): string | undefined {
 /**
  * Whether the page was opened inside the Instagram or Facebook app, where an ad click opens.
  * On 2026-10-21 every real partner-site order came from there, and every fake one from a plain
- * Chrome that also failed the "not a robot" check (see the worker's `likely_bot` flag).
+ * Chrome that also failed the "not a robot" check (see the worker's `likely_bot` flag, a warning only).
  */
 export const fromSocialApp = (ua: string | null | undefined) => /Instagram|FBAN|FBAV|FB_IAB|FBIOS|FB4A/.test(ua ?? '');
 
@@ -137,12 +137,12 @@ const WORDS = {
 };
 
 /**
- * A trap only a program falls into: a made-up click or key press, or a touch screen nobody
- * touched before the order was sent. Missing signals (an old cached page) never count.
+ * A trap only a program falls into: a made-up click, a touch screen nobody touched before the
+ * order was sent, or the automation mark. Missing signals (an old cached page) never count.
  */
 export function caughtByBotTrap(s: DeviceSignals | undefined): boolean {
   if (!s) return false;
-  return Boolean(s.synthetic) || (s.taps === 0 && Boolean(s.touch));
+  return Boolean(s.webdriver) || Boolean(s.synthetic) || (s.taps === 0 && Boolean(s.touch));
 }
 
 /**

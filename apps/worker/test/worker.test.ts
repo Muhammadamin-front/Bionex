@@ -702,10 +702,10 @@ describe("the operators' Mini App panel", () => {
   });
 
   it('keeps a likely-bot order in the group, but out of the panel', async () => {
-    // A driven browser (webdriver) → likely_bot: operators still see it in the group…
+    // A driven browser (webdriver) → bot_trap: operators still see it in the group…
     expect((await order({ fullName: 'Бот Киши', phone: '+998 90 312 45 70', signals: { webdriver: true } }, { ip: '203.0.113.70' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('Бот Киши');
-    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли катта');
+    expect(leadMessages().at(-1)!.text).toContain('бот тузоғига тушди');
     // …but it never clutters the panel table.
     const botData = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
     expect(botData.leads.some((l) => l.name === 'Бот Киши')).toBe(false);
@@ -713,6 +713,12 @@ describe("the operators' Mini App panel", () => {
     await order({ fullName: 'Оддий Киши', phone: '+998 90 312 45 71' }, { ip: '203.0.113.71' });
     const ok = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
     expect(ok.leads.some((l) => l.name === 'Оддий Киши')).toBe(true);
+    // A failed check from outside Instagram (likely_bot) is only a warning: real people fail it too.
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 69', turnstileToken: 'bad' }, { ip: '203.0.113.69', userAgent: chrome });
+    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли бор');
+    const warned = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
+    expect(warned.leads.some((l) => l.name === 'Шубҳали Киши')).toBe(true);
   });
 
   it('flags the browser bot traps: a made-up click, or a touch screen nobody touched', async () => {
@@ -1098,7 +1104,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
     const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
     expect((await order({ phone: '+998 90 312 45 71', turnstileToken: 'bad' }, { ip: '203.0.113.71', userAgent: chrome })).status).toBe(201);
-    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли катта');
+    expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли бор');
     // In the app the ads open in, a failed check alone is not enough.
     expect((await order({ phone: '+998 90 312 45 72', turnstileToken: 'bad' }, { ip: '203.0.113.72', userAgent: instagram })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
@@ -1107,14 +1113,14 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
   });
 
-  it('shows how the order was made («Tafsilot»), and a driven browser is a likely robot', async () => {
+  it('shows how the order was made («Tafsilot»), and a driven browser falls into the bot trap', async () => {
     const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
     const signals = { gpu: 'ANGLE (NVIDIA GeForce RTX 3060)', touch: 0, webdriver: true, fillMs: 1800, keys: 0, pasted: false, tz: 'Asia/Tashkent', lang: 'ru-RU', adClick: false, chrome: '152' };
     expect((await order({ phone: '+998 90 312 45 74', signals }, { ip: '203.0.113.74', userAgent: chrome })).status).toBe(201);
     const text = leadMessages().at(-1)!.text;
     expect(text).toContain('🔬 реклама босилмаган · webdriver (дастур бошқарган) · GPU: NVIDIA GeForce RTX 3060 · сенсор 0 · 2 сонияда');
     expect(text).toContain('Chrome 141 (аслида 152)');
-    expect(text).toContain('бот эҳтимоли катта');
+    expect(text).toContain('бот тузоғига тушди');
     // Nonsense in the signals is dropped, never a refused order.
     expect((await order({ phone: '+998 90 312 45 75', signals: { gpu: 5, touch: 'x', extra: 1 } }, { ip: '203.0.113.75' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('🔬');
@@ -1256,7 +1262,7 @@ describe('the partner site (sites.ts t2)', () => {
   });
 
   it('keeps bot-flagged orders out of the sheet, but still accepts them', async () => {
-    // A browser a program drives → likely_bot: accepted, but the partner's people never see it.
+    // A browser a program drives → bot_trap: accepted, but the partner's people never see it.
     const res = await partnerOrder({ fullName: 'Бот Буюртма', phone: '+998 90 312 45 88', signals: { webdriver: true } }, '203.0.113.88');
     expect(((await res.json()) as { status: string }).status).toBe('accepted');
     await new Promise((r) => setTimeout(r, 100));
@@ -1266,6 +1272,10 @@ describe('the partner site (sites.ts t2)', () => {
     await until(() => sheets.rows.length >= 1);
     expect(sheets.rows).toHaveLength(1);
     expect(sheets.rows[0]!.row[2]).toBe('Ҳақиқий Мижоз');
+    // A failed check (even outside Instagram) still goes to the sheet, with its warning.
+    await partnerOrder({ fullName: 'Шубҳали Мижоз', phone: '+998 90 312 45 87', turnstileToken: 'bad' }, '203.0.113.87');
+    await until(() => sheets.rows.length >= 2);
+    expect(sheets.rows[1]!.row[2]).toBe('Шубҳали Мижоз');
   });
 
   it('numbers its own orders, and is no repeat of a main-site order', async () => {

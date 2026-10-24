@@ -45,10 +45,10 @@ const PANEL_LIMIT = 1000;
  * marked spam, or one that looks like one. Such an order is accepted and recorded, but kept out
  * of the places people work from — the partner's Google Sheet, and (main site) the operators'
  * panel and lists — so nobody wastes a call on it. It still reaches the operators' group so they
- * can see the attempt. A bare failed check (no_captcha) is NOT here: a real customer in an
- * in-app browser can fail it.
+ * can see the attempt. A failed check is NOT here, even from outside the Instagram/Facebook app
+ * (likely_bot): real customers turned up among those, so they stay visible with a warning.
  */
-const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'likely_bot', 'spam_device', 'spam_lookalike'];
+const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike'];
 /**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
@@ -477,11 +477,10 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
     // Orders that are almost certainly a bot never reach the partner's sheet, so their people
-    // do not waste calls on them: the hidden field (honeypot), a browser a program drives or a
-    // failed check from outside the Instagram/Facebook app (likely_bot), a phone already marked
-    // spam (spam_device) or one that looks like one (spam_lookalike). A failed check on its own
-    // (no_captcha) is NOT enough — a real customer in an in-app browser can fail it — so those
-    // still go to the sheet. The order is still accepted and still counted; only the sheet skips it.
+    // do not waste calls on them: the hidden fields (honeypot), the browser's traps or a browser a
+    // program drives (bot_trap), a phone already marked spam (spam_device) or one that looks like
+    // one (spam_lookalike). A failed check (no_captcha, likely_bot) is NOT enough — real customers
+    // fail it — so those still go to the sheet, with the warning. The order is still accepted and still counted; only the sheet skips it.
     const looksLikeBot = flags.some((f) => LIKELY_BOT_FLAGS.includes(f));
     const sheet = sheetsConfig(this.env, site);
     if (sheet && !looksLikeBot) {

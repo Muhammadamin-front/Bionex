@@ -197,12 +197,13 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     if (data[HONEYPOT_FIELD]?.trim()) flags.push('honeypot');
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     if (!check.ok) flags.push('no_captcha');
-    // Failed the check and not opened from the Instagram / Facebook app the ads run in: so far
-    // that has always been a robot. Still only a flag (docs/SPAM.md: never refuse a customer).
-    // So does a browser that says a program drives it.
+    // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
+    // robot, but real customers turned up among them too (their Telegram name matched), so it
+    // is a warning for the call and the order stays in the panel and the sheet.
     const userAgent = request.headers.get('user-agent');
-    if (data.signals?.webdriver || (!check.ok && !fromSocialApp(userAgent))) flags.push('likely_bot');
-    // The browser's own traps: a made-up click, or a touch screen nobody touched (device.ts).
+    if (!check.ok && !fromSocialApp(userAgent)) flags.push('likely_bot');
+    // The browser's own traps — a made-up click, a touch screen nobody touched, or a browser that
+    // says a program drives it (device.ts): only a program does that, so these are hidden.
     if (caughtByBotTrap(data.signals)) flags.push('bot_trap');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the

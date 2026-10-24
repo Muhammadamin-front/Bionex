@@ -136,6 +136,13 @@ user's Mac.
     `caughtByBotTrap` (shared) → flag `bot_trap` («бот тузоғига тушди»), in `LIKELY_BOT_FLAGS`
     (hidden from panel / partner sheet, kept in the group). Like `likely_bot` it does NOT
     withhold the partner's server Lead. Flag only.
+15. **`likely_bot` is a warning again, not hidden** (2026-10-24, owner's decision): the owner
+    found real customers among failed-check orders (the Telegram profile of the number bore the
+    same name). `likely_bot` (no_captcha outside Instagram/Facebook) left `LIKELY_BOT_FLAGS`:
+    such orders show in the panel, lists and partner sheet with «бот эҳтимоли бор (одам ҳам
+    бўлиши мумкин)». `webdriver` moved from `likely_bot` to `bot_trap` (still hidden). The
+    owner declined a Telegram-contact confirmation button for now (offered: bots cannot do it;
+    looking up a number's Telegram name automatically is not possible with the Bot API).
 
 ## Open items
 
