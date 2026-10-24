@@ -388,9 +388,13 @@ export function OrderForm({
 
   const errorId = (f: Field) => `${id}-${f}-error`;
 
+  // No autofill: customers keep the phone for years but change SIM cards, and the browser
+  // would offer the old number (and the old name it was saved with). The field names are
+  // neutral too, because Chrome guesses from "name"/"phone" even with autocomplete off.
   return (
     <form
       ref={formRef}
+      autoComplete="off"
       noValidate
       onSubmit={onSubmit}
       onFocus={() => {
@@ -416,9 +420,9 @@ export function OrderForm({
           <input
             ref={nameRef}
             id={`${id}-name`}
-            name="name"
+            name="zn-customer"
             type="text"
-            autoComplete="name"
+            autoComplete="off"
             autoCapitalize="words"
             enterKeyHint="next"
             maxLength={80}
@@ -459,10 +463,10 @@ export function OrderForm({
             <input
               ref={phoneRef}
               id={`${id}-phone`}
-              name="phone"
+              name="zn-number"
               type="tel"
               inputMode="tel"
-              autoComplete="tel-national"
+              autoComplete="off"
               enterKeyHint="send"
               required
               value={phone}

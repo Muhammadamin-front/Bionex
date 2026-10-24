@@ -547,7 +547,7 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
             const quick = document.getElementById('tez-buyurtma');
             if (!quick || quick.getBoundingClientRect().bottom <= 0) return;
             e.preventDefault();
-            const heroName = quickFormOnScreen ? quick.querySelector<HTMLInputElement>('form input[name=name]') : null;
+            const heroName = quickFormOnScreen ? quick.querySelector<HTMLInputElement>('form input[name=zn-customer]') : null;
             if (heroName) {
               heroName.scrollIntoView({ block: 'center', behavior: 'smooth' });
               heroName.focus({ preventScroll: true });
