@@ -43,8 +43,9 @@ const shell =
 
 const TONES: Record<Tone, { body: string; slider: string; label: string }> = {
   // Green body, yellow slider — for light surfaces.
+  // Colours can be re-themed per site (--btn-*); the defaults are the original green.
   forest: {
-    body: 'bg-[linear-gradient(180deg,#1d8a55_0%,#0d3a27_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-8px_rgba(13,58,39,0.55)]',
+    body: 'bg-[linear-gradient(180deg,var(--btn-top,#1d8a55)_0%,var(--btn-bottom,#0d3a27)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_-8px_var(--btn-shadow,rgba(13,58,39,0.55))]',
     slider: 'linear-gradient(180deg, var(--color-accent) 0%, var(--color-accent-2) 100%)',
     label: 'text-white group-hover/btn:text-ink group-focus-visible/btn:text-ink group-data-[busy=true]/btn:text-ink',
   },

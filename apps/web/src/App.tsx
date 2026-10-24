@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Landing } from './components/landing/Landing';
+// The main site or the partner site, picked at build time (vite.config.ts).
+import { Landing } from '#site';
 
 /** Scroll to `el` at once, overriding the page's smooth scrolling (works in every browser). */
 function jumpTo(el: Element) {

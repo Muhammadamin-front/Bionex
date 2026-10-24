@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import postcss, { type Declaration, type Plugin as PostcssPlugin } from 'postcss';
 import postcssPresetEnv from 'postcss-preset-env';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 const TURNSTILE = 'https://challenges.cloudflare.com';
@@ -148,12 +149,42 @@ function warnAboutProductionConfig(env: Record<string, string>): void {
   for (const p of problems) console.warn(`\n⚠️  ${p}`);
 }
 
+/**
+ * The main site's own name and colour in the page head. The partner build keeps index.html as
+ * it is: it must carry nothing of the main site (docs/PARTNER-SITE.md).
+ */
+const MAIN_SITE_NAME = 'Оромгоҳ даволаш маскани';
+function mainSiteHead(): Plugin {
+  return {
+    name: 'main-site-head',
+    transformIndexHtml(html) {
+      return html
+        .replace(/<title>([^<]*)<\/title>/, `<title>$1 · ${MAIN_SITE_NAME}</title>`)
+        .replace(/(<meta property="og:site_name" content=")[^"]*"/, `$1${MAIN_SITE_NAME}"`)
+        .replace(/(<meta name="theme-color" content=")[^"]*"/, '$1#eaf4fc"')
+        .replace(
+          /<link rel="icon"[^>]*>/,
+          `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(MAIN_FAVICON)}" type="image/svg+xml" />`,
+        );
+    },
+  };
+}
+/** A piyola in the paxta-guli blue, the main site's mark. */
+const MAIN_FAVICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" rx="12" fill="#eaf4fc"/><path d="M7 15h26c0 8.3-5.8 15-13 15S7 23.3 7 15Z" fill="#1d68b3"/><path d="M7.6 18.5h24.8" stroke="#bfe0fa" stroke-width="2"/><circle cx="20" cy="23.5" r="2.6" fill="#fff"/></svg>';
+
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
-    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders()],
+    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(mode === 't2' ? [] : [mainSiteHead()])],
+    resolve: {
+      // Each site is its own tree: the partner build never even sees the main site's page.
+      alias: {
+        '#site': fileURLToPath(new URL(mode === 't2' ? './src/sites/partner.tsx' : './src/sites/main/index.tsx', import.meta.url)),
+      },
+    },
     server: {
       port: 5173,
       // The order API runs in `wrangler dev` (apps/worker) during development.

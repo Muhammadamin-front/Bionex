@@ -1,0 +1,502 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T00:00:00Z",
+  "title": "Design System: Оромгоҳ даволаш маскани",
+  "extensions": {
+    "colorMeta": {
+      "piyola-blue": {
+        "role": "primary",
+        "displayName": "Piyola Blue",
+        "canonical": "oklch(51.3% 0.138 253)",
+        "tonalRamp": [
+          "#000a23",
+          "#0e2743",
+          "#004487",
+          "#2468ae",
+          "#4a8cd5",
+          "#6fb2fe",
+          "#b6d4f8",
+          "#d2f2ff"
+        ]
+      },
+      "piyola-blue-deep": {
+        "role": "primary",
+        "displayName": "Deep Piyola Blue",
+        "canonical": "oklch(43.5% 0.117 253)",
+        "tonalRamp": [
+          "#000a23",
+          "#0e2743",
+          "#024581",
+          "#2e68a7",
+          "#528cce",
+          "#76b2f6",
+          "#b6d4f8",
+          "#d2f2ff"
+        ]
+      },
+      "pattern-mid": {
+        "role": "secondary",
+        "displayName": "Pattern Mid Blue",
+        "canonical": "oklch(67.2% 0.113 248)",
+        "tonalRamp": [
+          "#000b23",
+          "#0a2842",
+          "#00477e",
+          "#286aa3",
+          "#4d8eca",
+          "#72b4f2",
+          "#b3d5f7",
+          "#d0f3ff"
+        ]
+      },
+      "pattern-soft": {
+        "role": "secondary",
+        "displayName": "Pattern Soft Blue",
+        "canonical": "oklch(78.6% 0.082 246)",
+        "tonalRamp": [
+          "#000b22",
+          "#072942",
+          "#18486e",
+          "#3b6a92",
+          "#5e8eb8",
+          "#82b4df",
+          "#b1d6f7",
+          "#cef4ff"
+        ]
+      },
+      "pattern-light": {
+        "role": "secondary",
+        "displayName": "Pattern Light Blue",
+        "canonical": "oklch(89.1% 0.050 242)",
+        "tonalRamp": [
+          "#000c1e",
+          "#0c293d",
+          "#2c485e",
+          "#4c6a81",
+          "#6f8da5",
+          "#93b2cb",
+          "#b5d6f0",
+          "#d2f4ff"
+        ]
+      },
+      "navy-ink": {
+        "role": "neutral",
+        "displayName": "Navy Ink",
+        "canonical": "oklch(30.0% 0.069 251)",
+        "tonalRamp": [
+          "#000a23",
+          "#0d2843",
+          "#274769",
+          "#48698d",
+          "#6a8cb2",
+          "#8eb2d9",
+          "#b5d4f8",
+          "#d2f2ff"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "oklch(37.1% 0.079 251)",
+        "tonalRamp": [
+          "#000a23",
+          "#0c2842",
+          "#21476d",
+          "#426992",
+          "#658db7",
+          "#89b2df",
+          "#b4d5f8",
+          "#d1f2ff"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "oklch(45.7% 0.076 250)",
+        "tonalRamp": [
+          "#000b23",
+          "#0c2842",
+          "#23476c",
+          "#446990",
+          "#668db6",
+          "#8ab2dd",
+          "#b4d5f8",
+          "#d1f2ff"
+        ]
+      },
+      "placeholder-ink": {
+        "role": "neutral",
+        "displayName": "Placeholder Ink",
+        "canonical": "oklch(53.2% 0.067 251)",
+        "tonalRamp": [
+          "#000a23",
+          "#0d2843",
+          "#284768",
+          "#49698b",
+          "#6b8cb1",
+          "#8fb1d7",
+          "#b5d4f8",
+          "#d2f2ff"
+        ]
+      },
+      "navy-mark": {
+        "role": "neutral",
+        "displayName": "Navy Mark",
+        "canonical": "oklch(33.8% 0.080 251)",
+        "tonalRamp": [
+          "#000a23",
+          "#0d2843",
+          "#21476e",
+          "#426992",
+          "#648db8",
+          "#88b2df",
+          "#b5d5f8",
+          "#d1f2ff"
+        ]
+      },
+      "on-blue": {
+        "role": "neutral",
+        "displayName": "On-Blue",
+        "canonical": "oklch(92.2% 0.029 245)",
+        "tonalRamp": [
+          "#020c17",
+          "#1a2834",
+          "#384754",
+          "#596876",
+          "#7b8b9a",
+          "#9fb0c0",
+          "#c2d4e3",
+          "#dff1ff"
+        ]
+      },
+      "sky-cloth": {
+        "role": "neutral",
+        "displayName": "Sky Cloth",
+        "canonical": "oklch(96.2% 0.015 242)",
+        "tonalRamp": [
+          "#060c11",
+          "#20272d",
+          "#3e464d",
+          "#5f676e",
+          "#818a92",
+          "#a6afb7",
+          "#c9d2da",
+          "#e6f0f8"
+        ]
+      },
+      "cloth-shade": {
+        "role": "neutral",
+        "displayName": "Cloth in Shade",
+        "canonical": "oklch(93.3% 0.024 244)",
+        "tonalRamp": [
+          "#040c14",
+          "#1c2831",
+          "#3a4751",
+          "#5b6873",
+          "#7d8b97",
+          "#a2b0bc",
+          "#c4d3e0",
+          "#e2f1fe"
+        ]
+      },
+      "porcelain": {
+        "role": "neutral",
+        "displayName": "Porcelain",
+        "canonical": "oklch(100.0% 0.000 90)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d1d1d1",
+          "#eeeeee"
+        ]
+      },
+      "glaze-line": {
+        "role": "neutral",
+        "displayName": "Glaze Line",
+        "canonical": "oklch(88.3% 0.039 245)",
+        "tonalRamp": [
+          "#000c1a",
+          "#152838",
+          "#334759",
+          "#54697b",
+          "#768c9f",
+          "#9ab1c5",
+          "#bdd4e9",
+          "#daf2ff"
+        ]
+      },
+      "button-top": {
+        "role": "primary",
+        "displayName": "Glaze Gradient Top",
+        "canonical": "oklch(62.0% 0.139 250)",
+        "tonalRamp": [
+          "#000b23",
+          "#0c2842",
+          "#004587",
+          "#1b69ad",
+          "#448dd4",
+          "#6ab3fd",
+          "#b4d5f8",
+          "#d1f2ff"
+        ]
+      },
+      "button-bottom": {
+        "role": "primary",
+        "displayName": "Glaze Gradient Bottom",
+        "canonical": "oklch(47.8% 0.129 253)",
+        "tonalRamp": [
+          "#000a23",
+          "#0e2743",
+          "#004487",
+          "#2567ad",
+          "#4b8cd5",
+          "#70b2fd",
+          "#b6d4f8",
+          "#d3f2ff"
+        ]
+      },
+      "error-red": {
+        "role": "functional",
+        "displayName": "Error Red",
+        "canonical": "oklch(50.0% 0.182 30)",
+        "tonalRamp": [
+          "#1e0000",
+          "#3f1914",
+          "#7c1e15",
+          "#a34337",
+          "#cc6759",
+          "#f58c7d",
+          "#f6c3ba",
+          "#ffe0d7"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline only; 2.05rem phone, 2.9rem from sm, 2.55rem in the xl three-column hero."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles, 1.85rem to 2.5rem from sm."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sub-heads, card heads, disclosure summaries, form lead."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text, 60-62ch max; root is 112.5% so 1.125rem = 20.25px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Captions, sources, hints; never below 0.95rem."
+      }
+    },
+    "shadows": [
+      {
+        "name": "plate-rest",
+        "value": "0 34px 46px -30px rgba(18,57,95,0.5), inset 0 2px 0 rgba(255,255,255,0.9), inset 0 -10px 22px rgba(29,104,179,0.08)",
+        "purpose": "The lagan plate."
+      },
+      {
+        "name": "tray-rest",
+        "value": "0 34px 50px -34px rgba(18,57,95,0.6)",
+        "purpose": "The patnis holding the order form."
+      },
+      {
+        "name": "card-rest",
+        "value": "0 24px 44px -32px rgba(18,57,95,0.7)",
+        "purpose": "Porcelain cards."
+      },
+      {
+        "name": "cup-rest",
+        "value": "0 12px 18px -12px rgba(18,57,95,0.55)",
+        "purpose": "Piyola medallions."
+      },
+      {
+        "name": "pill-lift",
+        "value": "0 10px 18px -10px rgba(18,57,95,0.7)",
+        "purpose": "Pill and bar buttons."
+      },
+      {
+        "name": "bar-lift",
+        "value": "0 -14px 28px -18px rgba(18,57,95,0.6)",
+        "purpose": "Fixed bottom order bar on phones."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Set-down, boll opening, disclosures, pop-in."
+      },
+      {
+        "name": "ease-in-out-quint",
+        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+        "purpose": "The button knob sliding across."
+      },
+      {
+        "name": "set-down",
+        "value": "1.2s ease-out-expo, from translateY(14px) rotate(-6deg) scale(0.97)",
+        "purpose": "The lagan is set on the table once on load."
+      },
+      {
+        "name": "boll-open",
+        "value": "0.45s ease-out-expo, lobes scale 0 to 1 staggered 0.05s",
+        "purpose": "Signature: a ticked symptom opens a cotton boll."
+      },
+      {
+        "name": "heart-beat",
+        "value": "0.95s x6, lub-dub scale 1 / 1.085 / 1.055",
+        "purpose": "The pack's printed heart beats six times when seen, then rests."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (glaze slider)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Form submit and 'order now' links: glazed blue body, a light knob that slides across on hover/focus/busy.",
+      "html": "<button class=\"ds-btn-glaze\"><span class=\"ds-btn-glaze__knob\" aria-hidden=\"true\"><svg width=\"14\" height=\"16\" viewBox=\"0 0 14 16\"><path fill=\"currentColor\" d=\"M1 2a1 1 0 1 0 2 0a1 1 0 1 0-2 0M4 5a1 1 0 1 0 2 0a1 1 0 1 0-2 0M7 8a1 1 0 1 0 2 0a1 1 0 1 0-2 0M4 11a1 1 0 1 0 2 0a1 1 0 1 0-2 0M1 14a1 1 0 1 0 2 0a1 1 0 1 0-2 0M5 2a1 1 0 1 0 2 0a1 1 0 1 0-2 0M8 5a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 8a1 1 0 1 0 2 0a1 1 0 1 0-2 0M8 11a1 1 0 1 0 2 0a1 1 0 1 0-2 0M5 14a1 1 0 1 0 2 0a1 1 0 1 0-2 0\"/></svg></span><span class=\"ds-btn-glaze__label\">Батафсил маълумот олиш</span></button>",
+      "css": ".ds-btn-glaze{position:relative;display:inline-flex;align-items:center;height:4rem;min-width:15rem;overflow:hidden;border:0;border-radius:1rem;cursor:pointer;font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;background:linear-gradient(180deg,#3a8ad6 0%,#1a5ea3 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 24px -8px rgba(18,57,95,.45);transition:transform .2s}.ds-btn-glaze:active{transform:scale(.98)}.ds-btn-glaze__knob{position:absolute;top:.375rem;bottom:.375rem;left:.375rem;width:2.75rem;display:flex;align-items:center;padding-left:15px;border-radius:.75rem;color:#0f2f4f;background:linear-gradient(180deg,#bfe0fa 0%,#8dbfeb 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -2px 4px rgba(0,0,0,.12);transition:width .3s cubic-bezier(.65,0,.35,1)}.ds-btn-glaze__label{position:relative;z-index:2;width:100%;text-align:right;padding:0 1.25rem 0 4rem;font-size:1.05rem;font-weight:700;color:#fff;transition:color .3s}.ds-btn-glaze:hover .ds-btn-glaze__knob,.ds-btn-glaze:focus-visible .ds-btn-glaze__knob{width:calc(100% - .75rem)}.ds-btn-glaze:hover .ds-btn-glaze__label,.ds-btn-glaze:focus-visible .ds-btn-glaze__label{color:#0f2f4f}.ds-btn-glaze:focus-visible{outline:3px solid var(--color-brand,#1d68b3);outline-offset:3px}"
+    },
+    {
+      "name": "Pill Button",
+      "kind": "button",
+      "refersTo": "button-pill",
+      "description": "Header consultation link: solid piyola blue, fully round.",
+      "html": "<a class=\"ds-btn-pill\" href=\"#\">Консультация</a>",
+      "css": ".ds-btn-pill{display:inline-flex;align-items:center;height:3rem;padding:0 1.25rem;border-radius:9999px;background:#1d68b3;color:#fff;font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;font-weight:800;font-size:1rem;text-decoration:none;box-shadow:0 10px 18px -10px rgba(18,57,95,.7);transition:background-color .2s}.ds-btn-pill:hover{background:#15528f}.ds-btn-pill:focus-visible{outline:3px solid #1d68b3;outline-offset:3px}"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Phone field with fixed +998 prefix; sky-cloth at rest, porcelain on focus.",
+      "html": "<label class=\"ds-label\">Телефон рақамингиз<span class=\"ds-phone\"><span class=\"ds-phone__pre\">+998</span><input class=\"ds-phone__in\" inputmode=\"tel\" placeholder=\"90 123 45 67\"></span></label>",
+      "css": ".ds-label{display:block;font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;font-weight:700;font-size:1.125rem;color:#0f2f4f}.ds-phone{margin-top:.5rem;display:flex;align-items:center;height:4rem;border:2px solid #c4dcf1;border-radius:1rem;background:#eaf4fc;transition:border-color .2s,background-color .2s,box-shadow .2s}.ds-phone:focus-within{border-color:#1d68b3;background:#fff;box-shadow:0 0 0 4px rgba(29,104,179,.2)}.ds-phone__pre{padding:0 .875rem;border-right:2px solid #c4dcf1;font-size:1.25rem;font-weight:700;color:#1c4268;font-variant-numeric:tabular-nums}.ds-phone__in{flex:1;min-width:0;height:100%;border:0;background:transparent;padding:0 .875rem;font:inherit;font-weight:500;font-size:1.25rem;color:#0f2f4f;outline:none}.ds-phone__in::placeholder{color:#4f6f92}"
+    },
+    {
+      "name": "Symptom Chip",
+      "kind": "chip",
+      "refersTo": "symptom-chip",
+      "description": "Toggle chip in the symptom check; pressing it opens a cotton boll.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\"><svg class=\"ds-chip__boll\" viewBox=\"0 0 32 32\"><g fill=\"#fff\" stroke=\"#1d68b3\" stroke-width=\"1.3\"><circle cx=\"16\" cy=\"11\" r=\"5.2\"/><circle cx=\"21\" cy=\"16\" r=\"5.2\"/><circle cx=\"16\" cy=\"21\" r=\"5.2\"/><circle cx=\"11\" cy=\"16\" r=\"5.2\"/></g></svg>Бош айланиши</button>",
+      "css": ".ds-chip{display:flex;align-items:center;gap:.75rem;min-height:4rem;width:100%;padding:.75rem 1rem;border:2px solid #c4dcf1;border-radius:1rem;background:rgba(255,255,255,.7);font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;font-weight:700;font-size:1.06rem;color:#0f2f4f;text-align:left;cursor:pointer;transition:border-color .2s,background-color .2s,box-shadow .2s}.ds-chip:hover{border-color:#8dbfeb;background:#fff}.ds-chip[aria-pressed=true]{border-color:#1d68b3;background:#fff;box-shadow:0 10px 20px -14px rgba(18,57,95,.8)}.ds-chip:focus-visible{outline:3px solid #1d68b3;outline-offset:3px}.ds-chip__boll{width:2.25rem;height:2.25rem;flex:none}"
+    },
+    {
+      "name": "Porcelain Card",
+      "kind": "card",
+      "refersTo": "card-porcelain",
+      "description": "White glazed card resting on cloth, navy-tinted pooled shadow.",
+      "html": "<figure class=\"ds-card\"><blockquote class=\"ds-card__q\">Босимим анча барқарорлашди, бош оғриғи камайди.</blockquote><figcaption class=\"ds-card__by\">Мижоз, 58 ёш</figcaption></figure>",
+      "css": ".ds-card{margin:0;padding:2.5rem;border-radius:2rem;background:#fff;box-shadow:0 24px 44px -32px rgba(18,57,95,.7);font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;}.ds-card__q{margin:0;font-size:1.35rem;font-weight:700;line-height:1.5;color:#0f2f4f}.ds-card__by{margin-top:1.5rem;font-size:.95rem;color:#355a80}"
+    },
+    {
+      "name": "Patnis (order tray)",
+      "kind": "custom",
+      "refersTo": "card-porcelain",
+      "description": "Signature: the form on porcelain, inside a tray of paxta-guli cloth with a piyola-blue rim.",
+      "html": "<div class=\"ds-patnis\"><div class=\"ds-patnis__card\"><p class=\"ds-patnis__lead\">Рақамингизни қолдиринг. <span>Консультация бепул.</span></p></div></div>",
+      "css": ".ds-patnis{padding:12px;border-radius:2.25rem;background-color:#fff;background-image:repeating-linear-gradient(45deg,transparent 0 26px,#8dbfeb 26px 27.5px),repeating-linear-gradient(-45deg,transparent 0 26px,#8dbfeb 26px 27.5px);outline:3px solid #1d68b3;outline-offset:-3px;box-shadow:0 34px 50px -34px rgba(18,57,95,.6)}.ds-patnis__card{padding:1.5rem;border-radius:1.5rem;background:#fff;box-shadow:0 0 0 2px #8dbfeb}.ds-patnis__lead{margin:0;font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;font-weight:800;font-size:1.25rem;color:#0f2f4f}.ds-patnis__lead span{color:#1d68b3}"
+    },
+    {
+      "name": "Piyola Medallion",
+      "kind": "custom",
+      "refersTo": "piyola-blue",
+      "description": "Small round glazed dish holding an icon, step number or initial.",
+      "html": "<span class=\"ds-piyola\">2</span>",
+      "css": ".ds-piyola{position:relative;display:inline-grid;place-items:center;width:4rem;height:4rem;border-radius:9999px;background:radial-gradient(circle at 50% 40%,#fff 0 56%,#eef6fd 70%);box-shadow:0 12px 18px -12px rgba(18,57,95,.55),inset 0 0 0 2px #fff,inset 0 0 0 4px #1d68b3;font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;font-weight:900;font-size:1.5rem;color:#15528f}"
+    },
+    {
+      "name": "Blue Result Panel",
+      "kind": "card",
+      "refersTo": "panel-blue",
+      "description": "The one solid piyola-blue surface: symptom-check result with a porcelain button.",
+      "html": "<div class=\"ds-panel\"><p class=\"ds-panel__t\">Сиз 3 та аломат белгиладингиз</p><a class=\"ds-panel__btn\" href=\"#\">Бепул маслаҳат олиш</a></div>",
+      "css": ".ds-panel{padding:1.5rem;border-radius:1.75rem;background:#1d68b3;color:#d6e8f8;box-shadow:0 24px 40px -28px rgba(18,57,95,.9);font-family: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;}.ds-panel__t{margin:0;font-size:1.5rem;font-weight:800;color:#fff}.ds-panel__btn{margin-top:1.25rem;display:flex;align-items:center;justify-content:center;height:4rem;border-radius:1rem;background:#fff;color:#15528f;font-weight:800;font-size:1.08rem;text-decoration:none;transition:background-color .2s}.ds-panel__btn:hover{background:#eaf4fc}.ds-panel__btn:focus-visible{outline:3px solid #fff;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Dasturxon for a Guest",
+    "overview": "**Creative North Star: \"The Dasturxon for a Guest\"**\n\nThe page is a tea table laid for someone respected: a pale sky cloth for the ground, white glazed porcelain for every surface that holds something, and the light-blue paxta-guli (cotton-boll) tea-set pattern every Uzbek home owns, used the way porcelain uses it — as rims, borders and bands, never as a wallpaper behind text. Navy is the ink; one glazed piyola blue carries the action. The whole palette stays inside light blue, by the owner's explicit choice.\n\nObjects on the table give the page its shapes: the round lagan plate that carries the pack and the family photo, small round piyola medallions holding icons and step numbers, and the patnis — a tray with a patterned rim — that carries the order form. Density is calm and generous for readers aged 45–65 on phones: the root size is 112.5% (1rem = 18px), body text is never smaller than 1.125rem, and tap targets are 4rem tall.\n\nMotion is spare and authored: the plate is set down once (a 1.2s exponential ease), a ticked symptom opens a cotton boll beside it, and the pack's printed heart beats six times when seen. Danger is said in words, in navy, not shouted in red.",
+    "keyCharacteristics": [
+      "Pale sky cloth ground, white porcelain surfaces, navy ink, one piyola blue for action.",
+      "The paxta-guli pattern as rims, bands and plate rings only.",
+      "Round objects (lagan, piyola) for media, icons and numbers; generously rounded trays and cards for content.",
+      "One rounded type family, Nunito, at weights 500–900.",
+      "Soft navy-tinted drop shadows that read as objects resting on cloth."
+    ],
+    "rules": [
+      {
+        "name": "The Light Blue Only Rule",
+        "body": "Every UI colour lives in the blue family from Sky Cloth to Navy Ink. The only exceptions are the product's own photography (the red pack, the vessel illustration) and validation-error red on form fields.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Glaze Rule",
+        "body": "Piyola Blue is the action colour. Pattern blues decorate; they never carry text or a button.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Nunito only. Contrast comes from weight (500 / 700 / 800 / 900) and size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Spoken Numbers Rule",
+        "body": "Figures are set inside sentences in 900-weight Piyola Blue with tabular numerals, as a person would say them at the table — not as big isolated stat tiles.",
+        "section": "typography"
+      },
+      {
+        "name": "The Navy Shadow Rule",
+        "body": "Shadows are tinted with navy (18,57,95), never neutral black, and always use a negative spread so they sit under the object.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Pattern Is a Rim Rule",
+        "body": "The paxta-guli lattice appears only as rims, bands, plate rings (masked to an annulus) and the cloth under a tray or card. Text never sits directly on the lattice.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** keep every UI colour inside the light-blue family; carry the action in Piyola Blue alone.",
+      "**Do** frame Porcelain bands with the patterned rim strip, top and mirrored at the bottom.",
+      "**Do** put icons, numbers and initials in piyola medallions, and media in a lagan.",
+      "**Do** keep body text at 1.125rem or larger and every tap target at least 2.75rem (4rem for primary actions).",
+      "**Do** tint all shadows navy with negative spread so they pool under the object.",
+      "**Do** respect reduced motion: the set-down, the heartbeat and the boll fall back to their resting states."
+    ],
+    "donts": [
+      "**Don't** use red, orange or yellow in the interface to signal danger; say it in words, in navy. Product photography and form-error red are the exceptions.",
+      "**Don't** set text directly on the paxta-guli lattice.",
+      "**Don't** add a second typeface; Nunito carries every role.",
+      "**Don't** lay offer points out as a row of equal icon cards; they are cups around the plate or one sentence along the cloth's edge.",
+      "**Don't** use neutral black shadows or hard offset shadows."
+    ]
+  }
+}

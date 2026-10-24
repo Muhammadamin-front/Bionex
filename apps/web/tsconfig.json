@@ -3,7 +3,9 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // Type-checked against the main site; the partner entry exports the same shape.
+    "paths": { "#site": ["./src/sites/main/index.tsx"] }
   },
   "include": ["src", "vite.config.ts"]
 }

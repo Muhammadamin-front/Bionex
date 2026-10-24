@@ -1,0 +1,258 @@
+/*
+ * «Оромгоҳ даволаш маскани» — the main site's world.
+ * A dasturxon laid for a guest: pale sky cloth, white glazed porcelain, and the light-blue
+ * paxta-guli (cotton-boll) tea-set pattern as rims and borders. Navy is kept for text only;
+ * one glazed piyola blue carries the action. Everything else is light blue, as the owner asked.
+ *
+ * The shared tokens are re-pointed here (this file is bundled only into the main site), so the
+ * shared order form and dialog take the porcelain colours without a second copy of their code.
+ */
+:root:root {
+  --font-sans: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Nunito Variable', 'Nunito Fallback', ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #eaf4fc; /* the cloth */
+  --color-paper-2: #dcebf8; /* the cloth in shade */
+  --color-card: #ffffff; /* porcelain */
+  --color-ink: #0f2f4f;
+  --color-ink-2: #1c4268;
+  --color-muted: #355a80;
+  --color-placeholder: #4f6f92;
+  --color-line: #c4dcf1;
+  --color-brand: #1d68b3; /* piyola blue */
+  --color-brand-2: #15528f;
+  --color-forest: #12395f; /* navy, for text-weight marks */
+  --color-forest-2: #194a78;
+  --color-on-forest: #d6e8f8;
+  --color-accent: #bfe0fa; /* the light blue of the pattern */
+  --color-accent-2: #8dbfeb;
+  --color-alarm: #12395f; /* danger is said in words here, not in red */
+  --color-alarm-bg: #dcebf8;
+  --color-success: #1d68b3;
+
+  --pattern-mid: #5a9bd8;
+  --pattern-soft: #8dbfeb;
+
+  --btn-top: #3a8ad6;
+  --btn-bottom: #1a5ea3;
+  --btn-shadow: rgba(18, 57, 95, 0.45);
+
+  accent-color: var(--color-brand);
+  scrollbar-color: var(--color-accent-2) var(--color-paper);
+  --focus-ring: var(--color-brand);
+}
+
+/* Metric-matched fallback so text barely moves when Nunito arrives. */
+@font-face {
+  font-family: 'Nunito Fallback';
+  src: local('Arial'), local('Roboto'), local('Helvetica');
+  size-adjust: 101%;
+  ascent-override: 99%;
+  descent-override: 35%;
+  line-gap-override: 0%;
+}
+
+body {
+  font-weight: 500;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.on-dark {
+  --focus-ring: #ffffff;
+}
+
+/* ── The paxta-guli pattern, as a cloth and as a piyola's rim ── */
+.paxta {
+  background-color: #ffffff;
+  background-image: url('./art/paxta.svg');
+  background-size: 56px 56px;
+  background-position: center;
+}
+.rim {
+  height: 18px;
+  background-image: url('./art/rim.svg');
+  background-size: 32px 18px;
+  background-repeat: repeat-x;
+}
+.rim--down {
+  transform: scaleY(-1);
+}
+
+/*
+ * The lagan: a round glazed plate whose rim carries the pattern. The ring is the pattern masked
+ * to an annulus; a plate is truly round, so the circle is its real contour.
+ */
+.lagan {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 50% 42%, #ffffff 0 52%, #f2f8fe 68%, #ffffff 72%);
+  box-shadow:
+    0 34px 46px -30px rgba(18, 57, 95, 0.5),
+    0 2px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -10px 22px rgba(29, 104, 179, 0.08) inset;
+}
+@supports not (aspect-ratio: 1 / 1) {
+  .lagan::after {
+    content: '';
+    display: block;
+    padding-top: 100%;
+  }
+}
+.lagan__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-image: url('./art/paxta.svg');
+  background-size: 15% 15%;
+  background-position: center;
+  -webkit-mask: radial-gradient(closest-side, transparent 76%, #000 76.6%, #000 95%, transparent 95.6%);
+  mask: radial-gradient(closest-side, transparent 76%, #000 76.6%, #000 95%, transparent 95.6%);
+}
+.lagan__line {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.lagan__line--outer {
+  inset: 1.6%;
+  border: 3px solid var(--color-brand);
+}
+.lagan__line--inner {
+  inset: 12.6%;
+  border: 2px solid var(--pattern-soft);
+}
+
+/* A piyola seen from above: a small round dish with the patterned rim, an icon in the bowl. */
+.piyola {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 50% 40%, #ffffff 0 56%, #eef6fd 70%);
+  box-shadow: 0 12px 18px -12px rgba(18, 57, 95, 0.55);
+  color: var(--color-brand-2);
+}
+.piyola::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-image: url('./art/paxta.svg');
+  background-size: 50% 50%;
+  background-position: center;
+  -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 65%, #000 94%, transparent 95%);
+  mask: radial-gradient(closest-side, transparent 64%, #000 65%, #000 94%, transparent 95%);
+}
+.piyola::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 9999px;
+  border: 2px solid var(--color-brand);
+}
+.piyola > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* A patnis (tray) with a patterned border, holding the order form. */
+.patnis {
+  border-radius: 2.25rem;
+  padding: 12px;
+  box-shadow: 0 34px 50px -34px rgba(18, 57, 95, 0.6);
+  outline: 3px solid var(--color-brand);
+  outline-offset: -3px;
+}
+.patnis > form,
+.patnis > div {
+  box-shadow: 0 0 0 2px var(--pattern-soft);
+}
+@media (max-width: 639px) {
+  .patnis {
+    padding: 10px;
+    border-radius: 2rem;
+  }
+  .patnis > form {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+  /* The action's label stays on one line: a little less room kept for the knob and the edge. */
+  .patnis .am-btn > span:last-child {
+    padding-left: 3.6rem;
+    padding-right: 0.9rem;
+    font-size: 1rem;
+  }
+}
+/* The tray is narrow: the two fields stack, so the phone hint never breaks mid-number. */
+.patnis form .sm\:grid-cols-2 {
+  grid-template-columns: minmax(0, 1fr);
+}
+.patnis form .sm\:col-span-2 {
+  grid-column: auto;
+}
+
+/* ── The one authored moment: the plate is set down, then the pack's heart beats ── */
+.set-down {
+  animation: set-down 1.2s var(--ease-out-expo) both;
+}
+@keyframes set-down {
+  from {
+    transform: translate3d(0, 14px, 0) rotate(-6deg) scale(0.97);
+  }
+}
+
+/* Signature: a ticked symptom opens a cotton boll. */
+.boll__lobe {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+  transition: transform 0.45s var(--ease-out-expo);
+}
+.boll[data-open='true'] .boll__lobe {
+  transform: scale(1);
+}
+.boll[data-open='true'] .boll__lobe:nth-child(2) {
+  transition-delay: 0.05s;
+}
+.boll[data-open='true'] .boll__lobe:nth-child(3) {
+  transition-delay: 0.1s;
+}
+.boll[data-open='true'] .boll__lobe:nth-child(4) {
+  transition-delay: 0.15s;
+}
+.boll__bud {
+  transition: transform 0.35s var(--ease-out-expo);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.boll[data-open='true'] .boll__bud {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-down {
+    animation: none;
+  }
+}
+
+/*
+ * Leftovers of the partner page's palette inside shared pieces, recoloured here so the shared
+ * code stays untouched: the fields' green focus halo, the form cards' black shadow and the
+ * yellow glow behind the pack's beating heart.
+ */
+form [class*='23,120,74']:focus,
+form [class*='23,120,74']:focus-within {
+  box-shadow: 0 0 0 4px rgba(29, 104, 179, 0.22) !important;
+}
+[class*='rgba(0,0,0,0.55)'] {
+  box-shadow: 0 30px 60px -30px rgba(18, 57, 95, 0.55);
+}
+.pack-glow {
+  background: radial-gradient(closest-side, rgb(191 224 250 / 0.85), rgb(191 224 250 / 0));
+}

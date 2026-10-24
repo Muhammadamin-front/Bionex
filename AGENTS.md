@@ -144,6 +144,20 @@ user's Mac.
     owner declined a Telegram-contact confirmation button for now (offered: bots cannot do it;
     looking up a number's Telegram name automatically is not possible with the Bot API).
 
+16. **Main site redesigned as «Оромгоҳ даволаш маскани»** (2026-10-24, owner's request): the
+    owner renamed the main site (a real establishment of theirs; the product stays Зейнара) and
+    asked for an entirely light-blue, homely look, phone first. Direction picked on the
+    impeccable decision page: the paxta-guli (cotton-boll) tea set on a dasturkhon. The two sites
+    are now separate trees chosen at build time by the Vite alias `#site`
+    (`src/sites/main/` for the main site, `src/sites/partner.tsx` = the old page, untouched);
+    the partner build contains none of the new page, its name or its font. `mainSiteHead` in
+    vite.config.ts adds the name and a piyola favicon to the main site's `<title>`. Shared
+    OrderForm/OrderModal take the colours through re-pointed tokens in
+    `src/sites/main/oromgoh.css`; AntiMetalButton gained `--btn-*` vars (defaults = old green).
+    Product truth for design work: `apps/web/PRODUCT.md`; direction contract:
+    `apps/web/.impeccable/surfaces/`. The owner also wants visitors never to learn of the
+    company behind the code (the repo is public; they chose to keep it public).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

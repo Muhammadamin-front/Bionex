@@ -13,6 +13,7 @@
   "dependencies": {
     "@bionex/shared": "1.0.0",
     "@fontsource-variable/montserrat": "5.3.0",
+    "@fontsource-variable/nunito": "5.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.6"
