@@ -111,7 +111,8 @@ export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder): Prom
     asText(order.campaign ?? ''),
     asText(order.adset ?? ''),
     asText(order.ad ?? ''),
-    order.flags.map((f) => FLAG_TEXT[f]).filter(Boolean).join('; '),
+    // «!» first when the "not a robot" check failed: worth a call, but listen for a robot.
+    (order.flags.includes('no_captcha') ? '! ' : '') + order.flags.map((f) => FLAG_TEXT[f]).filter(Boolean).join('; '),
     '',
     '',
     asText(order.model ?? ''),

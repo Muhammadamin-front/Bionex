@@ -40,13 +40,12 @@ const META_WINDOW = 7 * DAY;
 /** At most this many orders reach the panel at once. */
 const PANEL_LIMIT = 1000;
 /**
- * Flags that mean "almost certainly a bot, not a customer": the hidden field, a browser a
- * program drives or a failed check from outside the Instagram/Facebook app, a phone already
- * marked spam, or one that looks like one. Such an order is accepted and recorded, but kept out
- * of the places people work from — the partner's Google Sheet, and (main site) the operators'
- * panel and lists — so nobody wastes a call on it. It still reaches the operators' group so they
- * can see the attempt. A failed check is NOT here, even from outside the Instagram/Facebook app
- * (likely_bot): real customers turned up among those, so they stay visible with a warning.
+ * Flags that mean "almost certainly a bot, not a customer": the hidden field, the browser's
+ * traps or a browser a program drives, a phone already marked spam, or one that looks like one.
+ * Such a main-site order is accepted and reaches the operators' group, but is kept out of the
+ * panel and lists. The Google Sheets are stricter about hiding only the hidden field (honeypot):
+ * every other order goes there with its warnings. A failed check is NOT here (likely_bot): real
+ * customers turned up among those, so they stay visible with a warning.
  */
 const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike'];
 /**
@@ -407,9 +406,10 @@ export class LeadRegistry extends DurableObject<Env> {
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
     // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
-    // numbered like the Telegram order. Bots stay out of it, as they stay out of the panel.
+    // numbered like the Telegram order. Only a filled hidden field (honeypot) stays out of it —
+    // the owner's rule: a real customer can fail every other check (see acceptPartner).
     const sheet = sheetsConfig(this.env, 'main');
-    if (sheet && !looksLikeBot) {
+    if (sheet && !input.flags.includes('honeypot')) {
       this.ctx.waitUntil(
         sendSheetOrder(sheet, {
           number: leadId,
@@ -476,14 +476,12 @@ export class LeadRegistry extends DurableObject<Env> {
     );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
-    // Orders that are almost certainly a bot never reach the partner's sheet, so their people
-    // do not waste calls on them: the hidden fields (honeypot), the browser's traps or a browser a
-    // program drives (bot_trap), a phone already marked spam (spam_device) or one that looks like
-    // one (spam_lookalike). A failed check (no_captcha, likely_bot) is NOT enough — real customers
-    // fail it — so those still go to the sheet, with the warning. The order is still accepted and still counted; only the sheet skips it.
-    const looksLikeBot = flags.some((f) => LIKELY_BOT_FLAGS.includes(f));
+    // Only an order that filled the hidden fields (honeypot) — something no person can do — is
+    // kept out of the partner's sheet. Everything else goes in with its warnings, a failed
+    // "not a robot" check marked «!»: the owner opened their own ad in Instagram, failed the
+    // check, and real customers were being lost (2026-10-25). The order is accepted either way.
     const sheet = sheetsConfig(this.env, site);
-    if (sheet && !looksLikeBot) {
+    if (sheet && !flags.includes('honeypot')) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
         sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),

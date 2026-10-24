@@ -158,6 +158,13 @@ user's Mac.
     `apps/web/.impeccable/surfaces/`. The owner also wants visitors never to learn of the
     company behind the code (the repo is public; they chose to keep it public).
 
+17. **Google Sheets hide only the honeypot** (2026-10-25, owner's decision): the owner opened
+    their own Instagram ad, failed the «verify human» check and concluded real customers were
+    being lost. Both sheets (partner `acceptPartner`, main-site copy in `accept`) now skip only
+    orders with `honeypot`; `bot_trap`, `spam_device`, `spam_lookalike`, `likely_bot` and
+    `no_captcha` go in with their warnings, and a failed check starts «Belgi» with «! ». The
+    panel/lists still hide `LIKELY_BOT_FLAGS`; the partner's Meta Lead rule is unchanged.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

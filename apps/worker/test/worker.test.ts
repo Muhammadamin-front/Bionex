@@ -1264,9 +1264,9 @@ describe('the partner site (sites.ts t2)', () => {
     expect(telegram.calls.some((c) => c.method === 'setWebhook')).toBe(false);
   });
 
-  it('keeps bot-flagged orders out of the sheet, but still accepts them', async () => {
-    // A browser a program drives → bot_trap: accepted, but the partner's people never see it.
-    const res = await partnerOrder({ fullName: 'Бот Буюртма', phone: '+998 90 312 45 88', signals: { webdriver: true } }, '203.0.113.88');
+  it('keeps only a filled hidden field out of the sheet, but still accepts it', async () => {
+    // The honeypot: accepted, but the partner's people never see it.
+    const res = await partnerOrder({ fullName: 'Бот Буюртма', phone: '+998 90 312 45 88', contactFax: 'x' }, '203.0.113.88');
     expect(((await res.json()) as { status: string }).status).toBe('accepted');
     await new Promise((r) => setTimeout(r, 100));
     expect(sheets.rows).toHaveLength(0);
@@ -1279,6 +1279,11 @@ describe('the partner site (sites.ts t2)', () => {
     await partnerOrder({ fullName: 'Шубҳали Мижоз', phone: '+998 90 312 45 87', turnstileToken: 'bad' }, '203.0.113.87');
     await until(() => sheets.rows.length >= 2);
     expect(sheets.rows[1]!.row[2]).toBe('Шубҳали Мижоз');
+    expect(sheets.rows[1]!.row[7]).toMatch(/^! «bot emasman» tekshiruvi o'tmadi/);
+    // Every other bot sign goes in too, with its warning (a real person can trip them).
+    await partnerOrder({ fullName: 'Дастур Мижоз', phone: '+998 90 312 45 86', signals: { webdriver: true } }, '203.0.113.86');
+    await until(() => sheets.rows.length >= 3);
+    expect(sheets.rows[2]!.row[7]).toContain("bot tuzog'iga tushdi");
   });
 
   it('numbers its own orders, and is no repeat of a main-site order', async () => {
@@ -1324,11 +1329,11 @@ describe('the partner site (sites.ts t2)', () => {
     sheets.statuses = [[1, 'keraksiz '], ['', 'Keraksiz'], [99, 'Spam']];
     await readSheet();
 
-    // Same phone, another network: now a known-spam device, so it is kept out of the sheet
-    // altogether (the ads are not told either). The order is still accepted.
+    // Same phone, another network: now a known-spam device. It still reaches the sheet, with the
+    // warning, but the ads are not told.
     expect((await partnerOrder({ fullName: 'Бошқа Исм', phone: '+998 90 312 45 87', deviceId: DEVICE }, '198.51.100.87')).status).toBe(201);
-    await new Promise((r) => setTimeout(r, 100));
-    expect(sheets.rows).toHaveLength(1);
+    await until(() => sheets.rows.length >= 2);
+    expect(sheets.rows[1]!.row[7]).toContain('bu qurilmadan avval spam belgilangan');
     expect(meta.bodies).toHaveLength(1);
     // The operators see it too, on the main site.
     expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
@@ -1339,8 +1344,8 @@ describe('the partner site (sites.ts t2)', () => {
     sheets.statuses = [[1, 'Kerakli']];
     await readSheet();
     expect((await partnerOrder({ fullName: 'Учинчи Исм', phone: '+998 90 312 45 89', deviceId: DEVICE }, '192.0.2.89')).status).toBe(201);
-    await until(() => sheets.rows.length >= 2);
-    expect(sheets.rows[1]!.row[7]).toBe('');
+    await until(() => sheets.rows.length >= 3);
+    expect(sheets.rows[2]!.row[7]).toBe('');
   });
 
   it("an operator's 🚫 marks the device: its next order is flagged even from another network", async () => {
@@ -1387,10 +1392,10 @@ describe('the partner site (sites.ts t2)', () => {
     // Another phone altogether: nothing.
     expect((await order({ phone: '+998 90 312 45 96', deviceId: device(3), fingerprint: 'cd'.repeat(32) }, { ip: '192.0.2.96' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('спам');
-    // On the partner site, a look-alike order is a likely bot, so it is kept out of the sheet.
+    // On the partner site, a look-alike order reaches the sheet with its warning.
     expect((await partnerOrder({ fullName: 'Ўхшаш Исм', phone: '+998 90 312 45 97', deviceId: device(4), fingerprint: LOOKS }, '192.0.2.97')).status).toBe(201);
-    await new Promise((r) => setTimeout(r, 100));
-    expect(sheets.rows).toHaveLength(0);
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows[0]!.row[7]).toContain("avval spam bo'lgan qurilmaga o'xshaydi");
   });
 
   it('opens nothing but the order form to the partner site', async () => {
