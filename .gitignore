@@ -24,3 +24,5 @@ google-credentials*.json
 **/.impeccable/review/
 **/.impeccable/mocks/
 **/.impeccable/build/
+# The doctor photo stays on the Mac that deploys; the public repo never carries it.
+apps/web/src/sites/main/photos/doctor.*

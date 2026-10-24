@@ -3,6 +3,7 @@ import type { OrderResult } from '../../components/landing/OrderForm';
 import { OrderModal } from '../../components/landing/OrderModal';
 import { initPixel } from '../../lib/pixel';
 import { captureUtm } from '../../lib/utm';
+import { Doctor } from './Doctor';
 import { Hero, Promises } from './Hero';
 import { About, Faq, Family, Footer, Order, Process, Quote, Reviews, Risks, StickyCta, Symptoms, Usage } from './Sections';
 
@@ -57,6 +58,7 @@ export function Landing() {
         <Symptoms />
         <Risks />
         <Process />
+        <Doctor />
         <About />
         <Usage />
         <Reviews />
