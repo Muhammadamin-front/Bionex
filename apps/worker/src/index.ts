@@ -6,7 +6,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { pwaIcon, pwaManifest, pwaServiceWorker } from './panel/pwa';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
-import { describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
+import { caughtByBotTrap, describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
 import { readableModel } from './models';
 import { readSheetStatuses, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
@@ -202,6 +202,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // So does a browser that says a program drives it.
     const userAgent = request.headers.get('user-agent');
     if (data.signals?.webdriver || (!check.ok && !fromSocialApp(userAgent))) flags.push('likely_bot');
+    // The browser's own traps: a made-up click, or a touch screen nobody touched (device.ts).
+    if (caughtByBotTrap(data.signals)) flags.push('bot_trap');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the
     //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is

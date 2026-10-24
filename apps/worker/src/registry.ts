@@ -48,7 +48,7 @@ const PANEL_LIMIT = 1000;
  * can see the attempt. A bare failed check (no_captcha) is NOT here: a real customer in an
  * in-app browser can fail it.
  */
-const LIKELY_BOT_FLAGS = ['honeypot', 'likely_bot', 'spam_device', 'spam_lookalike'];
+const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'likely_bot', 'spam_device', 'spam_lookalike'];
 /**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never

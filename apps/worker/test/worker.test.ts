@@ -715,6 +715,26 @@ describe("the operators' Mini App panel", () => {
     expect(ok.leads.some((l) => l.name === 'Оддий Киши')).toBe(true);
   });
 
+  it('flags the browser bot traps: a made-up click, or a touch screen nobody touched', async () => {
+    const panelNames = async () =>
+      ((await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> }).leads.map((l) => l.name);
+    await order({ fullName: 'Тузоқ Бир', phone: '+998 90 312 45 60', signals: { touch: 5, taps: 3, synthetic: 1, keys: 12 } }, { ip: '203.0.113.60' });
+    expect(leadMessages().at(-1)!.text).toContain('бот тузоғига тушди');
+    expect(leadMessages().at(-1)!.text).toContain('дастур босган ×1');
+    await order({ fullName: 'Тузоқ Икки', phone: '+998 90 312 45 61', signals: { touch: 5, taps: 0, keys: 12 } }, { ip: '203.0.113.61' });
+    expect(leadMessages().at(-1)!.text).toContain('экранга тегилмаган');
+    // A person who touched the screen, or a page too old to count touches, is not caught.
+    await order({ fullName: 'Одам Бир', phone: '+998 90 312 45 62', signals: { touch: 5, taps: 4, keys: 12, pageMs: 41_000 } }, { ip: '203.0.113.62' });
+    expect(leadMessages().at(-1)!.text).not.toContain('тузоғига');
+    expect(leadMessages().at(-1)!.text).toContain('сайтда 41 сонияда');
+    await order({ fullName: 'Одам Икки', phone: '+998 90 312 45 63', signals: { touch: 5, keys: 12 } }, { ip: '203.0.113.63' });
+    expect(leadMessages().at(-1)!.text).not.toContain('тузоғига');
+    const names = await panelNames();
+    expect(names).not.toContain('Тузоқ Бир');
+    expect(names).not.toContain('Тузоқ Икки');
+    expect(names).toEqual(expect.arrayContaining(['Одам Бир', 'Одам Икки']));
+  });
+
   it('keeps campaign, ad set (utm_term) and video (utm_content) per lead', async () => {
     await order(
       {

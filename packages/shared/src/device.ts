@@ -66,6 +66,12 @@ export interface DeviceSignals {
   fillMs?: number;
   keys?: number;
   pasted?: boolean;
+  /** Real touches (or mouse presses) on the page. 0 on a touch screen: nobody touched it. */
+  taps?: number;
+  /** Clicks a script made up (`isTrusted: false`) — only a program does that. */
+  synthetic?: number;
+  /** From opening the page to sending the order. */
+  pageMs?: number;
   tz?: string;
   lang?: string;
   /** The visit came from an ad click (fbclid in the address, or Meta's _fbc cookie). */
@@ -89,6 +95,9 @@ export function cleanSignals(value: unknown): DeviceSignals | undefined {
     fillMs: count(v.fillMs, 86_400_000),
     keys: count(v.keys, 10_000),
     pasted: flag(v.pasted),
+    taps: count(v.taps, 100_000),
+    synthetic: count(v.synthetic, 100_000),
+    pageMs: count(v.pageMs, 86_400_000),
     tz: short(v.tz, 40),
     lang: short(v.lang, 20),
     adClick: flag(v.adClick),
@@ -107,6 +116,9 @@ const WORDS = {
     keys: 'ta harf yozilgan',
     pasted: "nusxa qo'yilgan",
     noTyping: 'hech narsa yozilmagan',
+    noTouch: 'ekranga tegilmagan',
+    synthetic: 'dastur bosgan',
+    onPage: 'saytda',
     really: 'aslida',
   },
   cyrl: {
@@ -117,9 +129,21 @@ const WORDS = {
     keys: 'та ҳарф ёзилган',
     pasted: 'нусха қўйилган',
     noTyping: 'ҳеч нарса ёзилмаган',
+    noTouch: 'экранга тегилмаган',
+    synthetic: 'дастур босган',
+    onPage: 'сайтда',
     really: 'аслида',
   },
 };
+
+/**
+ * A trap only a program falls into: a made-up click or key press, or a touch screen nobody
+ * touched before the order was sent. Missing signals (an old cached page) never count.
+ */
+export function caughtByBotTrap(s: DeviceSignals | undefined): boolean {
+  if (!s) return false;
+  return Boolean(s.synthetic) || (s.taps === 0 && Boolean(s.touch));
+}
 
 /**
  * One short line for the people checking orders, e.g.
@@ -137,6 +161,9 @@ export function describeSignals(s: DeviceSignals | undefined, userAgent: string 
   if (s.keys) parts.push(`${s.keys} ${w.keys}`);
   if (s.pasted) parts.push(w.pasted);
   if (!s.keys && !s.pasted) parts.push(w.noTyping);
+  if (s.synthetic) parts.push(`${w.synthetic} ×${s.synthetic}`);
+  if (s.taps === 0 && s.touch) parts.push(w.noTouch);
+  if (s.pageMs !== undefined) parts.push(`${w.onPage} ${Math.round(s.pageMs / 1000)} ${w.seconds}`);
   const claimed = /Chrome\/(\d+)/.exec(userAgent ?? '')?.[1];
   if (s.chrome && claimed && claimed !== s.chrome) parts.push(`Chrome ${claimed} (${w.really} ${s.chrome})`);
   if (s.tz) parts.push(s.tz);

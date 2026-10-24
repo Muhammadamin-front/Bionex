@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 81 tests, Miniflare
+npm test --workspace=@bionex/worker      # 82 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -129,6 +129,13 @@ user's Mac.
     and `acceptPartner`. On the main site such an order still reaches the operators' GROUP (with
     its buttons) but `list_items.hidden = 1`, so it is left out of `panelData`, `/royxat` lists
     and the archive; stats (lead_status) still count it. A bare `no_captcha` stays visible.
+14. **More bot traps** (2026-10-24, owner's request «honeypot tuzog'ini qo'shgin»): the old
+    hidden «fax» field caught none of the partner spam, so the form gained a second decoy
+    (`name="website"`, sent in the same `contactFax` field) and the browser now counts real
+    touches (`taps`), made-up clicks (`synthetic`) and time on the page (`pageMs`) in `signals`.
+    `caughtByBotTrap` (shared) → flag `bot_trap` («бот тузоғига тушди»), in `LIKELY_BOT_FLAGS`
+    (hidden from panel / partner sheet, kept in the group). Like `likely_bot` it does NOT
+    withhold the partner's server Lead. Flag only.
 
 ## Open items
 

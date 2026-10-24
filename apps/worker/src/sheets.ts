@@ -43,6 +43,7 @@ const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video'
 /** The same warnings the operators' group shows, for the people ringing from the sheet. */
 const FLAG_TEXT: Record<string, string> = {
   honeypot: "bot bo'lishi mumkin",
+  bot_trap: "bot tuzog'iga tushdi",
   phone_pattern: "raqam soxtaga o'xshaydi",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
   likely_bot: "Instagram/Facebook'dan emas — bot ehtimoli katta",

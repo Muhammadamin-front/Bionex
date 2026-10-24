@@ -61,7 +61,8 @@ report names that number — «📣 Натижаси белгиланмаган:
 | `spam_lookalike` | аввал спам бўлган қурилмага ўхшайди | the browser id is new (data cleared, private window) but the phone's likeness (`deviceFingerprint`: user agent, screen, languages, time zone, CPU, graphics, a canvas drawing) matches a marked order. Phones of the same model and system can share it, so it is a hint for the operator, never a refusal |
 | `multi_phone_ip` | бу манбадан бугун бир нечта рақам юборилди | more than one number from this network today |
 | `phone_pattern` | рақам сунъийга ўхшайди | e.g. 90 111 11 11 |
-| `honeypot` | яширин майдон тўлдирилган | a field only a script fills |
+| `honeypot` | яширин майдон тўлдирилган | one of two hidden decoy fields («fax», «website») was filled — only a script does that |
+| `bot_trap` | бот тузоғига тушди | the browser saw a made-up click (`isTrusted: false`), or a touch screen nobody touched before sending (`taps: 0`). Old cached pages send no count and are never caught |
 | `no_captcha` | «бот эмасман» текшируви ўтмади | common on old phones and in Instagram's in-app browser — **not** evidence of anything |
 
 ## The honest limits

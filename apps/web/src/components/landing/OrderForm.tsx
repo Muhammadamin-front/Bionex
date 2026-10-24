@@ -68,6 +68,7 @@ export function OrderForm({
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
+  const websiteRef = useRef<HTMLInputElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
   const widgetBox = useRef<HTMLDivElement>(null);
   /** The wide check box needs 300 px; narrower forms get Cloudflare's square compact widget. */
@@ -299,7 +300,8 @@ export function OrderForm({
         deviceModel: model,
         signals,
         turnstileToken: token ?? undefined,
-        [HONEYPOT_FIELD]: honeypotRef.current?.value ?? '',
+        // Either decoy filled is the same trap.
+        [HONEYPOT_FIELD]: `${honeypotRef.current?.value ?? ''}${websiteRef.current?.value ?? ''}`.slice(0, 500),
         utm,
       });
       unansweredPayload.current = null;
@@ -486,6 +488,11 @@ export function OrderForm({
         <div className="hp-field" aria-hidden="true">
           <label htmlFor={`${id}-fax`}>Бу майдонни бўш қолдиринг</label>
           <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" />
+        </div>
+        {/* A second decoy with the name form-filling scripts like most. Browsers never autofill it. */}
+        <div className="hp-field" aria-hidden="true">
+          <label htmlFor={`${id}-website`}>Сайтингиз манзили</label>
+          <input ref={websiteRef} id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
         </div>
 
         {/* Turnstile mounts here, and with appearance 'interaction-only' it usually stays empty

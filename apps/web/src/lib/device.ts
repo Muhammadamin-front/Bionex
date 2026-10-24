@@ -181,6 +181,22 @@ if (typeof document !== 'undefined') {
 }
 
 /**
+ * Bot traps. A person on a phone touches the screen before an order can be sent; a program that
+ * sets the fields and calls `.click()` never does, and its clicks carry `isTrusted: false` —
+ * something no finger can produce. Only flags the order (the worker's `bot_trap`). Counted on the whole page, in the capture phase.
+ */
+const touches = { taps: 0, synthetic: 0 };
+if (typeof document !== 'undefined') {
+  const tap = (e: Event) => {
+    if (e.isTrusted) touches.taps++;
+    else touches.synthetic++;
+  };
+  document.addEventListener(typeof PointerEvent === 'function' ? 'pointerdown' : 'touchstart', tap, true);
+  // Clicks only: some autofill extensions type with made-up input events, but none click.
+  document.addEventListener('click', (e) => e.isTrusted || touches.synthetic++, true);
+}
+
+/**
  * What tells a phone from a computer pretending to be one, and a person from a program
  * (docs/SPAM.md): graphics chip, touch points, the automation mark, how the form was filled,
  * the phone's time zone and language, whether the visit came from an ad click, and Chrome's
@@ -202,6 +218,9 @@ export async function deviceSignals(): Promise<DeviceSignals> {
     fillMs: typing.first ? Math.round(performance.now() - typing.first) : 0,
     keys: typing.keys,
     pasted: typing.pasted,
+    taps: touches.taps,
+    synthetic: touches.synthetic,
+    pageMs: Math.round(performance.now()),
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
     lang: navigator.language,
     adClick,
