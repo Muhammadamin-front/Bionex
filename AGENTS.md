@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 82 tests, Miniflare
+npm test --workspace=@bionex/worker      # 83 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -164,6 +164,14 @@ user's Mac.
     orders with `honeypot`; `bot_trap`, `spam_device`, `spam_lookalike`, `likely_bot` and
     `no_captcha` go in with their warnings, and a failed check starts «Belgi» with «! ». The
     panel/lists still hide `LIKELY_BOT_FLAGS`; the partner's Meta Lead rule is unchanged.
+
+18. **No Pixel automatic events on the main site; honeypot never reported** (2026-10-25): Events
+    Manager showed parameter-less browser `Lead`s on the main Pixel beside the CAPI ones —
+    most likely the Pixel's own automatic form detection (not our code; the bundle has no
+    `Lead` call on the main site). `pixel.ts` now sets `fbq('set','autoConfig',false,id)` before
+    `init` when `VITE_META_BROWSER_LEAD` is not 1 (partner Pixel unchanged). `accept` stores no
+    `meta_pending` row for a `honeypot` order, so no outcome button can report it. To confirm:
+    after deploy, browser Leads in Events Manager should stop within 1–2 days.
 
 ## Open items
 

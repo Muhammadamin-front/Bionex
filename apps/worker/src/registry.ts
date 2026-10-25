@@ -361,8 +361,9 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().id;
     this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
     // Meta is told nothing yet: a name and a number in a form prove nothing. Held until an
-    // operator rings the customer and presses an outcome (see button()).
-    if (input.meta) {
+    // operator rings the customer and presses an outcome (see button()). A filled hidden field
+    // (honeypot) is a program, whatever an operator later presses: Meta never hears of it.
+    if (input.meta && !input.flags.includes('honeypot')) {
       this.sql.exec(
         'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at) VALUES (?, ?, ?, ?, ?)',
         leadId,

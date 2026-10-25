@@ -1013,6 +1013,12 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     expect(meta.bodies).toHaveLength(1);
   });
 
+  it('never reports a filled hidden field to Meta, whatever the operator presses', async () => {
+    expect((await order({ contactFax: 'x' })).status).toBe(201);
+    await press('s:1:sold');
+    expect(await quiet()).toHaveLength(0);
+  });
+
   it('reports the moment the customer ordered, not the moment the operator pressed', async () => {
     const before = Math.floor(Date.now() / 1000);
     await order();

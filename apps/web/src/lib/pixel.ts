@@ -39,6 +39,11 @@ export function initPixel(): void {
   window.fbq = fbq;
   window._fbq = fbq;
   fbq.disablePushState = true; // in-page #anchors are not new page views
+  // No automatic events on the main site: the Pixel's own form and button detection was
+  // reporting every filled-in form (spam included) as a Lead with no parameters, beside the
+  // operator-confirmed Lead the Worker sends (Events Manager showed both, 2026-10-25). Must
+  // come before 'init'. The partner site keeps its Pixel as its owner set it up.
+  if (import.meta.env.VITE_META_BROWSER_LEAD !== '1') fbq('set', 'autoConfig', false, PIXEL_ID);
   fbq('init', PIXEL_ID);
   fbq('track', 'PageView');
 
