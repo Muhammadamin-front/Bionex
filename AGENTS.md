@@ -37,6 +37,7 @@ npm test --workspace=@bionex/worker      # 83 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
+npm run deploy:old-design --workspace=@bionex/worker  # worker + main site in its OLD look (MAIN_DESIGN=old)
 ```
 `apps/web/.env.production` and `apps/web/.env.t2` are gitignored (values are public: Turnstile
 site key, site URL, Pixel id, `VITE_META_BROWSER_LEAD=1` for t2). They exist only on the
@@ -172,6 +173,12 @@ user's Mac.
     `init` when `VITE_META_BROWSER_LEAD` is not 1 (partner Pixel unchanged). `accept` stores no
     `meta_pending` row for a `honeypot` order, so no outcome button can report it. To confirm:
     after deploy, browser Leads in Events Manager should stop within 1–2 days.
+
+19. **`deploy:old-design`** (2026-10-26, owner's request): the owner wants the Worker changes
+    (sheets, Meta) live while the new «Оромгоҳ» design waits. `MAIN_DESIGN=old` makes
+    vite.config.ts point `#site` at `src/sites/partner.tsx` (the original page) for the main
+    build and skip `mainSiteHead`; shared form fixes and the Pixel autoConfig fix still ship.
+    Plain `deploy` publishes the new design. Ask which one the owner wants before deploying.
 
 ## Open items
 

@@ -175,14 +175,18 @@ const MAIN_FAVICON =
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  // MAIN_DESIGN=old: the main site keeps its previous look (the original page, the one the
+  // partner site also uses) while everything else ships — the owner's way to deploy the
+  // Worker and the form fixes before publishing the new design (npm run deploy:old-design).
+  const oldPage = mode === 't2' || process.env.MAIN_DESIGN === 'old';
   // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
-    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(mode === 't2' ? [] : [mainSiteHead()])],
+    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(oldPage ? [] : [mainSiteHead()])],
     resolve: {
       // Each site is its own tree: the partner build never even sees the main site's page.
       alias: {
-        '#site': fileURLToPath(new URL(mode === 't2' ? './src/sites/partner.tsx' : './src/sites/main/index.tsx', import.meta.url)),
+        '#site': fileURLToPath(new URL(oldPage ? './src/sites/partner.tsx' : './src/sites/main/index.tsx', import.meta.url)),
       },
     },
     server: {
