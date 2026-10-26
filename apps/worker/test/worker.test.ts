@@ -1004,6 +1004,15 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
       expect(await quiet()).toHaveLength(2);
     });
 
+    it('keeps bot-trap orders out of the sheet, and takes failed checks with «!»', async () => {
+      await order({ fullName: 'Тузоқ Киши', signals: { touch: 5, taps: 0, keys: 9 } }, { ip: '203.0.113.46' });
+      await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47' });
+      for (let i = 0; i < 50 && sheets.rows.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(sheets.rows.map((r) => r.row[2])).toEqual(['Шубҳали Киши']);
+      expect(sheets.rows[0]!.row[7]).toMatch(/^! /);
+    });
+
     it('remembers «Keraksiz» as spam, so the next order from that phone arrives marked', async () => {
       const DEVICE = '11111111-2222-4333-8444-555555555555';
       await order({ deviceId: DEVICE }, { ip: '203.0.113.44' });
@@ -1329,10 +1338,10 @@ describe('the partner site (sites.ts t2)', () => {
     await until(() => sheets.rows.length >= 2);
     expect(sheets.rows[1]!.row[2]).toBe('Шубҳали Мижоз');
     expect(sheets.rows[1]!.row[7]).toMatch(/^! «bot emasman» tekshiruvi o'tmadi/);
-    // Every other bot sign goes in too, with its warning (a real person can trip them).
+    // A bot trap (here a browser a program drives) stays out like the hidden field.
     await partnerOrder({ fullName: 'Дастур Мижоз', phone: '+998 90 312 45 86', signals: { webdriver: true } }, '203.0.113.86');
-    await until(() => sheets.rows.length >= 3);
-    expect(sheets.rows[2]!.row[7]).toContain("bot tuzog'iga tushdi");
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows).toHaveLength(2);
   });
 
   it('numbers its own orders, and is no repeat of a main-site order', async () => {

@@ -33,11 +33,11 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 85 tests, Miniflare
+npm test --workspace=@bionex/worker      # 86 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
-npm run deploy:old-design --workspace=@bionex/worker  # worker + main site in its OLD look (MAIN_DESIGN=old)
+npm run deploy:old-design --workspace=@bionex/worker  # OLD look — do NOT offer; the owner wants the new design live
 ```
 `apps/web/.env.production` and `apps/web/.env.t2` are gitignored (values are public: Turnstile
 site key, site URL, Pixel id, `VITE_META_BROWSER_LEAD=1` for t2). They exist only on the
@@ -162,8 +162,10 @@ user's Mac.
 17. **Google Sheets hide only the honeypot** (2026-10-25, owner's decision): the owner opened
     their own Instagram ad, failed the «verify human» check and concluded real customers were
     being lost. Both sheets (partner `acceptPartner`, main-site copy in `accept`) now skip only
-    orders with `honeypot`; `bot_trap`, `spam_device`, `spam_lookalike`, `likely_bot` and
-    `no_captcha` go in with their warnings, and a failed check starts «Belgi» with «! ». The
+    `SHEET_HIDDEN_FLAGS` = `honeypot` + `bot_trap` (2026-10-26: to the owner «honeypot» means
+    both traps; they complained bot_trap rows still reached the partner sheet). `spam_device`,
+    `spam_lookalike`, `likely_bot` and `no_captcha` go in with their warnings, and a failed
+    check starts «Belgi» with «! ». A hidden partner order is seen by nobody (no Telegram). The
     panel/lists still hide `LIKELY_BOT_FLAGS`; the partner's Meta Lead rule is unchanged.
 
 18. **No Pixel automatic events on the main site; honeypot never reported** (2026-10-25): Events
@@ -178,7 +180,8 @@ user's Mac.
     (sheets, Meta) live while the new «Оромгоҳ» design waits. `MAIN_DESIGN=old` makes
     vite.config.ts point `#site` at `src/sites/partner.tsx` (the original page) for the main
     build and skip `mainSiteHead`; shared form fixes and the Pixel autoConfig fix still ship.
-    Plain `deploy` publishes the new design. Ask which one the owner wants before deploying.
+    Plain `deploy` publishes the new design. The owner then said the new design must stay live
+    (deploying old-design was a misunderstanding): give only plain `deploy` from now on.
 
 20. **Main sheet «Holat» drives Meta too** (2026-10-26, owner's request «signalni Google
     Sheets'dan olishimiz kerak»): the 5-minute cron also reads the main sheet («Bionex-Zeynara»,
