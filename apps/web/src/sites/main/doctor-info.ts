@@ -12,9 +12,9 @@
  */
 export const doctor = {
   /** e.g. 'Алишер Каримов' */
-  name: 'Shuxrat Qosimov',
+  name: '',
   /** e.g. 'Кардиолог, олий тоифали шифокор' */
-  title: 'Kardiolog',
+  title: '',
   /** What the doctor says, one paragraph per line, in their own words. */
   quote: [] as string[],
 };
