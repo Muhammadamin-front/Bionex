@@ -526,6 +526,29 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /**
+   * «Holat» of the main site's sheet (index.ts `syncMainSheet`), the second way to mark an order
+   * besides the Telegram buttons: whichever is marked first reports it, and only once (the
+   * pending row goes as it is sent). «Keraksiz» also remembers the order's network and device as
+   * spam, like 🚫; changing it back forgets them. Waiting statuses change nothing.
+   */
+  async syncMainSheet(input: { rows: Array<{ leadId: number; outcome: 'sold' | 'rejected' | 'spam' | null }>; now: number }): Promise<void> {
+    for (const row of input.rows) {
+      const source = `sheet:${row.leadId}`;
+      if (row.outcome !== 'spam') this.sql.exec('DELETE FROM spam_marks WHERE source = ?', source);
+      if (!row.outcome) continue;
+      if (row.outcome === 'spam') {
+        this.sql.exec(
+          'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, ? FROM leads WHERE id = ?',
+          source,
+          input.now,
+          row.leadId,
+        );
+      }
+      this.reportToMeta(row.leadId, row.outcome, input.now);
+    }
+  }
+
+  /**
    * An earlier order from this device, from a phone that looks like it, or from this network
    * was marked as spam within 30 days. The look-alike is said only when the device itself is
    * not recognised (its browser data was cleared, or a private window): a hint, never a refusal.

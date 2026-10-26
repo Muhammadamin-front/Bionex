@@ -33,7 +33,7 @@ an operators' Telegram group; operators ring the customer and press outcome butt
 Commands (from repo root):
 ```
 npm run typecheck
-npm test --workspace=@bionex/worker      # 83 tests, Miniflare
+npm test --workspace=@bionex/worker      # 85 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
@@ -46,7 +46,7 @@ user's Mac.
 ## Principles already settled — do not undo without asking
 
 1. **Main site: Meta `Lead` only after an operator confirms a real person** (✅ Сотилди or
-   ❌ Рад этди). 🚫 Спам and unmarked orders are never reported. No browser `Lead` on the main
+   ❌ Рад этди in Telegram, or «Sotildi» / «Kerakli» in the main sheet's «Holat» — see #20). 🚫 Спам and unmarked orders are never reported. No browser `Lead` on the main
    site. Reason: 5 of the first 8 leads were fake; see `docs/META-CAPI.md`, `docs/SPAM.md`.
 2. **The partner site is the targetologist's alone and must not reveal the main site**: no
    main Pixel, domain or "bionex" string in its build; its orders never reach the operators'
@@ -179,6 +179,15 @@ user's Mac.
     vite.config.ts point `#site` at `src/sites/partner.tsx` (the original page) for the main
     build and skip `mainSiteHead`; shared form fixes and the Pixel autoConfig fix still ship.
     Plain `deploy` publishes the new design. Ask which one the owner wants before deploying.
+
+20. **Main sheet «Holat» drives Meta too** (2026-10-26, owner's request «signalni Google
+    Sheets'dan olishimiz kerak»): the 5-minute cron also reads the main sheet («Bionex-Zeynara»,
+    tab «Lidlar», № = the Telegram order number) via the same Apps Script `statuses` action.
+    `sheetOutcome`: «Sotildi» → sold (Lead + Purchase), «Kerakli» → `rejected` (Lead only),
+    «Keraksiz»/«Spam» → spam (no Lead, device/network remembered as `sheet:<id>`), anything
+    else waits. Telegram buttons still report too (owner chose both); whichever is marked first
+    sends the one Lead (`meta_pending` row is consumed). Only works if the main sheet's script
+    is the same as the partner's (has `statuses`).
 
 ## Open items
 

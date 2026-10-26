@@ -972,6 +972,49 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     mf = withMeta();
   });
 
+  describe("from the main site's own sheet («Holat»)", () => {
+    const readSheet = async () => {
+      const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+      await worker.scheduled({ cron: '*/5 * * * *' });
+    };
+    beforeEach(async () => {
+      await mf.dispose();
+      mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret' });
+    });
+
+    it('reports «Sotildi» and «Kerakli» as a Lead, once, and waits on the others', async () => {
+      const first = sid();
+      await order({ submissionId: first }, { ip: '203.0.113.41' });
+      const second = sid();
+      await order({ submissionId: second, phone: '+998 90 312 45 42' }, { ip: '203.0.113.42' });
+      await order({ phone: '+998 90 312 45 43' }, { ip: '203.0.113.43' });
+      // Waiting statuses send nothing.
+      sheets.statuses = [[1, "Ko'tarmadi"], [2, "Qaytib qo'ng'iroq"], [3, '']];
+      await readSheet();
+      expect(await quiet()).toHaveLength(0);
+      // Then the real outcomes; read twice, still one Lead each.
+      sheets.statuses = [[1, 'Sotildi'], [2, 'Kerakli'], [3, 'Keraksiz']];
+      await readSheet();
+      await readSheet();
+      const events = await settled(2);
+      await quiet();
+      expect(events.map((e) => [e.event_name, e.event_id]).sort()).toEqual([['Lead', first], ['Lead', second]].sort());
+      // A Telegram button pressed afterwards cannot send a second one.
+      await press('s:1:sold');
+      expect(await quiet()).toHaveLength(2);
+    });
+
+    it('remembers «Keraksiz» as spam, so the next order from that phone arrives marked', async () => {
+      const DEVICE = '11111111-2222-4333-8444-555555555555';
+      await order({ deviceId: DEVICE }, { ip: '203.0.113.44' });
+      sheets.statuses = [[1, 'Keraksiz']];
+      await readSheet();
+      await order({ deviceId: DEVICE, phone: '+998 90 312 45 45' }, { ip: '198.51.100.45' });
+      expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+      expect(await quiet()).toHaveLength(0);
+    });
+  });
+
   it('stays off unless both the pixel id and the token are set', async () => {
     const half: Array<Record<string, string>> = [{}, { META_PIXEL_ID: PIXEL }, { META_CAPI_TOKEN: 'EAA-test-token' }];
     for (const bindings of half) {

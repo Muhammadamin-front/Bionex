@@ -8,7 +8,7 @@ import { pwaIcon, pwaManifest, pwaServiceWorker } from './panel/pwa';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
 import { caughtByBotTrap, describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
 import { readableModel } from './models';
-import { readSheetStatuses, sheetsConfig } from './sheets';
+import { readSheetStatuses, sheetOutcome, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 
@@ -103,6 +103,7 @@ export default {
   async scheduled(controller, env, ctx) {
     if (controller.cron === PARTNER_SHEET_CRON) {
       ctx.waitUntil(syncPartnerSheet(env, Date.now()));
+      ctx.waitUntil(syncMainSheet(env, Date.now()));
       return;
     }
     if (env.TELEGRAM_DRY_RUN !== '1' && !(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)) return;
@@ -280,6 +281,19 @@ async function syncPartnerSheet(env: Env, now: number): Promise<void> {
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
   if (rows) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncPartnerSpam({ site: 't2', rows, now });
+}
+
+/**
+ * «Holat» in the main site's own sheet, read with the partner's: the outcome the people
+ * ringing from the sheet chose, reported to Meta like a Telegram button (sheets.ts `sheetOutcome`).
+ */
+async function syncMainSheet(env: Env, now: number): Promise<void> {
+  const cfg = sheetsConfig(env, 'main');
+  if (!cfg) return;
+  const rows = await readSheetStatuses(cfg);
+  if (!rows) return;
+  const marked = rows.map((r) => ({ leadId: r.number, outcome: sheetOutcome(r.status) }));
+  await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncMainSheet({ rows: marked, now });
 }
 
 /**

@@ -58,6 +58,20 @@ const FLAG_TEXT: Record<string, string> = {
  */
 export const isSpamStatus = (status: unknown) => /keraksiz|кераксиз|spam|спам/i.test(String(status ?? ''));
 
+/**
+ * What a «Holat» in the main site's sheet means for Meta (the owner's rules, 2026-10-26):
+ * «Sotildi» a sale (Lead + Purchase), «Kerakli» a real person (Lead), «Keraksiz» spam (no Lead,
+ * remembered). Anything else — «Ko'tarmadi», «Qaytib qo'ng'iroq», empty — waits (null).
+ * «Kerakli» rides as `rejected`: the outcome that reports a Lead and no Purchase.
+ */
+export function sheetOutcome(status: unknown): 'sold' | 'rejected' | 'spam' | null {
+  const s = String(status ?? '').trim();
+  if (isSpamStatus(s)) return 'spam';
+  if (/sotildi|сотилди/i.test(s)) return 'sold';
+  if (/^(kerakli|керакли)\b/i.test(s)) return 'rejected';
+  return null;
+}
+
 export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
   // The main site's own sheet («Bionex-Zeynara»): a copy of each order next to the operators'
   // Telegram group, which stays where the work is done. Off until both values are set.
@@ -82,8 +96,8 @@ const tashkentTime = (ms: number) =>
  */
 const asText = (value: string) => (/^[=+\-@]/.test(value) ? `'${value}` : value);
 
-/** Each order's number and whether its «Holat» says spam; null when the sheet could not be read. */
-export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ number: number; spam: boolean }> | null> {
+/** Each order's number and its «Holat» (as written, and whether it says spam); null when the sheet could not be read. */
+export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ number: number; spam: boolean; status: string }> | null> {
   try {
     const res = await fetch(cfg.url, {
       method: 'POST',
@@ -95,7 +109,7 @@ export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ numb
     if (!Array.isArray(rows)) return null;
     return rows
       .filter((r): r is [unknown, unknown] => Array.isArray(r) && Number.isInteger(Number(r[0])) && Number(r[0]) > 0)
-      .map(([number, status]) => ({ number: Number(number), spam: isSpamStatus(status) }));
+      .map(([number, status]) => ({ number: Number(number), spam: isSpamStatus(status), status: String(status ?? '') }));
   } catch (err) {
     console.error('Google Sheets statuses unreadable', (err as Error)?.message);
     return null;
