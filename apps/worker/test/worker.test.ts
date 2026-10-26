@@ -1065,9 +1065,11 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     expect(meta.bodies).toHaveLength(1);
   });
 
-  it('never reports a filled hidden field to Meta, whatever the operator presses', async () => {
+  it('never reports a bot trap to Meta, whatever the operator presses', async () => {
     expect((await order({ contactFax: 'x' })).status).toBe(201);
     await press('s:1:sold');
+    expect((await order({ phone: '+998 90 312 45 48', signals: { synthetic: 1 } }, { ip: '203.0.113.48' })).status).toBe(201);
+    await press('s:2:sold');
     expect(await quiet()).toHaveLength(0);
   });
 
@@ -1338,10 +1340,13 @@ describe('the partner site (sites.ts t2)', () => {
     await until(() => sheets.rows.length >= 2);
     expect(sheets.rows[1]!.row[2]).toBe('Шубҳали Мижоз');
     expect(sheets.rows[1]!.row[7]).toMatch(/^! «bot emasman» tekshiruvi o'tmadi/);
-    // A bot trap (here a browser a program drives) stays out like the hidden field.
+    // A bot trap (here a browser a program drives) stays out like the hidden field, and the
+    // partner's Meta dataset is not told of either.
+    const leadsBefore = meta.bodies.length;
     await partnerOrder({ fullName: 'Дастур Мижоз', phone: '+998 90 312 45 86', signals: { webdriver: true } }, '203.0.113.86');
     await new Promise((r) => setTimeout(r, 100));
     expect(sheets.rows).toHaveLength(2);
+    expect(meta.bodies).toHaveLength(leadsBefore);
   });
 
   it('numbers its own orders, and is no repeat of a main-site order', async () => {

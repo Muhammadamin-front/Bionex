@@ -43,17 +43,18 @@ const PANEL_LIMIT = 1000;
  * Flags that mean "almost certainly a bot, not a customer": the hidden field, the browser's
  * traps or a browser a program drives, a phone already marked spam, or one that looks like one.
  * Such a main-site order is accepted and reaches the operators' group, but is kept out of the
- * panel and lists. The Google Sheets hide fewer (SHEET_HIDDEN_FLAGS): every other order goes
+ * panel and lists. The Google Sheets hide fewer (TRAP_FLAGS): every other order goes
  * there with its warnings. A failed check is NOT here (likely_bot): real
  * customers turned up among those, so they stay visible with a warning.
  */
 const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike'];
 /**
- * What only a program does — the hidden fields (honeypot) and the browser's traps (bot_trap) —
- * stays out of both Google Sheets; every other order goes in with its warnings (the owner's
- * rule, 2026-10-25/26: their "honeypot" means both traps).
+ * What only a program does — the hidden fields (honeypot) and the browser's traps (bot_trap).
+ * Such an order stays out of both Google Sheets and is never reported to Meta, on either site;
+ * every other order goes to the sheets with its warnings (the owner's rules, 2026-10-25/26:
+ * their "honeypot" means both traps).
  */
-const SHEET_HIDDEN_FLAGS = ['honeypot', 'bot_trap'];
+const TRAP_FLAGS = ['honeypot', 'bot_trap'];
 /**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
@@ -367,9 +368,9 @@ export class LeadRegistry extends DurableObject<Env> {
       .one().id;
     this.sql.exec('INSERT INTO lead_status (lead_id, created_at) VALUES (?, ?)', leadId, now);
     // Meta is told nothing yet: a name and a number in a form prove nothing. Held until an
-    // operator rings the customer and presses an outcome (see button()). A filled hidden field
-    // (honeypot) is a program, whatever an operator later presses: Meta never hears of it.
-    if (input.meta && !input.flags.includes('honeypot')) {
+    // operator rings the customer and presses an outcome (see button()). A bot trap (TRAP_FLAGS)
+    // is a program, whatever an operator later presses: Meta never hears of it.
+    if (input.meta && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
       this.sql.exec(
         'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at) VALUES (?, ?, ?, ?, ?)',
         leadId,
@@ -413,10 +414,10 @@ export class LeadRegistry extends DurableObject<Env> {
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
     // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
-    // numbered like the Telegram order. Only the bot traps stay out of it (SHEET_HIDDEN_FLAGS) —
+    // numbered like the Telegram order. Only the bot traps stay out of it (TRAP_FLAGS) —
     // the owner's rule: a real customer can fail every other check (see acceptPartner).
     const sheet = sheetsConfig(this.env, 'main');
-    if (sheet && !input.flags.some((f) => SHEET_HIDDEN_FLAGS.includes(f))) {
+    if (sheet && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
       this.ctx.waitUntil(
         sendSheetOrder(sheet, {
           number: leadId,
@@ -483,13 +484,13 @@ export class LeadRegistry extends DurableObject<Env> {
     );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
-    // Only an order caught by a bot trap (SHEET_HIDDEN_FLAGS) — something no person does — is
+    // Only an order caught by a bot trap (TRAP_FLAGS) — something no person does — is
     // kept out of the partner's sheet. A partner order goes nowhere else, so such an order is
     // seen by no one; it is still accepted and counted. Everything else goes in with its warnings, a failed
     // "not a robot" check marked «!»: the owner opened their own ad in Instagram, failed the
     // check, and real customers were being lost (2026-10-25). The order is accepted either way.
     const sheet = sheetsConfig(this.env, site);
-    if (sheet && !flags.some((f) => SHEET_HIDDEN_FLAGS.includes(f))) {
+    if (sheet && !flags.some((f) => TRAP_FLAGS.includes(f))) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
         sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),
@@ -497,10 +498,10 @@ export class LeadRegistry extends DurableObject<Env> {
     } else if (!sheet) {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
     }
-    // A script (the hidden field), or a phone already marked as spam: the ads must not learn
+    // A bot trap (TRAP_FLAGS), or a phone already marked as spam: the ads must not learn
     // from it. A network marked as spam is not enough — thousands of customers share one.
     const meta = metaConfig(this.env, site);
-    if (meta && input.meta && !flags.includes('honeypot') && !flags.includes('spam_device')) {
+    if (meta && input.meta && !flags.some((f) => TRAP_FLAGS.includes(f)) && !flags.includes('spam_device')) {
       this.ctx.waitUntil(
         sendMetaEvent(meta, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
       );

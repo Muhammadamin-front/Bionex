@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
+import { caughtByBotTrap } from '@bionex/shared/device';
 import { deviceFingerprint, deviceId, deviceModel, deviceSignals } from '../../lib/device';
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
@@ -307,7 +308,10 @@ export function OrderForm({
       unansweredPayload.current = null;
       // The main site reports no Lead from here: the Worker does, once an operator has rung
       // the customer. Only the partner site sends one at once (see trackLead).
-      if (response.status === 'accepted') trackLead(submissionId);
+      // A bot trap (a filled decoy, a made-up click, an untouched touch screen) sends no Lead:
+      // the server withholds its own for the same reasons (registry.ts TRAP_FLAGS).
+      const trapped = Boolean(`${honeypotRef.current?.value ?? ''}${websiteRef.current?.value ?? ''}`.trim()) || caughtByBotTrap(signals);
+      if (response.status === 'accepted' && !trapped) trackLead(submissionId);
       submittedHere.current = true;
       setBusy(false);
       // The heading already says the order was received; for a new order the body only

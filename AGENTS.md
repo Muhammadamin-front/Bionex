@@ -54,7 +54,9 @@ user's Mac.
 3. **Partner site Lead is sent at once for every accepted form** (the owner's explicit
    choice, 2026-10-21): browser Pixel `Lead` (eventID = submissionId) + server CAPI `Lead`
    (same event_id) when `META_T2_CAPI_TOKEN` is set. A version that waited for the sheet's
-   verdict was reverted.
+   verdict was reverted. Exception (owner, 2026-10-26): a bot trap (`TRAP_FLAGS` = honeypot +
+   bot_trap) sends no Lead on either site — browser (OrderForm checks `caughtByBotTrap` and
+   the decoys) or server.
 4. Spam is fought by making it worthless, not by blocking customers (mobile NAT shares IPs).
 
 ## What was built in these sessions (newest last)
@@ -191,6 +193,11 @@ user's Mac.
     else waits. Telegram buttons still report too (owner chose both); whichever is marked first
     sends the one Lead (`meta_pending` row is consumed). Only works if the main sheet's script
     is the same as the partner's (has `statuses`).
+
+21. **Bot traps never reach Meta** (2026-10-26, owner's request): `TRAP_FLAGS` (renamed from
+    SHEET_HIDDEN_FLAGS) also gates the partner's server Lead and the main site's
+    `meta_pending` row; OrderForm skips the browser `trackLead` when a decoy is filled or
+    `caughtByBotTrap(signals)`. Needs both deploys (worker, then t2) to take full effect.
 
 ## Open items
 
