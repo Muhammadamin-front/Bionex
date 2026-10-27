@@ -1301,12 +1301,12 @@ describe('the partner site (sites.ts t2)', () => {
     const { PARTNER } = await mf.getBindings<{ PARTNER: { fetch(url: string, init?: RequestInit): Promise<Response> } }>();
     return PARTNER.fetch(`${PARTNER_SITE}${path}`, init);
   }
-  const partnerOrder = (body: Record<string, unknown>, ip: string) =>
+  const partnerOrder = (body: Record<string, unknown>, ip: string, userAgent?: string) =>
     partner('/api/leads', {
       method: 'POST',
       // No Origin: Miniflare's binding proxy refuses any request carrying one. The origin check
       // itself is the same code as the main site's and is tested there.
-      headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip, ...(userAgent ? { 'user-agent': userAgent } : {}) },
       body: JSON.stringify({ submissionId: sid(), turnstileToken: 'partner', ...body }),
     });
 
@@ -1356,9 +1356,14 @@ describe('the partner site (sites.ts t2)', () => {
     await until(() => sheets.rows.length >= 1);
     expect(sheets.rows).toHaveLength(1);
     expect(sheets.rows[0]!.row[2]).toBe('Ҳақиқий Мижоз');
-    // A failed check (even outside Instagram) still goes to the sheet, with its warning.
-    await partnerOrder({ fullName: 'Шубҳали Мижоз', phone: '+998 90 312 45 87', turnstileToken: 'bad' }, '203.0.113.87');
+    // A failed check outside the Instagram / Facebook app stays out too, but one inside the app
+    // (where the ads open and real customers fail it) goes in with its «!» warning.
+    const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
+    await partnerOrder({ fullName: 'Браузердан Мижоз', phone: '+998 90 312 45 90', turnstileToken: 'bad' }, '203.0.113.90');
+    await partnerOrder({ fullName: 'Шубҳали Мижоз', phone: '+998 90 312 45 87', turnstileToken: 'bad' }, '203.0.113.87', instagram);
     await until(() => sheets.rows.length >= 2);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sheets.rows).toHaveLength(2);
     expect(sheets.rows[1]!.row[2]).toBe('Шубҳали Мижоз');
     expect(sheets.rows[1]!.row[7]).toMatch(/^! «bot emasman» tekshiruvi o'tmadi/);
     // A bot trap (here a browser a program drives) stays out like the hidden field, and the

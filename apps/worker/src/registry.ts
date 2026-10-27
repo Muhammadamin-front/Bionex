@@ -56,6 +56,13 @@ const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike
  */
 const TRAP_FLAGS = ['honeypot', 'bot_trap'];
 /**
+ * The partner's sheet also drops `likely_bot`: a failed check from a browser that is not the
+ * Instagram / Facebook app the ads run in (owner, 2026-10-27, after the sheet filled with such
+ * rows). A failed check inside the app still goes in with its «!» — that is where real customers
+ * and the owner's own test failed. Sheet only: the partner's Meta Lead rule (TRAP_FLAGS) is unchanged.
+ */
+const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
+/**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
  * reported — Meta has no field for "this was fake", and withholding the event is the only way
@@ -484,13 +491,14 @@ export class LeadRegistry extends DurableObject<Env> {
     );
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
 
-    // Only an order caught by a bot trap (TRAP_FLAGS) — something no person does — is
-    // kept out of the partner's sheet. A partner order goes nowhere else, so such an order is
-    // seen by no one; it is still accepted and counted. Everything else goes in with its warnings, a failed
-    // "not a robot" check marked «!»: the owner opened their own ad in Instagram, failed the
-    // check, and real customers were being lost (2026-10-25). The order is accepted either way.
+    // An order caught by a bot trap (TRAP_FLAGS) — something no person does — and a failed
+    // "not a robot" check from outside the Instagram / Facebook app (`likely_bot`) are kept out of
+    // the partner's sheet (PARTNER_SHEET_HIDDEN_FLAGS). A partner order goes nowhere else, so such an
+    // order is seen by no one; it is still accepted and counted. Everything else goes in with its
+    // warnings, a failed check inside the app marked «!»: the owner opened their own ad in Instagram,
+    // failed the check, and real customers were being lost (2026-10-25).
     const sheet = sheetsConfig(this.env, site);
-    if (sheet && !flags.some((f) => TRAP_FLAGS.includes(f))) {
+    if (sheet && !flags.some((f) => PARTNER_SHEET_HIDDEN_FLAGS.includes(f))) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
         sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),
