@@ -1010,13 +1010,17 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await quiet()).toHaveLength(2);
     });
 
-    it('keeps bot-trap orders out of the sheet, and takes failed checks with «!»', async () => {
+    it('keeps bot traps and failed checks outside Instagram / Facebook out of the sheet, and takes failed checks inside the app with «!»', async () => {
+      const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
       await order({ fullName: 'Тузоқ Киши', signals: { touch: 5, taps: 0, keys: 9 } }, { ip: '203.0.113.46' });
-      await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47' });
+      await order({ fullName: 'Браузердан Киши', phone: '+998 90 312 45 46', turnstileToken: 'bad' }, { ip: '203.0.113.49' });
+      await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47', userAgent: instagram });
       for (let i = 0; i < 50 && sheets.rows.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));
       expect(sheets.rows.map((r) => r.row[2])).toEqual(['Шубҳали Киши']);
       expect(sheets.rows[0]!.row[7]).toMatch(/^! /);
+      // The operators still hear of every one of them.
+      expect(leadMessages()).toHaveLength(3);
     });
 
     it('remembers «Keraksiz» as spam, so the next order from that phone arrives marked', async () => {
