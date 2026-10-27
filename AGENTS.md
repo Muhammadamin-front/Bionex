@@ -45,8 +45,10 @@ user's Mac.
 
 ## Principles already settled — do not undo without asking
 
-1. **Main site: Meta `Lead` only after an operator confirms a real person** (✅ Сотилди or
-   ❌ Рад этди in Telegram, or «Sotildi» / «Kerakli» in the main sheet's «Holat» — see #20). 🚫 Спам and unmarked orders are never reported. No browser `Lead` on the main
+1. **Main site: Meta `Lead` only after an operator confirms a real person, and only through the
+   main sheet's «Holat»** («Sotildi» / «Kerakli» — see #20). Since 2026-10-27 (owner: «telegramga
+   faqat malumot borsin») Telegram buttons send NOTHING to Meta (they still mark/track; 🚫 still
+   withholds the order). 🚫 Спам and unmarked orders are never reported. No browser `Lead` on the main
    site. Reason: 5 of the first 8 leads were fake; see `docs/META-CAPI.md`, `docs/SPAM.md`.
 2. **The partner site is the targetologist's alone and must not reveal the main site**: no
    main Pixel, domain or "bionex" string in its build; its orders never reach the operators'
@@ -198,6 +200,12 @@ user's Mac.
     SHEET_HIDDEN_FLAGS) also gates the partner's server Lead and the main site's
     `meta_pending` row; OrderForm skips the browser `trackLead` when a decoy is filled or
     `caughtByBotTrap(signals)`. Needs both deploys (worker, then t2) to take full effect.
+
+22. **Telegram is information only for Meta** (2026-10-27, owner's request; they moved fully to
+    Google Sheets): `button()` in registry.ts no longer calls `reportToMeta`; only `syncMainSheet`
+    does. A Telegram 🚫 deletes the order's `meta_pending` row. Orders kept out of the sheet
+    (`LIKELY_BOT_FLAGS`) can therefore never reach Meta. If the sheet script or its secrets break,
+    no main-site Lead is sent at all — watch Cloudflare Logs for «Google Sheets».
 
 ## Open items
 

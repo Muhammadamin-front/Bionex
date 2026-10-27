@@ -177,8 +177,8 @@ export interface OrderInput {
  * still waiting for Telegram, and for 7 days in list_items for the operators' /royxat.
  * One exception, meta_pending: an order waiting to be marked keeps the match data Meta's
  * Conversions API needs — the phone and name already one-way hashed, but the IP, the user
- * agent and Meta's _fbp / _fbc cookies as they were. It is deleted the moment the operator
- * presses an outcome, and in any case after 7 days (all Meta would still accept).
+ * agent and Meta's _fbp / _fbc cookies as they were. It is deleted the moment the sheet's
+ * «Holat» gives an outcome (or 🚫 is pressed), and in any case after 7 days (all Meta would still accept).
  */
 export class LeadRegistry extends DurableObject<Env> {
   private readonly sql: SqlStorage;
@@ -534,8 +534,8 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /**
-   * «Holat» of the main site's sheet (index.ts `syncMainSheet`), the second way to mark an order
-   * besides the Telegram buttons: whichever is marked first reports it, and only once (the
+   * «Holat» of the main site's sheet (index.ts `syncMainSheet`), the only way an order reaches
+   * Meta (the Telegram buttons report nothing since 2026-10-27): it is reported once (the
    * pending row goes as it is sent). «Keraksiz» also remembers the order's network and device as
    * spam, like 🚫; changing it back forgets them. Waiting statuses change nothing.
    */
@@ -749,7 +749,10 @@ export class LeadRegistry extends DurableObject<Env> {
         input.leadId,
       );
     }
-    this.reportToMeta(input.leadId, input.action, input.now);
+    // Nothing goes to Meta from a Telegram button (owner, 2026-10-27): the group is for
+    // information. The outcome that reports to Meta is «Holat» in the main sheet (syncMainSheet).
+    // A 🚫 still withholds: the order is dropped from the pending ones, so a later «Sotildi» cannot report it.
+    if (input.action === 'spam') this.sql.exec('DELETE FROM meta_pending WHERE lead_id = ?', input.leadId);
     return {
       changed: true,
       toast: input.action === 'spam' ? 'Спам деб белгиланди. Бу манбадан келадиган кейинги буюртмалар ⚠️ билан келади.' : 'Белгиланди.',

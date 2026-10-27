@@ -930,10 +930,16 @@ describe('configuration', () => {
  * Meta learned to find more of them. Nothing goes to Meta now until an operator has rung the
  * customer and said what happened.
  */
-describe('the Lead event sent to Meta once an operator confirms the order', () => {
+describe("the Lead event sent to Meta once the sheet's «Holat» confirms the order", () => {
   const PIXEL = '1109358048693673';
   const withMeta = (extra: Record<string, string> = {}) =>
-    start({ META_PIXEL_ID: PIXEL, META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock', ...extra });
+    start({ META_PIXEL_ID: PIXEL, META_CAPI_TOKEN: 'EAA-test-token', META_API_BASE: 'https://graph.mock', SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', ...extra });
+  /** The people ringing from the sheet choose «Holat»; the cron reads it (the only way an order reaches Meta). */
+  const mark = async (leadId: number, status: string) => {
+    sheets.statuses = [[leadId, status]];
+    const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+    await worker.scheduled({ cron: '*/5 * * * *' });
+  };
 
   const secret = async () => {
     const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
@@ -1024,13 +1030,29 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     });
   });
 
+  it('reports nothing to Meta for any Telegram button: the group is for information only', async () => {
+    await order();
+    for (const action of ['sold', 'rejected', 'noanswer', 'callback']) await press(`s:1:${action}`);
+    expect(await quiet()).toHaveLength(0);
+    // The sheet is still the way in: the order stayed pending, so «Sotildi» there reports it.
+    await mark(1, 'Sotildi');
+    expect(await settled()).toHaveLength(1);
+  });
+
+  it('a Telegram 🚫 withholds the order, so a later «Sotildi» in the sheet cannot report it', async () => {
+    await order();
+    await press('s:1:spam');
+    await mark(1, 'Sotildi');
+    expect(await quiet()).toHaveLength(0);
+  });
+
   it('stays off unless both the pixel id and the token are set', async () => {
     const half: Array<Record<string, string>> = [{}, { META_PIXEL_ID: PIXEL }, { META_CAPI_TOKEN: 'EAA-test-token' }];
     for (const bindings of half) {
       await mf.dispose();
       mf = start({ META_API_BASE: 'https://graph.mock', ...bindings });
       expect((await order()).status).toBe(201);
-      await press('s:1:sold');
+      await mark(1, 'Sotildi');
       expect(await quiet()).toHaveLength(0);
       expect(await (await mf.dispatchFetch(`${SITE}/api/health`)).json()).toMatchObject({ meta: false });
     }
@@ -1057,7 +1079,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
   it('sends one Lead when the sale is marked, keyed to the order the browser knows', async () => {
     const submissionId = sid();
     expect((await order({ submissionId })).status).toBe(201);
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     const [event] = await settled();
     expect(event).toMatchObject({ event_name: 'Lead', action_source: 'website', event_id: submissionId });
     expect(meta.bodies[0]!.access_token).toBe('EAA-test-token');
@@ -1067,9 +1089,9 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
 
   it('never reports a bot trap to Meta, whatever the operator presses', async () => {
     expect((await order({ contactFax: 'x' })).status).toBe(201);
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect((await order({ phone: '+998 90 312 45 48', signals: { synthetic: 1 } }, { ip: '203.0.113.48' })).status).toBe(201);
-    await press('s:2:sold');
+    await mark(2, 'Sotildi');
     expect(await quiet()).toHaveLength(0);
   });
 
@@ -1078,7 +1100,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     await order();
     const after = Math.floor(Date.now() / 1000); // the order may straddle a second boundary
     await new Promise((r) => setTimeout(r, 1100)); // the operator calls back later
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     const [event] = await settled();
     expect(event!.event_time).toBeGreaterThanOrEqual(before);
     expect(event!.event_time).toBeLessThanOrEqual(after);
@@ -1086,29 +1108,29 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
 
   it('reports a customer who said no: a real person, which is what the ads must look for', async () => {
     await order();
-    await press('s:1:rejected');
+    await mark(1, 'Kerakli');
     expect(await settled()).toHaveLength(1);
   });
 
   it('never reports an order marked spam — that is the whole point', async () => {
     await order();
-    await press('s:1:spam');
+    await mark(1, 'Keraksiz');
     expect(await quiet()).toHaveLength(0);
   });
 
   it('keeps an unanswered order waiting, and reports it when the call finally connects', async () => {
     await order();
-    await press('s:1:noanswer');
+    await mark(1, "Ko'tarmadi");
     expect(await quiet()).toHaveLength(0);
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect(await settled()).toHaveLength(1);
   });
 
   it('keeps a "ring me later" order waiting: the customer answered but has not decided', async () => {
     await order();
-    await press('s:1:callback');
+    await mark(1, "Qaytib qo'ng'iroq");
     expect(await quiet()).toHaveLength(0);
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect(await settled()).toHaveLength(1);
   });
 
@@ -1117,7 +1139,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     mf = withMeta({ META_ORDER_VALUE: '349000' });
     const submissionId = sid();
     await order({ submissionId });
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     const events = await settled(2);
     expect(events).toHaveLength(2);
     const purchase = events.find((e) => e.event_name === 'Purchase')!;
@@ -1131,23 +1153,22 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     await mf.dispose();
     mf = withMeta({ META_ORDER_VALUE: '349000' });
     await order();
-    await press('s:1:rejected');
+    await mark(1, 'Kerakli');
     expect((await quiet()).map((e) => e.event_name)).toEqual(['Lead']);
   });
 
   it('sends no Purchase at all without a value: a made-up figure is worse than none', async () => {
     await order();
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect((await quiet()).map((e) => e.event_name)).toEqual(['Lead']);
   });
 
   it('reports an order once, however many times the buttons are pressed', async () => {
     await order();
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     await settled();
-    await press('s:1:rejected');
-    await press('r:1');
-    await press('s:1:sold');
+    await mark(1, 'Kerakli');
+    await mark(1, 'Sotildi');
     expect(await quiet()).toHaveLength(1);
   });
 
@@ -1156,7 +1177,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     // who spoke to the customer is a better judge of a real person than the widget.
     await order({ turnstileToken: 'bad' });
     expect(leadMessages()[0]!.text).toContain('«бот эмасман» текшируви ўтмади');
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect(await settled()).toHaveLength(1);
   });
 
@@ -1191,7 +1212,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
 
   it('identifies the customer only by one-way hashes, never the number itself', async () => {
     await order({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67' });
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     const [event] = await settled();
     const sent = JSON.stringify(event);
     expect(sent).not.toContain('998903124567');
@@ -1213,7 +1234,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
         cookie: '_ga=GA1.1.x; _fbp=fb.1.1760000000000.1234567890; _fbc=fb.1.1760000000000.IwAR-click-id',
       },
     );
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     const [event] = await settled();
     expect(event!.user_data).toMatchObject({
       client_ip_address: '203.0.113.77',
@@ -1227,12 +1248,12 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
     await order({ phone: '+998 90 312 45 68' });
     const repeat = await order({ phone: '+998 90 312 45 68' });
     expect(await repeat.json()).toMatchObject({ status: 'duplicate' });
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     expect(await settled()).toHaveLength(1);
     expect(await quiet()).toHaveLength(1);
   });
 
-  it('saves the outcome and keeps the group in step even when Meta is unreachable', async () => {
+  it('keeps the group in step when a button is pressed, whatever Meta does', async () => {
     await mf.dispose();
     mf = withMeta({ META_API_BASE: 'https://graph-down.mock' });
     expect((await order()).status).toBe(201);
@@ -1245,7 +1266,7 @@ describe('the Lead event sent to Meta once an operator confirms the order', () =
   it('counts the orders nobody has marked in the daily report, since the ads ignore those', async () => {
     await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' });
     await order({ phone: '+998 90 312 45 82' }, { ip: '203.0.113.82' });
-    await press('s:1:sold');
+    await mark(1, 'Sotildi');
     await settled();
     await hook({ message: { message_id: 9, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/hisobot' } });
     expect(telegram.messages.at(-1)!.text).toContain('📣 Натижаси белгиланмаган: 1 та');
@@ -1373,10 +1394,10 @@ describe('the partner site (sites.ts t2)', () => {
     expect((await order({ phone: '+998 90 312 45 84' }, { ip: '203.0.113.84' })).status).toBe(201);
     await new Promise((r) => setTimeout(r, 100));
     expect(meta.bodies).toHaveLength(1);
+    // A Telegram button reports nothing to the main dataset (its Lead comes from the sheet's «Holat»).
     await press('s:1:sold');
-    await until(() => meta.bodies.length >= 2);
-    expect(meta.paths[1]).toBe(`/v21.0/${MAIN_PIXEL}/events`);
-    expect(meta.bodies[1]!.access_token).toBe('EAA-main');
+    await new Promise((r) => setTimeout(r, 150));
+    expect(meta.bodies).toHaveLength(1);
   });
 
   it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {
