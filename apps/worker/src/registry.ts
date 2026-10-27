@@ -56,13 +56,6 @@ const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike
  */
 const TRAP_FLAGS = ['honeypot', 'bot_trap'];
 /**
- * The main site's sheet also drops `likely_bot`: a failed check from a browser that is not the
- * Instagram / Facebook app the ads run in (owner, 2026-10-27). A failed check inside the app
- * still goes in with its «!» — that is where the owner's own test and real customers failed.
- * The partner's sheet is not touched.
- */
-const MAIN_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
-/**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
  * reported — Meta has no field for "this was fake", and withholding the event is the only way
@@ -421,10 +414,10 @@ export class LeadRegistry extends DurableObject<Env> {
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
     // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
-    // numbered like the Telegram order. Bot traps and a failed check outside the Instagram /
-    // Facebook app stay out of it (MAIN_SHEET_HIDDEN_FLAGS); a failed check inside the app goes in with «!».
+    // numbered like the Telegram order. Only the bot traps stay out of it (TRAP_FLAGS) —
+    // the owner's rule: a real customer can fail every other check (see acceptPartner).
     const sheet = sheetsConfig(this.env, 'main');
-    if (sheet && !input.flags.some((f) => MAIN_SHEET_HIDDEN_FLAGS.includes(f))) {
+    if (sheet && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
       this.ctx.waitUntil(
         sendSheetOrder(sheet, {
           number: leadId,

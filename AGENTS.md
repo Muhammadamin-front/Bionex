@@ -207,11 +207,6 @@ user's Mac.
     (`LIKELY_BOT_FLAGS`) can therefore never reach Meta. If the sheet script or its secrets break,
     no main-site Lead is sent at all — watch Cloudflare Logs for «Google Sheets».
 
-23. **Main sheet also drops `likely_bot`** (2026-10-27, owner's choice after seeing failed-check rows
-    in the sheet): `MAIN_SHEET_HIDDEN_FLAGS` = `TRAP_FLAGS` + `likely_bot` (failed check outside the
-    Instagram/Facebook app). A failed check inside the app (`no_captcha` only) still goes in with
-    «!». Telegram still shows every order; the partner sheet is untouched.
-
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
