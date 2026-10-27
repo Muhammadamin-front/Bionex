@@ -214,6 +214,16 @@ user's Mac.
     «!». Sheet only: the partner's Meta Lead rule and the main site are unchanged. The owner had
     said not to touch the partner site, then asked for exactly this on its sheet.
 
+24. **`reused_click` warning** (2026-10-27, owner's request: a real person copies the ad link and
+    spams): the browser sends `clickId` (Meta's `fbclid` from the address or the `_fbc` cookie,
+    `adClickId` in device.ts); the worker keeps only its hash (`leads.click_hash`, 30 days) and
+    flags an order whose click id is behind an earlier order from another number: «шу реклама
+    босилиши аввал бошқа рақамдан ишлатилган» / «shu reklama bosilishi…». **Warning only** — a customer
+    forwarding the link looks the same; not hidden, not withheld from Meta. Main site only
+    (acceptPartner ignores `clickId`). The owner was told NOT to change the ad link in Meta (editing an ad
+    can reset learning, and a copied link repeats anyway). «reklama bosilmagan» in «Tafsilot» already
+    shows orders without an ad click.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

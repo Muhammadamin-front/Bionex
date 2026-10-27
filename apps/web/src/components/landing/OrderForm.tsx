@@ -6,7 +6,7 @@ import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
 import { caughtByBotTrap } from '@bionex/shared/device';
-import { deviceFingerprint, deviceId, deviceModel, deviceSignals } from '../../lib/device';
+import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } from '../../lib/device';
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
@@ -297,6 +297,7 @@ export function OrderForm({
         phone: fullPhone,
         submissionId,
         deviceId: deviceId(),
+        clickId: adClickId(),
         fingerprint,
         deviceModel: model,
         signals,

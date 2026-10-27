@@ -81,6 +81,8 @@ export function makeLeadSubmissionSchema(opts: { phonePrefixes?: readonly string
     deviceId: z.string().regex(SUBMISSION_ID_PATTERN).optional(),
     /** A SHA-256 (hex) of what the browser reports about the phone (apps/web lib/device.ts). */
     fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    /** The ad click's id (Meta's fbclid, from the address or the _fbc cookie): one per click, so a copied link repeats it. */
+    clickId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/).optional(),
     /** The phone's model as the browser names it (device.ts); cleaned, never a reason to refuse. */
     deviceModel: z.string().max(200).optional().transform(cleanDeviceModel),
     /** What tells a phone from a computer, a person from a program (device.ts); never refused. */

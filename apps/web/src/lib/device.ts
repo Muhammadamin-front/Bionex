@@ -197,6 +197,22 @@ if (typeof document !== 'undefined') {
 }
 
 /**
+ * The id of the ad click that brought this visit: `fbclid` in the address, else the one inside
+ * Meta's `_fbc` cookie («fb.1.<time>.<fbclid>»). Meta makes a new one for every click, so the same
+ * id behind many orders means one link was copied (registry.ts `reused_click`). Undefined without an ad click.
+ */
+export function adClickId(): string | undefined {
+  try {
+    const fromAddress = new URLSearchParams(location.search).get('fbclid');
+    const fromCookie = document.cookie.match(/(?:^|;\s*)_fbc=fb\.\d+\.\d+\.([^;]+)/)?.[1];
+    const id = fromAddress || fromCookie;
+    return id && /^[A-Za-z0-9_-]{8,200}$/.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * What tells a phone from a computer pretending to be one, and a person from a program
  * (docs/SPAM.md): graphics chip, touch points, the automation mark, how the form was filled,
  * the phone's time zone and language, whether the visit came from an ad click, and Chrome's

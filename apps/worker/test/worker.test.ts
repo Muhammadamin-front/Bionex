@@ -1450,6 +1450,20 @@ describe('the partner site (sites.ts t2)', () => {
     expect(leadMessages().at(-1)!.text).not.toContain('қурилмадан');
   });
 
+  it('warns when one ad click id is behind orders from different numbers, and not for a different click', async () => {
+    const CLICK = 'AbCdEf123456_-xyz';
+    expect((await order({ phone: '+998 90 312 45 95', clickId: CLICK }, { ip: '203.0.113.95' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('реклама босилиши');
+    // Another number, another network, the same click: the link was copied.
+    expect((await order({ phone: '+998 90 312 45 96', clickId: CLICK }, { ip: '198.51.100.96' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('шу реклама босилиши аввал бошқа рақамдан ишлатилган');
+    // A different click, and an order with no click at all, are not warned.
+    expect((await order({ phone: '+998 90 312 45 97', clickId: 'ZyXwVu987654_-abc' }, { ip: '192.0.2.97' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('реклама босилиши');
+    expect((await order({ phone: '+998 90 312 45 98' }, { ip: '192.0.2.98' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('реклама босилиши');
+  });
+
   it('shows the phone model: the one the browser named, else the one its user agent names', async () => {
     expect((await order({ phone: '+998 90 312 45 81', deviceModel: 'Redmi Note 12 · Android 14' }, { ip: '203.0.113.81' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('📱 Redmi Note 12 · Android 14');

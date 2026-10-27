@@ -239,6 +239,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       meta: match,
       device: data.deviceId,
       fingerprint: data.fingerprint,
+      click: data.clickId,
       model: readableModel(data.deviceModel ?? modelFromUserAgent(userAgent)),
       details: data.signals
         ? { latn: describeSignals(data.signals, userAgent, 'latn'), cyrl: describeSignals(data.signals, userAgent, 'cyrl') }

@@ -163,6 +163,8 @@ export interface OrderInput {
   meta?: { userData: MetaUserData; sourceUrl: string };
   /** The browser's own random id (apps/web lib/device.ts); absent for bot orders and blocked storage. */
   device?: string;
+  /** The ad click's id (Meta's fbclid); hashed before it is kept. Absent without an ad click. */
+  click?: string;
   /** The phone's likeness, a SHA-256 the browser made (apps/web lib/device.ts); absent for bot orders. */
   fingerprint?: string;
   /** The phone's model as its browser names it (@bionex/shared device.ts), for people to read. */
@@ -296,6 +298,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!leadColumns.includes('device_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN device_hash TEXT');
     // The phone's likeness (apps/web lib/device.ts deviceFingerprint), for marks that outlive a cleared browser.
     if (!leadColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN fp_hash TEXT');
+    // The ad click's id (fbclid): the same one behind several orders means a copied link.
+    if (!leadColumns.includes('click_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN click_hash TEXT');
     const markColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(spam_marks)').toArray().map((c) => c.name);
     if (!markColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE spam_marks ADD COLUMN fp_hash TEXT');
     const partnerColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(partner_leads)').toArray().map((c) => c.name);
@@ -334,6 +338,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const ipHash = await this.hash(input.ip);
     const deviceHash = input.device ? await this.hash(`device:${input.device}`) : null;
     const fpHash = input.fingerprint ? await this.hash(`fp:${input.fingerprint}`) : null;
+    const clickHash = input.click ? await this.hash(`click:${input.click}`) : null;
     const { now } = input;
 
     // Everything below runs without awaiting, so no other order can interleave with it.
@@ -362,14 +367,21 @@ export class LeadRegistry extends DurableObject<Env> {
 
     // Operators marked an earlier order from this network or device as spam: say so on this one.
     input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)] };
+    // Meta makes a new fbclid for every ad click, so the same one behind an earlier order from another
+    // number means the link was copied from an address bar (a real customer forwarding it looks the
+    // same): a warning, never a refusal.
+    if (clickHash && this.sql.exec('SELECT 1 FROM leads WHERE click_hash = ? AND at > ? LIMIT 1', clickHash, now - 30 * DAY).toArray().length) {
+      input = { ...input, flags: [...input.flags, 'reused_click'] };
+    }
 
     const leadId = this.sql
       .exec<{ id: number }>(
-        'INSERT INTO leads (phone_hash, ip_hash, device_hash, fp_hash, at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+        'INSERT INTO leads (phone_hash, ip_hash, device_hash, fp_hash, click_hash, at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
         phoneHash,
         ipHash,
         deviceHash,
         fpHash,
+        clickHash,
         now,
       )
       .one().id;
