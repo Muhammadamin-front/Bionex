@@ -1,6 +1,6 @@
 // The main site: the original page (the one the partner site also shows) plus what makes it
 // believable — real customers' video messages and the product's state certificate, right under
-// the first form. The media live only on the Mac that deploys (.gitignore): the public repo never
+// the first form (above it since 2026-10-28). The media live only on the Mac that deploys (.gitignore): the public repo never
 // carries customers' faces. A missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';

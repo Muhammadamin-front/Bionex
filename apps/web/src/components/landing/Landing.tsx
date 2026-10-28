@@ -20,7 +20,7 @@ import {
 } from './Sections';
 
 /**
- * `proof`: what the main site adds under the first form (real customers' videos, the certificate).
+ * `proof`: what the main site adds above the first form (real customers' videos, the certificate).
  * The partner site passes nothing, so its page stays exactly as it was.
  */
 export function Landing({ proof }: { proof?: ReactNode } = {}) {
@@ -72,8 +72,10 @@ export function Landing({ proof }: { proof?: ReactNode } = {}) {
             the illness and the product, so they are ready to order: the form comes first and
             the symptom check stays right below it for whoever still needs convincing. */}
         <Hero />
-        <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+        {/* Main site: the proof between the product and the form, so whoever scrolls on undecided
+            meets the videos and the certificate first and the form right under them. */}
         {proof}
+        <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
         <Symptoms />
         <Promises />
         <Risks />
