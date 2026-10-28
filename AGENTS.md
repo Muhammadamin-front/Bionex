@@ -253,6 +253,16 @@ user's Mac.
     text, with the «Spam» routing, is `docs/main-sheet-script.js`. Fix is in the script, not the Worker. `/spam N qayta` forgets `spam_exported` for those days
     and writes them again (after the wrong rows are deleted by hand).
 
+27. **The main Pixel's stray browser `Lead` was a Meta-side rule, not our code** (2026-10-28):
+    Events Manager → dataset → Settings → Automatic events → Manage events had a rule «Added by
+    Automatic events» (made 2026-10-23 16:30, `estRules` in the Pixel's config, rule_id
+    1006464389144185): a click on a button whose text contains «батафсил маълумот олиш» (our submit
+    button) → `Lead` (`es=automatic`, `cd[cs_est]=true`, `est_source`). It sent a Lead for every
+    click, bots included, beside the sheet-confirmed CAPI Lead; `autoConfig=false` does not stop it.
+    The owner deleted it; the config at connect.facebook.net/signals/config/1109358048693673 no
+    longer has `estRules`, and a test submit (Meta requests intercepted, never sent) shows only
+    PageView + InitiateCheckout. Check that config first if browser Leads ever come back.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
