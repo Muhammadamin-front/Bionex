@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrderResult } from '../../components/landing/OrderForm';
-import { OrderModal } from '../../components/landing/OrderModal';
 import { initPixel } from '../../lib/pixel';
 import { captureUtm } from '../../lib/utm';
 import { Doctor } from './Doctor';
@@ -69,7 +68,9 @@ export function Landing() {
       </main>
       <Footer />
       <StickyCta visible={!typing} quickFormOnScreen={quickVisible && !order} />
-      <OrderModal utm={utm} order={order} onOrdered={setOrder} />
+      {/* No order dialog on arrival (owner, 2026-10-28): the form is already on the first screen
+          (Hero), and a dialog over it asked for a number before the page could be read. The
+          partner site's page still opens it (components/landing/Landing.tsx). */}
     </>
   );
 }
