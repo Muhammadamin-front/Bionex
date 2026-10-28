@@ -248,8 +248,9 @@ user's Mac.
     group; re-running is harmless. Orders that already sit in «Lidlar» are not removed (delete by hand).
     The partner sheet is separate and unchanged (#23).
     2026-10-28: the first `/spam 3` rows landed in «Lidlar», not «Spam»: the main spreadsheet's Apps
-    Script is NOT the one in docs/PARTNER-SITE.md (it ignores `data.sheet`; the owner has not shown it
-    yet). Fix is in the script, not the Worker. `/spam N qayta` forgets `spam_exported` for those days
+    Script is NOT the one in docs/PARTNER-SITE.md (it ignored `data.sheet`, skips «Belgi» in «Lidlar», and
+    also sends its own QualifiedLead to the main Pixel when «Holat» = «Kerakli»). Its full current
+    text, with the «Spam» routing, is `docs/main-sheet-script.js`. Fix is in the script, not the Worker. `/spam N qayta` forgets `spam_exported` for those days
     and writes them again (after the wrong rows are deleted by hand).
 
 ## Open items
