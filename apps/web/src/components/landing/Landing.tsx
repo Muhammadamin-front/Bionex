@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { initPixel } from '../../lib/pixel';
 import { captureUtm } from '../../lib/utm';
 import { Hero, Promises, QuickOrder } from './Hero';
@@ -19,7 +19,11 @@ import {
   Usage,
 } from './Sections';
 
-export function Landing() {
+/**
+ * `proof`: what the main site adds under the first form (real customers' videos, the certificate).
+ * The partner site passes nothing, so its page stays exactly as it was.
+ */
+export function Landing({ proof }: { proof?: ReactNode } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
@@ -69,6 +73,7 @@ export function Landing() {
             the symptom check stays right below it for whoever still needs convincing. */}
         <Hero />
         <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+        {proof}
         <Symptoms />
         <Promises />
         <Risks />

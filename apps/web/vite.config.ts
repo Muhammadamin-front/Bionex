@@ -175,18 +175,19 @@ const MAIN_FAVICON =
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  // MAIN_DESIGN=old: the main site keeps its previous look (the original page, the one the
-  // partner site also uses) while everything else ships — the owner's way to deploy the
-  // Worker and the form fixes before publishing the new design (npm run deploy:old-design).
-  const oldPage = mode === 't2' || process.env.MAIN_DESIGN === 'old';
+  // The main site is the original page again, with real customers' videos and the certificate
+  // (src/sites/classic, owner 2026-10-28). MAIN_DESIGN=oromgoh builds the light-blue «Оромгоҳ»
+  // design instead (npm run deploy:oromgoh). The partner site is always the original page.
+  const oromgoh = mode !== 't2' && process.env.MAIN_DESIGN === 'oromgoh';
+  const site = mode === 't2' ? './src/sites/partner.tsx' : oromgoh ? './src/sites/main/index.tsx' : './src/sites/classic/index.tsx';
   // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
-    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(oldPage ? [] : [mainSiteHead()])],
+    plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(oromgoh ? [mainSiteHead()] : [])],
     resolve: {
       // Each site is its own tree: the partner build never even sees the main site's page.
       alias: {
-        '#site': fileURLToPath(new URL(oldPage ? './src/sites/partner.tsx' : './src/sites/main/index.tsx', import.meta.url)),
+        '#site': fileURLToPath(new URL(site, import.meta.url)),
       },
     },
     server: {

@@ -37,7 +37,7 @@ npm test --workspace=@bionex/worker      # 86 tests, Miniflare
 npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
-npm run deploy:old-design --workspace=@bionex/worker  # OLD look — do NOT offer; the owner wants the new design live
+npm run deploy:oromgoh --workspace=@bionex/worker    # the light-blue «Оромгоҳ» design instead (see #28)
 ```
 `apps/web/.env.production` and `apps/web/.env.t2` are gitignored (values are public: Turnstile
 site key, site URL, Pixel id, `VITE_META_BROWSER_LEAD=1` for t2). They exist only on the
@@ -262,6 +262,19 @@ user's Mac.
     The owner deleted it; the config at connect.facebook.net/signals/config/1109358048693673 no
     longer has `estRules`, and a test submit (Meta requests intercepted, never sent) shows only
     PageView + InitiateCheckout. Check that config first if browser Leads ever come back.
+
+28. **Main site back to the original page, with real proof** (2026-10-28, owner's request: many
+    landing page views, few leads): the main build's `#site` is now `src/sites/classic/index.tsx` —
+    the original page (`components/landing/Landing.tsx`, popup included, as on 24–25 Oct) plus a
+    `proof` section under the first form: three real customers' Telegram video messages
+    (cropped square, re-encoded ~2.5 MB each, `preload="none"` + poster) and the Ministry of Health
+    sanitary-epidemiological certificate № 482583 for «Зейнара» (valid to 29.07.2028; it states
+    safety, not efficacy — keep the wording to that). The media sit in
+    `src/sites/classic/media/` (gitignored: only on the deploying Mac; a missing file hides its
+    part). `Landing` gained an optional `proof` prop; the partner build passes none and contains no
+    media. The «Оромгоҳ» design stays in the tree: `MAIN_DESIGN=oromgoh` / `npm run deploy:oromgoh`
+    (only then is `mainSiteHead` applied). #19's `deploy:old-design` is gone; #16's design is no
+    longer the default.
 
 ## Open items
 

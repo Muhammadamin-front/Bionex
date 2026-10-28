@@ -26,3 +26,6 @@ google-credentials*.json
 **/.impeccable/build/
 # The doctor photo stays on the Mac that deploys; the public repo never carries it.
 apps/web/src/sites/main/photos/doctor.*
+
+# Real customers' review videos and the product certificate: deployed from this Mac, never in the public repo.
+apps/web/src/sites/classic/media/
