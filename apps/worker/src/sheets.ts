@@ -38,6 +38,8 @@ export interface SheetOrder {
 }
 
 const SHEET = 'Lidlar';
+/** The main spreadsheet's second tab: suspect orders (registry.ts MAIN_SPAM_SHEET_FLAGS) live here, never in «Lidlar». The script makes the tab on first use. */
+export const SPAM_SHEET = 'Spam';
 const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma', 'Tafsilot'];
 
 /** The same warnings the operators' group shows, for the people ringing from the sheet. */
@@ -118,7 +120,8 @@ export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ numb
   }
 }
 
-export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder): Promise<void> {
+/** Appends the order to `tab`; true only when the sheet answered «ok». */
+export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder, tab: string = SHEET): Promise<boolean> {
   const row = [
     order.number,
     tashkentTime(order.at),
@@ -139,12 +142,14 @@ export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder): Prom
     const res = await fetch(cfg.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ secret: cfg.secret, sheet: SHEET, headers: HEADERS, row }),
+      body: JSON.stringify({ secret: cfg.secret, sheet: tab, headers: HEADERS, row }),
       signal: AbortSignal.timeout(10_000),
     });
     const text = (await res.text()).trim();
-    if (!res.ok || text !== 'ok') console.error(`Google Sheets refused order ${order.number} (${res.status} ${text.slice(0, 40)})`);
+    if (res.ok && text === 'ok') return true;
+    console.error(`Google Sheets refused order ${order.number} (${res.status} ${text.slice(0, 40)})`);
   } catch (err) {
     console.error('Google Sheets unreachable', (err as Error)?.message);
   }
+  return false;
 }

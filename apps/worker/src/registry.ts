@@ -4,10 +4,11 @@ import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
-import { sendSheetOrder, sheetsConfig } from './sheets';
+import { sendSheetOrder, SPAM_SHEET, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import {
   callTelegram,
+  flagsInMessage,
   formatLead,
   batchTitle,
   formatList,
@@ -62,6 +63,15 @@ const TRAP_FLAGS = ['honeypot', 'bot_trap'];
  * and the owner's own test failed. Sheet only: the partner's Meta Lead rule (TRAP_FLAGS) is unchanged.
  */
 const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
+/**
+ * The main site's orders that go to the «Spam» tab of its spreadsheet instead of «Lidlar»
+ * (owner, 2026-10-28): bot traps, a failed "not a robot" check, a device marked spam before. One
+ * place for each order, never both. «Holat» is read from «Lidlar» only, so nothing here reaches Meta
+ * until a person copies the row into «Lidlar» (with its №) and sets «Sotildi» / «Kerakli».
+ */
+const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device'];
+/** Rows of «/spam N» written per run; the rest follow on the 5-minute cron (the Worker's request time is short). */
+const SPAM_EXPORT_BATCH = 12;
 /**
  * The call outcomes that make an order worth reporting to Meta as a Lead: the operator got
  * through to a real person who gave an answer. "Спам" is the opposite of one, so it is never
@@ -270,6 +280,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('details')) this.sql.exec('ALTER TABLE list_items ADD COLUMN details TEXT');
     // Main-site bot/spam orders: in the table but kept out of the panel and lists (see accept).
     if (!listColumns.includes('hidden')) this.sql.exec('ALTER TABLE list_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+    // Orders already written to the «Spam» tab (live or by «/spam N»), so none is written twice.
+    this.sql.exec('CREATE TABLE IF NOT EXISTS spam_exported (lead_id INTEGER PRIMARY KEY)');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS partner_leads (
@@ -433,12 +445,14 @@ export class LeadRegistry extends DurableObject<Env> {
     // The order first, then (if it completed one) the list under it.
     this.enqueue(text, { leadId, now, thread: 'leads' });
     // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
-    // numbered like the Telegram order. Only the bot traps stay out of it (TRAP_FLAGS) —
-    // the owner's rule: a real customer can fail every other check (see acceptPartner).
+    // numbered like the Telegram order. A suspect order (MAIN_SPAM_SHEET_FLAGS) goes to its «Spam»
+    // tab, every other one to «Lidlar» — never both.
     const sheet = sheetsConfig(this.env, 'main');
-    if (sheet && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
-      this.ctx.waitUntil(
-        sendSheetOrder(sheet, {
+    if (sheet) {
+      const suspect = input.flags.some((f) => MAIN_SPAM_SHEET_FLAGS.includes(f));
+      const sent = sendSheetOrder(
+        sheet,
+        {
           number: leadId,
           at: now,
           fullName: input.fullName,
@@ -449,8 +463,11 @@ export class LeadRegistry extends DurableObject<Env> {
           flags: input.flags,
           model: input.model,
           details: input.details?.latn,
-        }),
+        },
+        suspect ? SPAM_SHEET : undefined,
       );
+      // Written once: «/spam N» skips what the live path has already put in the tab.
+      this.ctx.waitUntil(sent.then((ok) => suspect && ok && this.sql.exec('INSERT OR IGNORE INTO spam_exported (lead_id) VALUES (?)', leadId)));
     }
     if (list?.full) this.sendList(now);
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
@@ -612,6 +629,73 @@ export class LeadRegistry extends DurableObject<Env> {
   /** Messages Telegram has not accepted yet (0 when all is well). */
   async queued(): Promise<number> {
     return this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM outbox').one().n;
+  }
+
+  /**
+   * «/spam N» in the group: copies the last N days' suspect orders (MAIN_SPAM_SHEET_FLAGS, read back
+   * from each order's saved group message) into the «Spam» tab. A batch now, the rest on every
+   * 5-minute cron tick (`continueSpamExport`). An order already in the tab is skipped, so running it
+   * again is harmless. Orders that went to «Lidlar» earlier stay there; delete those rows by hand.
+   */
+  async startSpamExport(days: number, now: number): Promise<string> {
+    if (!sheetsConfig(this.env, 'main')) return '⚠️ Google жадвал уланмаган (SHEETS_URL, SHEETS_SECRET).';
+    const since = now - Math.min(Math.max(Math.round(days) || 3, 1), 30) * DAY;
+    this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('spam_export_since', ?)", String(since));
+    this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('spam_export_total', '0')");
+    const r = await this.exportSpamBatch(since);
+    if (r.failed) return '⚠️ Google жадвал жавоб бермади. 5 дақиқадан кейин ўзи қайта уриниб кўради.';
+    if (r.left > 0) return `📤 «Spam» варағига ${r.sent} та ёзилди, яна ${r.left} таси 5 дақиқада ёзилади.`;
+    this.sql.exec("DELETE FROM meta WHERE k IN ('spam_export_since', 'spam_export_total')");
+    return `✅ «Spam» варағига ${r.sent} та буюртма ёзилди.`;
+  }
+
+  /** The 5-minute cron: the next batch of a «/spam N» that is not finished; tells the group when it is. */
+  async continueSpamExport(now: number): Promise<void> {
+    const since = Number(this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'spam_export_since'").toArray()[0]?.v);
+    if (!since) return;
+    const r = await this.exportSpamBatch(since);
+    if (r.failed || r.left > 0) return;
+    const total = Number(this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'spam_export_total'").toArray()[0]?.v ?? 0);
+    this.sql.exec("DELETE FROM meta WHERE k IN ('spam_export_since', 'spam_export_total')");
+    await this.notify(`✅ «Spam» варағига кўчириш тугади: жами ${total} та буюртма ёзилди.`, now);
+  }
+
+  private async exportSpamBatch(since: number): Promise<{ sent: number; left: number; failed: boolean }> {
+    const cfg = sheetsConfig(this.env, 'main');
+    if (!cfg) return { sent: 0, left: 0, failed: true };
+    const rows = this.sql
+      .exec<{
+        lead_id: number;
+        name: string;
+        phone: string;
+        at: number;
+        msg_html: string;
+        campaign: string | null;
+        adset: string | null;
+        ad: string | null;
+        device: string | null;
+        details: string | null;
+      }>(
+        'SELECT lead_id, name, phone, at, msg_html, campaign, adset, ad, device, details FROM list_items WHERE at > ? AND msg_html IS NOT NULL AND lead_id NOT IN (SELECT lead_id FROM spam_exported) ORDER BY at ASC',
+        since,
+      )
+      .toArray()
+      .map((r) => ({ r, flags: flagsInMessage(r.msg_html) }))
+      .filter(({ flags }) => flags.some((f) => MAIN_SPAM_SHEET_FLAGS.includes(f)));
+    let sent = 0;
+    for (const { r, flags } of rows.slice(0, SPAM_EXPORT_BATCH)) {
+      const ok = await sendSheetOrder(
+        cfg,
+        { number: r.lead_id, at: r.at, fullName: r.name, phone: r.phone, campaign: r.campaign, adset: r.adset, ad: r.ad, flags, model: r.device ?? undefined, details: r.details ?? undefined },
+        SPAM_SHEET,
+      );
+      if (!ok) return { sent, left: rows.length - sent, failed: true };
+      this.sql.exec('INSERT OR IGNORE INTO spam_exported (lead_id) VALUES (?)', r.lead_id);
+      sent++;
+    }
+    const total = Number(this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'spam_export_total'").toArray()[0]?.v ?? 0) + sent;
+    this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('spam_export_total', ?)", String(total));
+    return { sent, left: rows.length - sent, failed: false };
   }
 
   /** Retries messages that could not be delivered earlier. */
@@ -1222,6 +1306,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM lead_status WHERE created_at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM spam_marks WHERE at < ?', now - 30 * DAY);
+    this.sql.exec('DELETE FROM spam_exported WHERE lead_id NOT IN (SELECT lead_id FROM list_items)');
     this.sql.exec('DELETE FROM partner_leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM bot_sessions WHERE updated_at < ?', now - DAY);
     // Never marked, and now too old for Meta to accept: there is nothing left to send.

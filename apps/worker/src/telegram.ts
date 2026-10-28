@@ -109,6 +109,13 @@ const FLAG_TEXT: Record<string, string> = {
   likely_bot: 'Instagram/Facebook орқали эмас — бот эҳтимоли бор (одам ҳам бўлиши мумкин)',
 };
 
+/** The flags an order's group message carried, read back from its saved text (for orders from before the flags were kept apart). */
+export function flagsInMessage(html: string): string[] {
+  return Object.entries(FLAG_TEXT)
+    .filter(([, text]) => html.includes(text))
+    .map(([flag]) => flag);
+}
+
 export function formatLead(lead: LeadMessage): string {
   const lines = [
     `🆕 <b>Янги буюртма №${lead.number}</b>`,
@@ -160,6 +167,7 @@ export const HELP_TEXT = [
   '/holat — бот ишлаяптими, рўйхатда нечта буюртма бор',
   '/hisobot — бугунги ҳисобот (ҳар куни 20:00 да ўзи ҳам келади)',
   '/panel — операторлар панели: барча буюртмалар, статистика, спам',
+  '/spam 3 — охирги 3 кундаги спам ва текширувдан ўтмаган буюртмаларни Google жадвалдаги «Spam» варағига кўчириш',
   '',
   'Ҳар буюртма остида: «📞 Мен оламан» → қўнғироқдан кейин «✅ Сотилди», «❌ Рад этди», «🔁 Кўтармади» ёки «⏰ Кейинроқ».',
   '⏰ Кейинроқ — мижоз гаплашди, лекин «ҳозир вақтим йўқ» деди. Кейин қайта қўнғироқ қилиб, натижани белгилаб қўйинг.',

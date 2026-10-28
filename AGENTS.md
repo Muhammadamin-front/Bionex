@@ -235,6 +235,19 @@ user's Mac.
     and is hidden as before. The partner site is unchanged: any filled decoy is a trap there. A bot
     that fakes human `signals` and fills a decoy now reaches the sheet (the repo is public).
 
+26. **Main site: suspect orders go to a «Spam» tab** (2026-10-28, owner's request «tekshiruvdan o'ta
+    olmagan spam, bot barchasini alohida sheetsga», chosen: failed check included, as a new tab of
+    the same spreadsheet): `MAIN_SPAM_SHEET_FLAGS` = `TRAP_FLAGS` + `no_captcha` + `likely_bot` +
+    `spam_device`. Such an order is written to tab «Spam» (the Apps Script makes it on first use),
+    every other to «Lidlar» — never both; Telegram/panel are unchanged. «Holat» is read from «Lidlar»
+    only, so nothing in «Spam» reaches Meta unless a person copies the row (with its №) into «Lidlar»
+    and sets «Sotildi»/«Kerakli» (the `meta_pending` row exists for non-trap orders). `spam_exported`
+    remembers what is already in the tab. **`/spam N`** in the operators' group (default 3 days, max 30)
+    copies earlier suspect orders back from `list_items.msg_html` (flags read with `flagsInMessage`),
+    12 per run and the rest on every 5-minute cron tick (`continueSpamExport`), then says so in the
+    group; re-running is harmless. Orders that already sit in «Lidlar» are not removed (delete by hand).
+    The partner sheet is separate and unchanged (#23).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

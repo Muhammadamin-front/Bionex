@@ -36,7 +36,7 @@ const meta = {
 };
 
 /** Fake Apps Script web app of the partner's Google Sheet: every row it was sent, and its «Holat» column. */
-const sheets = { rows: [] as Array<Record<string, any>>, statuses: [] as Array<[unknown, unknown]> };
+const sheets = { rows: [] as Array<Record<string, any>>, statuses: [] as Array<[unknown, unknown]>, refuse: false };
 
 async function outbound(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -51,6 +51,7 @@ async function outbound(request: Request): Promise<Response> {
     const body = (await request.json()) as Record<string, any>;
     if (body.secret !== 'sheet-secret') return new Response('forbidden');
     if (body.action === 'statuses') return Response.json(sheets.statuses);
+    if (sheets.refuse) return new Response('error');
     sheets.rows.push(body);
     return new Response('ok');
   }
@@ -175,6 +176,7 @@ beforeEach(async () => {
   meta.paths = [];
   sheets.rows = [];
   sheets.statuses = [];
+  sheets.refuse = false;
 });
 
 afterAll(async () => {
@@ -1022,13 +1024,39 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await quiet()).toHaveLength(2);
     });
 
-    it('keeps bot-trap orders out of the sheet, and takes failed checks with «!»', async () => {
+    it('puts bot traps and failed checks in the «Spam» tab, and only clean orders in «Lidlar»', async () => {
+      await order({ fullName: 'Тоза Киши', phone: '+998 90 312 45 44' }, { ip: '203.0.113.44' });
       await order({ fullName: 'Тузоқ Киши', signals: { touch: 5, taps: 0, keys: 9 } }, { ip: '203.0.113.46' });
-      await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47' });
-      for (let i = 0; i < 50 && sheets.rows.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
+      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47' });
+      for (let i = 0; i < 50 && sheets.rows.length < 3; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));
-      expect(sheets.rows.map((r) => r.row[2])).toEqual(['Шубҳали Киши']);
-      expect(sheets.rows[0]!.row[7]).toMatch(/^! /);
+      const inTab = (tab: string) => sheets.rows.filter((r) => r.sheet === tab).map((r) => r.row[2]);
+      expect(inTab('Lidlar')).toEqual(['Тоза Киши']);
+      expect(inTab('Spam').sort()).toEqual(['Текширув Киши', 'Тузоқ Киши']);
+      expect(sheets.rows.find((r) => r.row[2] === 'Текширув Киши')!.row[7]).toMatch(/^! /);
+      // The operators still hear of every one of them.
+      expect(leadMessages()).toHaveLength(3);
+    });
+
+    it('«/spam N» copies earlier suspect orders into the «Spam» tab once, and says so in the group', async () => {
+      // The sheet is down when they arrive: nothing is written, so «/spam» has something to copy.
+      sheets.refuse = true;
+      await order({ fullName: 'Тузоқ Киши', contactFax: 'x' }, { ip: '203.0.113.61' });
+      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 62', turnstileToken: 'bad' }, { ip: '203.0.113.62' });
+      await order({ fullName: 'Тоза Киши', phone: '+998 90 312 45 63' }, { ip: '203.0.113.63' });
+      await new Promise((r) => setTimeout(r, 100));
+      expect(sheets.rows).toHaveLength(0);
+      sheets.refuse = false;
+      await hook({ message: { message_id: 9, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/spam 3' } });
+      expect(sheets.rows.map((r) => [r.sheet, r.row[0], r.row[2]])).toEqual([
+        ['Spam', 1, 'Тузоқ Киши'],
+        ['Spam', 2, 'Текширув Киши'],
+      ]);
+      expect(telegram.messages.at(-1)!.text).toContain('2 та буюртма ёзилди');
+      // Again: nothing is written twice.
+      await hook({ message: { message_id: 10, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/spam 3' } });
+      expect(sheets.rows).toHaveLength(2);
+      expect(telegram.messages.at(-1)!.text).toContain('0 та буюртма ёзилди');
     });
 
     it('takes a decoy filled with human signs into the sheet with its warning, and lets «Sotildi» report it', async () => {
@@ -1036,8 +1064,11 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       await order({ fullName: 'Дастурий Киши', phone: '+998 90 312 45 54', contactFax: 'x' }, { ip: '203.0.113.54' });
       for (let i = 0; i < 50 && sheets.rows.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));
-      expect(sheets.rows.map((r) => r.row[2])).toEqual(['Автотўлдирган Киши']);
-      expect(sheets.rows[0]!.row[7]).toContain("avto-to'ldirish bo'lishi mumkin");
+      const lidlar = sheets.rows.filter((r) => r.sheet === 'Lidlar');
+      expect(lidlar.map((r) => r.row[2])).toEqual(['Автотўлдирган Киши']);
+      expect(lidlar[0]!.row[7]).toContain("avto-to'ldirish bo'lishi mumkin");
+      // The one a program sent goes to the «Spam» tab.
+      expect(sheets.rows.filter((r) => r.sheet === 'Spam').map((r) => r.row[2])).toEqual(['Дастурий Киши']);
       await mark(1, 'Sotildi');
       expect(await settled()).toHaveLength(1);
     });

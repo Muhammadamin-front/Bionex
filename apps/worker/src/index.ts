@@ -104,6 +104,7 @@ export default {
     if (controller.cron === PARTNER_SHEET_CRON) {
       ctx.waitUntil(syncPartnerSheet(env, Date.now()));
       ctx.waitUntil(syncMainSheet(env, Date.now()));
+      ctx.waitUntil(env.REGISTRY.get(env.REGISTRY.idFromName('main')).continueSpamExport(Date.now()));
       return;
     }
     if (env.TELEGRAM_DRY_RUN !== '1' && !(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)) return;
@@ -339,7 +340,10 @@ async function telegramCommand(request: Request, env: Env, origin: string): Prom
     if (command === 'royxat' || command === 'list') await registry.listNow(now, thread);
     else if (command === 'holat' || command === 'status') await registry.reportStatus(now, thread);
     else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now, thread);
-    else if (command === 'panel' || command === 'crm') await sendPanelButton(env, Number(message.chat.id), thread);
+    else if (command === 'spam') {
+      const days = Number(/^\/spam\S*\s+(\d+)/i.exec(message.text?.trim() ?? '')?.[1] ?? 3);
+      await registry.notify(await registry.startSpamExport(days, now), now, thread);
+    } else if (command === 'panel' || command === 'crm') await sendPanelButton(env, Number(message.chat.id), thread);
     else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now, thread);
   } catch (err) {
     console.error('Telegram command failed', (err as Error)?.message);
