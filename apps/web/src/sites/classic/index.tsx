@@ -4,6 +4,7 @@
 // carries customers' faces. A missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
+import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
@@ -25,6 +26,110 @@ const videos = [
   .filter((v): v is typeof v & { src: string } => Boolean(v.src));
 const certificate = { full: file('certificate.jpg'), small: file('certificate-small.jpg') };
 
+/**
+ * The videos play by themselves once the row is on screen, one after another (owner, 2026-10-28):
+ * muted, as browsers allow nothing else without a tap — «Овозни ёқиш» turns the sound on, and it
+ * stays on for the next ones; after the last one it stops. Off the screen it pauses. Never on a data saver or for someone who
+ * asked the phone for less motion.
+ */
+function VideoRow() {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const refs = useRef<Array<HTMLVideoElement | null>>([]);
+  const [current, setCurrent] = useState(0);
+  const [sound, setSound] = useState(false);
+  const [onScreen, setOnScreen] = useState(false);
+  const [auto] = useState(() => {
+    try {
+      const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+      return !saveData && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || !auto || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setOnScreen(Boolean(e && e.intersectionRatio >= 0.5)), { threshold: [0, 0.5] });
+    io.observe(row);
+    return () => io.disconnect();
+  }, [auto]);
+
+  // The current one plays while the row is on screen; every other one is paused.
+  useEffect(() => {
+    refs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i !== current || !onScreen) {
+        if (!v.paused) v.pause();
+        return;
+      }
+      v.muted = !sound;
+      v.play().catch(() => {
+        // Sound refused without a tap (iPhone): carry on muted.
+        if (!v.muted) {
+          v.muted = true;
+          setSound(false);
+          v.play().catch(() => undefined);
+        }
+      });
+    });
+    // `sound` is read, not watched: turning it on must not restart the video.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, onScreen]);
+
+  // Bring the playing one into the row's view (phones swipe sideways; the page itself never moves).
+  useEffect(() => {
+    const row = rowRef.current;
+    const v = refs.current[current]?.parentElement;
+    if (row && v && row.scrollWidth > row.clientWidth) row.scrollTo({ left: v.offsetLeft - row.offsetLeft - 16, behavior: 'smooth' });
+  }, [current]);
+
+  const turnSoundOn = () => {
+    const v = refs.current[current];
+    setSound(true);
+    if (v) {
+      v.muted = false;
+      v.play().catch(() => undefined);
+    }
+  };
+
+  return (
+    <div ref={rowRef} className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0">
+      {videos.map((v, i) => (
+        <figure key={v.src} className="relative w-[78%] flex-none snap-center overflow-hidden rounded-3xl bg-card shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:w-auto">
+          {/* preload="none": nothing is downloaded until it is its turn or someone presses play. */}
+          <video
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            className={`block aspect-[3/4] w-full bg-ink ${v.fit}`}
+            src={v.src}
+            poster={v.poster}
+            controls
+            playsInline
+            muted
+            preload="none"
+            aria-label={`Мижоз фикри ${i + 1}`}
+            onPlay={() => setCurrent(i)}
+            onEnded={() => i === current && i + 1 < videos.length && setCurrent(i + 1)}
+            onVolumeChange={(e) => i === current && setSound(!e.currentTarget.muted)}
+          />
+          {auto && i === current && onScreen && !sound && (
+            <button
+              type="button"
+              onClick={turnSoundOn}
+              className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-ink/80 px-4 py-2 text-[0.95rem] font-bold text-white backdrop-blur-sm"
+            >
+              🔊 Овозни ёқиш
+            </button>
+          )}
+          <figcaption className="px-5 py-3 text-[0.95rem] text-muted">Мижоз фикри · {v.length}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 function Proof() {
   if (!videos.length && !certificate.full) return null;
   return (
@@ -36,17 +141,7 @@ function Proof() {
               Мижозларимиз ўз овози билан
             </h2>
             <p className="mt-3 max-w-2xl text-lg text-ink-2">Зейнарани ичган мижозларимиз ўзлари айтиб беради.</p>
-            {/* On a phone one row to swipe through (six stacked videos would bury the rest of the
-                page); from sm up a grid. */}
-            <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0">
-              {videos.map((v, i) => (
-                <figure key={v.src} className="w-[78%] flex-none snap-center overflow-hidden rounded-3xl bg-card shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:w-auto">
-                  {/* preload="none": nothing is downloaded until the visitor presses play. */}
-                  <video className={`block aspect-[3/4] w-full bg-ink ${v.fit}`} src={v.src} poster={v.poster} controls playsInline preload="none" aria-label={`Мижоз фикри ${i + 1}`} />
-                  <figcaption className="px-5 py-3 text-[0.95rem] text-muted">Мижоз фикри · {v.length}</figcaption>
-                </figure>
-              ))}
-            </div>
+            <VideoRow />
             {videos.length > 1 && <p className="mt-2 text-[0.95rem] text-muted sm:hidden">← Бошқа видеоларни кўриш учун суринг →</p>}
             <p className="mt-5 text-[0.95rem] text-muted">Натижалар ҳар бир инсонда турлича бўлиши мумкин.</p>
           </>

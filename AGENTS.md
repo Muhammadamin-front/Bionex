@@ -270,7 +270,10 @@ user's Mac.
     box in hand (`story-1..3`, 9:16 at 540×960, 2–8.5 MB) and three Telegram video messages
     (`review-1..3`, cropped square, ~2.5 MB), one swipeable row on phones, `preload="none"` + poster. Videos are built into
     `/video/` and served by the Worker with byte ranges (`src/video.ts`, `run_worker_first`): static assets
-    answer Range with 200, and iPhone Safari / the Instagram app on iOS then plays nothing and the Ministry of Health
+    answer Range with 200, and iPhone Safari / the Instagram app on iOS then plays nothing. `VideoRow` autoplays
+    (owner's request): muted once the row is ≥50% on screen, next one on `ended` (stops after the last),
+    pauses off screen; «🔊 Овозни ёқиш» turns sound on for the rest; no autoplay on data saver or
+    prefers-reduced-motion and the Ministry of Health
     sanitary-epidemiological certificate № 482583 for «Зейнара» (valid to 29.07.2028; it states
     safety, not efficacy — keep the wording to that). The media sit in
     `src/sites/classic/media/` (gitignored: only on the deploying Mac; a missing file hides its
