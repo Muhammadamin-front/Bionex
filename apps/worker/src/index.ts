@@ -195,7 +195,13 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
 
     // 3. Signals for the operators; they do not block the order.
     const flags: string[] = [];
-    if (data[HONEYPOT_FIELD]?.trim()) flags.push('honeypot');
+    if (data[HONEYPOT_FIELD]?.trim()) {
+      // Main site: a decoy filled by a browser that shows human signs (a real touch, no program
+      // mark) may be a person whose autofill filled it — a warning, not a trap (owner, 2026-10-28).
+      // No signals at all (a direct post to the API) or any program sign stays a trap. The partner
+      // site keeps its rule: any filled decoy is a trap.
+      flags.push(site === 'main' && data.signals && !caughtByBotTrap(data.signals) ? 'decoy_filled' : 'honeypot');
+    }
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     if (!check.ok) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a

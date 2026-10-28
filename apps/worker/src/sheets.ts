@@ -44,6 +44,7 @@ const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video'
 const FLAG_TEXT: Record<string, string> = {
   honeypot: "bot bo'lishi mumkin",
   bot_trap: "bot tuzog'iga tushdi",
+  decoy_filled: "yashirin maydon to'ldirilgan, lekin dastur belgisi yo'q (avto-to'ldirish bo'lishi mumkin, odam ham bo'lishi mumkin)",
   phone_pattern: "raqam soxtaga o'xshaydi",
   reused_click: "shu reklama bosilishi avval boshqa raqamdan ishlatilgan (havola ko'chirilgan bo'lishi mumkin)",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",

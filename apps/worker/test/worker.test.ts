@@ -199,6 +199,18 @@ describe('a new order', () => {
     expect(leadMessages()[0]!.text).not.toContain('<b>x</b>');
   });
 
+  it('takes a filled decoy from a browser with human signs as a warning, not a trap (main site)', async () => {
+    const person = { touch: 5, taps: 3, keys: 9 };
+    await order({ contactFax: 'autofill', signals: person });
+    expect(leadMessages()[0]!.text).toMatch(/автотўлдириш бўлиши мумкин/);
+    expect(leadMessages()[0]!.text).not.toMatch(/бот бўлиши мумкин/);
+    // No signals (a direct post) or a program sign: still the trap.
+    await order({ phone: '+998 90 312 45 51', contactFax: 'x' }, { ip: '203.0.113.51' });
+    expect(leadMessages().at(-1)!.text).toMatch(/бот бўлиши мумкин/);
+    await order({ phone: '+998 90 312 45 52', contactFax: 'x', signals: { ...person, synthetic: 2 } }, { ip: '203.0.113.52' });
+    expect(leadMessages().at(-1)!.text).toMatch(/бот бўлиши мумкин/);
+  });
+
   it('flags a filled honeypot or a made-up looking number but still delivers it', async () => {
     await order({ contactFax: 'spam', phone: '+998 90 111 11 11' });
     expect(leadMessages()[0]!.text).toMatch(/бот бўлиши мумкин/);
@@ -1019,6 +1031,17 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(sheets.rows[0]!.row[7]).toMatch(/^! /);
     });
 
+    it('takes a decoy filled with human signs into the sheet with its warning, and lets «Sotildi» report it', async () => {
+      await order({ fullName: 'Автотўлдирган Киши', contactFax: 'x', signals: { touch: 5, taps: 3, keys: 9 } }, { ip: '203.0.113.53' });
+      await order({ fullName: 'Дастурий Киши', phone: '+998 90 312 45 54', contactFax: 'x' }, { ip: '203.0.113.54' });
+      for (let i = 0; i < 50 && sheets.rows.length < 1; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(sheets.rows.map((r) => r.row[2])).toEqual(['Автотўлдирган Киши']);
+      expect(sheets.rows[0]!.row[7]).toContain("avto-to'ldirish bo'lishi mumkin");
+      await mark(1, 'Sotildi');
+      expect(await settled()).toHaveLength(1);
+    });
+
     it('remembers «Keraksiz» as spam, so the next order from that phone arrives marked', async () => {
       const DEVICE = '11111111-2222-4333-8444-555555555555';
       await order({ deviceId: DEVICE }, { ip: '203.0.113.44' });
@@ -1347,6 +1370,8 @@ describe('the partner site (sites.ts t2)', () => {
 
   it('keeps only a filled hidden field out of the sheet, but still accepts it', async () => {
     // The honeypot: accepted, but the partner's people never see it.
+    // Even with human signs: the partner site keeps its rule, a filled decoy is a trap.
+    await partnerOrder({ fullName: 'Автотўлдирган Мижоз', phone: '+998 90 312 45 79', contactFax: 'x', signals: { touch: 5, taps: 3, keys: 9 } }, '203.0.113.79');
     const res = await partnerOrder({ fullName: 'Бот Буюртма', phone: '+998 90 312 45 88', contactFax: 'x' }, '203.0.113.88');
     expect(((await res.json()) as { status: string }).status).toBe('accepted');
     await new Promise((r) => setTimeout(r, 100));

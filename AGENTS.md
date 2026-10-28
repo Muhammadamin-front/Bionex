@@ -224,6 +224,17 @@ user's Mac.
     can reset learning, and a copied link repeats anyway). «reklama bosilmagan» in «Tafsilot» already
     shows orders without an ad click.
 
+25. **Autofill may fill a decoy; main site tells it from a bot** (2026-10-28, owner's worry that a
+    real customer is hidden as «honeypot»): the decoys are off-screen, not `display:none`, so
+    autofill / password managers can fill them. (a) The two decoy inputs carry `NO_AUTOFILL`
+    (`data-lpignore`, `data-1p-ignore`, `data-bwignore`, `data-form-type`). (b) `takeOrder`, **main
+    site only**: a filled decoy from a browser that sent `signals` with no program sign
+    (`!caughtByBotTrap`) becomes `decoy_filled` — a warning like `likely_bot`: it goes to the main
+    sheet, the panel and `meta_pending` (so «Sotildi» can report it). No signals (a direct API post)
+    or any program sign (webdriver, made-up click, untouched touch screen) stays `honeypot` / `bot_trap`
+    and is hidden as before. The partner site is unchanged: any filled decoy is a trap there. A bot
+    that fakes human `signals` and fills a decoy now reaches the sheet (the repo is public).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
