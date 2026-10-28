@@ -272,7 +272,9 @@ user's Mac.
     `/video/` and served by the Worker with byte ranges (`src/video.ts`, `run_worker_first`): static assets
     answer Range with 200, and iPhone Safari / the Instagram app on iOS then plays nothing. `VideoRow` autoplays
     (owner's request): muted once the row is ≥50% on screen, next one on `ended` (stops after the last),
-    pauses off screen; «🔊 Овозни ёқиш» turns sound on for the rest; no autoplay on data saver or
+    pauses off screen; with sound when `navigator.userActivation.hasBeenActive` (any earlier tap,
+    e.g. closing the order dialog), else muted with a big «🔊 Овозни ёқиш учун босинг» (sound then
+    stays on for the rest); browsers forbid sound before a tap — Playwright pages always count as tapped; no autoplay on data saver or
     prefers-reduced-motion and the Ministry of Health
     sanitary-epidemiological certificate № 482583 for «Зейнара» (valid to 29.07.2028; it states
     safety, not efficacy — keep the wording to that). The media sit in

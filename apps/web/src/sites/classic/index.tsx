@@ -28,10 +28,19 @@ const certificate = { full: file('certificate.jpg'), small: file('certificate-sm
 
 /**
  * The videos play by themselves once the row is on screen, one after another (owner, 2026-10-28):
- * muted, as browsers allow nothing else without a tap — «Овозни ёқиш» turns the sound on, and it
- * stays on for the next ones; after the last one it stops. Off the screen it pauses. Never on a data saver or for someone who
+ * with sound once the visitor has touched the page (closing the order dialog counts) — browsers
+ * allow sound only after that — else muted, with «Овозни ёқиш» to turn it on for the rest; after the last one it stops. Off the screen it pauses. Never on a data saver or for someone who
  * asked the phone for less motion.
  */
+/** The page has had a tap or a key press, so a browser lets a video play with its sound. */
+const touchedPage = () => {
+  try {
+    return Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive);
+  } catch {
+    return false;
+  }
+};
+
 function VideoRow() {
   const rowRef = useRef<HTMLDivElement>(null);
   const refs = useRef<Array<HTMLVideoElement | null>>([]);
@@ -63,15 +72,18 @@ function VideoRow() {
         if (!v.paused) v.pause();
         return;
       }
-      v.muted = !sound;
-      v.play().catch(() => {
-        // Sound refused without a tap (iPhone): carry on muted.
-        if (!v.muted) {
-          v.muted = true;
-          setSound(false);
-          v.play().catch(() => undefined);
-        }
-      });
+      const withSound = sound || touchedPage();
+      v.muted = !withSound;
+      v.play()
+        .then(() => withSound && setSound(true))
+        .catch(() => {
+          // Sound refused (an iPhone wants a tap on the video itself): carry on muted.
+          if (!v.muted) {
+            v.muted = true;
+            setSound(false);
+            v.play().catch(() => undefined);
+          }
+        });
     });
     // `sound` is read, not watched: turning it on must not restart the video.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,9 +130,9 @@ function VideoRow() {
             <button
               type="button"
               onClick={turnSoundOn}
-              className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-ink/80 px-4 py-2 text-[0.95rem] font-bold text-white backdrop-blur-sm"
+              className="absolute inset-x-0 top-1/2 mx-auto w-max -translate-y-1/2 rounded-full bg-ink/85 px-6 py-4 text-lg font-extrabold text-white shadow-lg backdrop-blur-sm"
             >
-              🔊 Овозни ёқиш
+              🔊 Овозни ёқиш учун босинг
             </button>
           )}
           <figcaption className="px-5 py-3 text-[0.95rem] text-muted">Мижоз фикри · {v.length}</figcaption>
