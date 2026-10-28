@@ -268,7 +268,9 @@ user's Mac.
     the original page (`components/landing/Landing.tsx`, popup included, as on 24–25 Oct) plus a
     `proof` section under the first form: six real customers' videos — three filmed stories with the
     box in hand (`story-1..3`, 9:16 at 540×960, 2–8.5 MB) and three Telegram video messages
-    (`review-1..3`, cropped square, ~2.5 MB), one swipeable row on phones, `preload="none"` + poster and the Ministry of Health
+    (`review-1..3`, cropped square, ~2.5 MB), one swipeable row on phones, `preload="none"` + poster. Videos are built into
+    `/video/` and served by the Worker with byte ranges (`src/video.ts`, `run_worker_first`): static assets
+    answer Range with 200, and iPhone Safari / the Instagram app on iOS then plays nothing and the Ministry of Health
     sanitary-epidemiological certificate № 482583 for «Зейнара» (valid to 29.07.2028; it states
     safety, not efficacy — keep the wording to that). The media sit in
     `src/sites/classic/media/` (gitignored: only on the deploying Mac; a missing file hides its
