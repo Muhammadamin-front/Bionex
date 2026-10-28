@@ -29,7 +29,8 @@ const certificate = { full: file('certificate.jpg'), small: file('certificate-sm
 /**
  * The videos play by themselves once the row is on screen, one after another (owner, 2026-10-28):
  * with sound once the visitor has touched the page (closing the order dialog counts) — browsers
- * allow sound only after that — else muted, with «Овозни ёқиш» to turn it on for the rest; after the last one it stops. Off the screen it pauses. Never on a data saver or for someone who
+ * allow sound only after that — else muted, with «Овозни ёқиш» to turn it on for the rest; after the last one it stops. Swiping to another video plays that one
+ * and pauses the one before. Off the screen it pauses. Never on a data saver or for someone who
  * asked the phone for less motion.
  */
 /** The page has had a tap or a key press, so a browser lets a video play with its sound. */
@@ -88,6 +89,24 @@ function VideoRow() {
     // `sound` is read, not watched: turning it on must not restart the video.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, onScreen]);
+
+  // Swiped to another video (phones): that one plays, the one before pauses. Only where the row
+  // scrolls sideways; on a wide screen every video is in view at once.
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (row.scrollWidth <= row.clientWidth) return;
+        const seen = entries.filter((e) => e.isIntersecting && e.intersectionRatio >= 0.6).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const i = seen ? refs.current.findIndex((v) => v?.parentElement === seen.target) : -1;
+        if (i >= 0) setCurrent(i);
+      },
+      { root: row, threshold: [0.6, 0.9] },
+    );
+    refs.current.forEach((v) => v?.parentElement && io.observe(v.parentElement));
+    return () => io.disconnect();
+  }, []);
 
   // Bring the playing one into the row's view (phones swipe sideways; the page itself never moves).
   useEffect(() => {

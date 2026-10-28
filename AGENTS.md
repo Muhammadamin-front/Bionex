@@ -275,7 +275,8 @@ user's Mac.
     pauses off screen; with sound when `navigator.userActivation.hasBeenActive` (any earlier tap,
     e.g. closing the order dialog), else muted with a big «🔊 Овозни ёқиш учун босинг» (sound then
     stays on for the rest); browsers forbid sound before a tap — Playwright pages always count as tapped; no autoplay on data saver or
-    prefers-reduced-motion and the Ministry of Health
+    prefers-reduced-motion. Swiping the phone row to another video plays it and pauses the
+    previous (an IntersectionObserver on the row, ≥60% visible) and the Ministry of Health
     sanitary-epidemiological certificate № 482583 for «Зейнара» (valid to 29.07.2028; it states
     safety, not efficacy — keep the wording to that). The media sit in
     `src/sites/classic/media/` (gitignored: only on the deploying Mac; a missing file hides its
