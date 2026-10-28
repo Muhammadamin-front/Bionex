@@ -22,13 +22,16 @@ import {
 /**
  * `proof`: what the main site adds above the first form (real customers' videos, the certificate).
  * `popup: false`: no order dialog on arrival (the main site — it would cover the proof).
+ * `barOverForms: false`: the bottom order bar steps aside while a form is on screen (the main site),
+ * so it can never cover the form's own button.
  * The partner site passes nothing, so its page stays exactly as it was.
  */
-export function Landing({ proof, popup = true }: { proof?: ReactNode; popup?: boolean } = {}) {
+export function Landing({ proof, popup = true, barOverForms = true }: { proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
   const [quickVisible, setQuickVisible] = useState(false);
+  const [orderVisible, setOrderVisible] = useState(false);
   /** A form field has focus: the phone keyboard is open, so the order bar steps aside. */
   const [typing, setTyping] = useState(false);
   // One order result for the whole page: once either form succeeds, both show the
@@ -59,6 +62,16 @@ export function Landing({ proof, popup = true }: { proof?: ReactNode; popup?: bo
     io.observe(el);
     return () => io.disconnect();
   }, []);
+
+  // And the bottom form, for `barOverForms: false`.
+  useEffect(() => {
+    const el = orderRef.current;
+    if (barOverForms || !el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setOrderVisible(Boolean(e?.isIntersecting)), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [barOverForms]);
+  const formOnScreen = !barOverForms && (quickVisible || orderVisible);
 
   return (
     <>
@@ -91,7 +104,7 @@ export function Landing({ proof, popup = true }: { proof?: ReactNode; popup?: bo
       </main>
       <Footer />
       {/* Always on screen (except while typing), as the owner asked. */}
-      <StickyCta visible={!typing} quickFormOnScreen={quickVisible && !order} />
+      <StickyCta visible={!typing && !formOnScreen} quickFormOnScreen={quickVisible && !order} />
       {/* Over everything: the form meets the visitor instead of waiting to be scrolled to. */}
       {popup && <OrderModal utm={utm} order={order} onOrdered={setOrder} />}
     </>

@@ -202,5 +202,6 @@ function Proof() {
 
 export function Landing() {
   // No order dialog on arrival (owner, 2026-10-28): it covered the videos before anyone saw them.
-  return <Page proof={<Proof />} popup={false} />;
+  // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
+  return <Page proof={<Proof />} popup={false} barOverForms={false} />;
 }

@@ -295,6 +295,15 @@ user's Mac.
     Orders trapped this way before the deploy sit in the «Spam» tab with «dastur bosgan ×N» and no
     «webdriver» / «ekranga tegilmagan»: worth a call.
 
+30. **The bottom order bar covered the form's submit button** (2026-10-28): with the button near the
+    bottom of the screen, a tap landed on the always-on «Бепул консультация» bar (it slides back in
+    when the keyboard closes) and only scrolled to the form — the order was never sent. Main site:
+    `Landing` `barOverForms={false}` hides the bar while either form is on screen. The partner page
+    still has the bug (shared default `true`; ask before changing it there). Same day the owner saw no
+    orders after 15:57 — no deploy happened then (09:38, 16:21 were the deploys); a live test order
+    at ~18:20 returned 201 and logged no Telegram/Sheets error. Worker/DO invocations did fall after
+    16:00, so look at the ads (edits put an ad back into review) before the code.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
