@@ -341,8 +341,9 @@ async function telegramCommand(request: Request, env: Env, origin: string): Prom
     else if (command === 'holat' || command === 'status') await registry.reportStatus(now, thread);
     else if (command === 'hisobot' || command === 'report') await registry.dailyReport(now, thread);
     else if (command === 'spam') {
-      const days = Number(/^\/spam\S*\s+(\d+)/i.exec(message.text?.trim() ?? '')?.[1] ?? 3);
-      await registry.notify(await registry.startSpamExport(days, now), now, thread);
+      const text = message.text?.trim() ?? '';
+      const days = Number(/^\/spam\S*\s+(\d+)/i.exec(text)?.[1] ?? 3);
+      await registry.notify(await registry.startSpamExport(days, now, /\bqayta\b|\bқайта\b/i.test(text)), now, thread);
     } else if (command === 'panel' || command === 'crm') await sendPanelButton(env, Number(message.chat.id), thread);
     else if (command === 'start' || command === 'help' || command === 'yordam') await registry.notify(HELP_TEXT, now, thread);
   } catch (err) {

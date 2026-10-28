@@ -1057,6 +1057,9 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       await hook({ message: { message_id: 10, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/spam 3' } });
       expect(sheets.rows).toHaveLength(2);
       expect(telegram.messages.at(-1)!.text).toContain('0 та буюртма ёзилди');
+      // «qayta»: written again on purpose (after wrong rows were deleted by hand).
+      await hook({ message: { message_id: 11, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/spam 3 qayta' } });
+      expect(sheets.rows).toHaveLength(4);
     });
 
     it('takes a decoy filled with human signs into the sheet with its warning, and lets «Sotildi» report it', async () => {

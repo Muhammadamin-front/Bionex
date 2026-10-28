@@ -637,9 +637,12 @@ export class LeadRegistry extends DurableObject<Env> {
    * 5-minute cron tick (`continueSpamExport`). An order already in the tab is skipped, so running it
    * again is harmless. Orders that went to «Lidlar» earlier stay there; delete those rows by hand.
    */
-  async startSpamExport(days: number, now: number): Promise<string> {
+  async startSpamExport(days: number, now: number, again = false): Promise<string> {
     if (!sheetsConfig(this.env, 'main')) return '⚠️ Google жадвал уланмаган (SHEETS_URL, SHEETS_SECRET).';
     const since = now - Math.min(Math.max(Math.round(days) || 3, 1), 30) * DAY;
+    // «/spam N qayta»: forget what was written in those days and write it again — for rows that
+    // landed in the wrong tab (a sheet script that ignored the tab name) and were deleted by hand.
+    if (again) this.sql.exec('DELETE FROM spam_exported WHERE lead_id IN (SELECT lead_id FROM list_items WHERE at > ?)', since);
     this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('spam_export_since', ?)", String(since));
     this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('spam_export_total', '0')");
     const r = await this.exportSpamBatch(since);

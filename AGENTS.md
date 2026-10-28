@@ -247,6 +247,10 @@ user's Mac.
     12 per run and the rest on every 5-minute cron tick (`continueSpamExport`), then says so in the
     group; re-running is harmless. Orders that already sit in «Lidlar» are not removed (delete by hand).
     The partner sheet is separate and unchanged (#23).
+    2026-10-28: the first `/spam 3` rows landed in «Lidlar», not «Spam»: the main spreadsheet's Apps
+    Script is NOT the one in docs/PARTNER-SITE.md (it ignores `data.sheet`; the owner has not shown it
+    yet). Fix is in the script, not the Worker. `/spam N qayta` forgets `spam_exported` for those days
+    and writes them again (after the wrong rows are deleted by hand).
 
 ## Open items
 
