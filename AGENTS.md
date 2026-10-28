@@ -265,7 +265,8 @@ user's Mac.
 
 28. **Main site back to the original page, with real proof** (2026-10-28, owner's request: many
     landing page views, few leads): the main build's `#site` is now `src/sites/classic/index.tsx` —
-    the original page (`components/landing/Landing.tsx`, popup included, as on 24–25 Oct) plus a
+    the original page (`components/landing/Landing.tsx`; its arrival popup off here — `popup={false}`,
+    the same day, as it covered the videos; the partner keeps it) plus a
     `proof` section between the hero and the first form (moved above it the same day): six real customers' videos — three filmed stories with the
     box in hand (`story-1..3`, 9:16 at 540×960, 2–8.5 MB) and three Telegram video messages
     (`review-1..3`, cropped square, ~2.5 MB), one swipeable row on phones, `preload="none"` + poster. Videos are built into

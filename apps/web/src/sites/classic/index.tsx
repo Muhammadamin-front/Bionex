@@ -28,7 +28,7 @@ const certificate = { full: file('certificate.jpg'), small: file('certificate-sm
 
 /**
  * The videos play by themselves once the row is on screen, one after another (owner, 2026-10-28):
- * with sound once the visitor has touched the page (closing the order dialog counts) — browsers
+ * with sound once the visitor has touched the page — browsers
  * allow sound only after that — else muted, with «Овозни ёқиш» to turn it on for the rest; after the last one it stops. Swiping to another video plays that one
  * and pauses the one before. Off the screen it pauses. Never on a data saver or for someone who
  * asked the phone for less motion.
@@ -201,5 +201,6 @@ function Proof() {
 }
 
 export function Landing() {
-  return <Page proof={<Proof />} />;
+  // No order dialog on arrival (owner, 2026-10-28): it covered the videos before anyone saw them.
+  return <Page proof={<Proof />} popup={false} />;
 }

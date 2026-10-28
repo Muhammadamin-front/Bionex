@@ -21,9 +21,10 @@ import {
 
 /**
  * `proof`: what the main site adds above the first form (real customers' videos, the certificate).
+ * `popup: false`: no order dialog on arrival (the main site — it would cover the proof).
  * The partner site passes nothing, so its page stays exactly as it was.
  */
-export function Landing({ proof }: { proof?: ReactNode } = {}) {
+export function Landing({ proof, popup = true }: { proof?: ReactNode; popup?: boolean } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
@@ -92,7 +93,7 @@ export function Landing({ proof }: { proof?: ReactNode } = {}) {
       {/* Always on screen (except while typing), as the owner asked. */}
       <StickyCta visible={!typing} quickFormOnScreen={quickVisible && !order} />
       {/* Over everything: the form meets the visitor instead of waiting to be scrolled to. */}
-      <OrderModal utm={utm} order={order} onOrdered={setOrder} />
+      {popup && <OrderModal utm={utm} order={order} onOrdered={setOrder} />}
     </>
   );
 }
