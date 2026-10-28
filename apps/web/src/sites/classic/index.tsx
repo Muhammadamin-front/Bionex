@@ -9,9 +9,20 @@ import { Landing as Page } from '../../components/landing/Landing';
 const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
 
-const videos = [1, 2, 3]
-  .map((n) => ({ src: file(`review-${n}.mp4`), poster: file(`review-${n}.jpg`) }))
-  .filter((v): v is { src: string; poster: string | undefined } => Boolean(v.src));
+/**
+ * In the order shown: the filmed stories with the box in hand first (vertical, `cover`), then the
+ * Telegram video messages (square, `contain` keeps the round message whole).
+ */
+const videos = [
+  { name: 'story-1', length: '0:41', fit: 'object-cover' },
+  { name: 'story-2', length: '1:48', fit: 'object-cover' },
+  { name: 'story-3', length: '3:00', fit: 'object-cover' },
+  { name: 'review-1', length: '1:00', fit: 'object-contain' },
+  { name: 'review-2', length: '0:35', fit: 'object-contain' },
+  { name: 'review-3', length: '0:36', fit: 'object-contain' },
+]
+  .map((v) => ({ ...v, src: file(`${v.name}.mp4`), poster: file(`${v.name}.jpg`) }))
+  .filter((v): v is typeof v & { src: string } => Boolean(v.src));
 const certificate = { full: file('certificate.jpg'), small: file('certificate-small.jpg') };
 
 function Proof() {
@@ -24,16 +35,19 @@ function Proof() {
             <h2 id="ishonch-title" className="text-[1.8rem] font-extrabold leading-[1.15] tracking-[-0.02em] text-balance sm:text-[2.4rem]">
               Мижозларимиз ўз овози билан
             </h2>
-            <p className="mt-3 max-w-2xl text-lg text-ink-2">Зейнарани ичган мижозларимиз Телеграм орқали юборган видео-хабарлар.</p>
-            <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <p className="mt-3 max-w-2xl text-lg text-ink-2">Зейнарани ичган мижозларимиз ўзлари айтиб беради.</p>
+            {/* On a phone one row to swipe through (six stacked videos would bury the rest of the
+                page); from sm up a grid. */}
+            <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0">
               {videos.map((v, i) => (
-                <figure key={v.src} className="overflow-hidden rounded-3xl bg-card shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)]">
+                <figure key={v.src} className="w-[78%] flex-none snap-center overflow-hidden rounded-3xl bg-card shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:w-auto">
                   {/* preload="none": nothing is downloaded until the visitor presses play. */}
-                  <video className="block aspect-square w-full bg-ink object-cover" src={v.src} poster={v.poster} controls playsInline preload="none" aria-label={`Мижоз фикри ${i + 1}`} />
-                  <figcaption className="px-5 py-3 text-[0.95rem] text-muted">Мижоз фикри · видео-хабар</figcaption>
+                  <video className={`block aspect-[3/4] w-full bg-ink ${v.fit}`} src={v.src} poster={v.poster} controls playsInline preload="none" aria-label={`Мижоз фикри ${i + 1}`} />
+                  <figcaption className="px-5 py-3 text-[0.95rem] text-muted">Мижоз фикри · {v.length}</figcaption>
                 </figure>
               ))}
             </div>
+            {videos.length > 1 && <p className="mt-2 text-[0.95rem] text-muted sm:hidden">← Бошқа видеоларни кўриш учун суринг →</p>}
             <p className="mt-5 text-[0.95rem] text-muted">Натижалар ҳар бир инсонда турлича бўлиши мумкин.</p>
           </>
         )}
