@@ -195,9 +195,11 @@ function lastDataRow_(sh) {
   return 1;
 }
 
-// Tekshirish: ▶ Выполнить bilan ishga tushiring — «Spam» varag'ida «0 | TEST» paydo bo'lishi kerak (keyin o'chiring)
+// Tekshirish: ▶ Выполнить bilan ishga tushiring — «Spam» varag'ida «0 | TEST» qatori paydo bo'lishi kerak (keyin o'chiring).
+// Sarlavhalar saytnikidek to'liq: bo'sh varaqda birinchi yozuv sarlavha qatorini yaratadi.
 function testSpam() {
   const secret = PropertiesService.getScriptProperties().getProperty('LEAD_SECRET');
-  const r = doPost({ postData: { contents: JSON.stringify({ secret: secret, sheet: SPAM_SHEET, headers: ['№', 'Ism'], row: [0, 'TEST'] }) } });
+  const headers = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma', 'Tafsilot'];
+  const r = doPost({ postData: { contents: JSON.stringify({ secret: secret, sheet: SPAM_SHEET, headers: headers, row: [0, '', 'TEST'] }) } });
   Logger.log(r.getContent());
 }
