@@ -29,6 +29,9 @@ function turnstileLanguage(): string {
 type Field = 'fullName' | 'phone';
 type FieldErrors = Partial<Record<Field, string>>;
 
+/** Marks that password managers and autofill honour: never put a saved value into a decoy field. */
+const NO_AUTOFILL = { 'data-lpignore': 'true', 'data-1p-ignore': true, 'data-bwignore': 'true', 'data-form-type': 'other' } as const;
+
 export interface OrderResult {
   message: string;
   /** Formatted for display: "+998 90 123 45 67". */
@@ -493,15 +496,18 @@ export function OrderForm({
           )}
         </div>
 
-        {/* Honeypot: invisible to people and screen readers; bots tend to fill every field. */}
+        {/* Honeypot: invisible to people and screen readers; bots tend to fill every field.
+            The data-* marks tell password managers and autofill (LastPass, 1Password, Bitwarden,
+            Dashlane) to leave the decoys alone: they sit off-screen, not display:none, and a
+            person whose autofill filled one would be taken for a bot. */}
         <div className="hp-field" aria-hidden="true">
           <label htmlFor={`${id}-fax`}>Бу майдонни бўш қолдиринг</label>
-          <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" />
+          <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" {...NO_AUTOFILL} />
         </div>
-        {/* A second decoy with the name form-filling scripts like most. Browsers never autofill it. */}
+        {/* A second decoy with the name form-filling scripts like most. */}
         <div className="hp-field" aria-hidden="true">
           <label htmlFor={`${id}-website`}>Сайтингиз манзили</label>
-          <input ref={websiteRef} id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
+          <input ref={websiteRef} id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" {...NO_AUTOFILL} />
         </div>
 
         {/* Turnstile mounts here, and with appearance 'interaction-only' it usually stays empty
