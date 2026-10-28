@@ -11,6 +11,7 @@ import { readableModel } from './models';
 import { readSheetStatuses, sheetOutcome, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
+import { serveVideo } from './video';
 
 export { LeadRegistry } from './registry';
 
@@ -67,6 +68,7 @@ export default {
     if (url.pathname === '/panel/icon-192.png') return pwaIcon(192);
     if (url.pathname === '/panel/icon-512.png') return pwaIcon(512);
     if (url.pathname.startsWith('/api/panel/')) return panelApi(request, env, url);
+    if (url.pathname.startsWith('/video/')) return serveVideo(request, env);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
 
     if (url.pathname === '/api/telegram/hook' && request.method === 'POST') return telegramCommand(request, env, url.origin);

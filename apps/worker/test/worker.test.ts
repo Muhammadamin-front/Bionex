@@ -100,7 +100,10 @@ function start(bindings: Record<string, string> = {}) {
     compatibilityDate: '2026-10-01',
     durableObjects: { REGISTRY: { className: 'LeadRegistry', useSQLite: true } },
     serviceBindings: {
-      ASSETS: () => new Response('<!doctype html><title>site</title>'),
+      ASSETS: (req: Request) =>
+        new URL(req.url).pathname.startsWith('/video/')
+          ? new Response('0123456789', { headers: { 'content-type': 'video/mp4' } })
+          : new Response('<!doctype html><title>site</title>'),
       // What the partner site's Pages function is bound to (apps/partner/wrangler.jsonc).
       PARTNER: { name: 'zeynara', entrypoint: 'PartnerSite' },
     },
@@ -217,6 +220,23 @@ describe('a new order', () => {
     await order({ contactFax: 'spam', phone: '+998 90 111 11 11' });
     expect(leadMessages()[0]!.text).toMatch(/бот бўлиши мумкин/);
     expect(leadMessages()[0]!.text).toMatch(/сунъийга ўхшайди/);
+  });
+});
+
+describe('videos', () => {
+  it('serves byte ranges, as an iPhone needs to play them', async () => {
+    const get = (range?: string) => mf.dispatchFetch(`${SITE}/video/review-1.mp4`, range ? { headers: { range } } : {});
+    const first = await get('bytes=0-1');
+    expect(first.status).toBe(206);
+    expect(first.headers.get('content-range')).toBe('bytes 0-1/10');
+    expect(await first.text()).toBe('01');
+    expect(await (await get('bytes=7-')).text()).toBe('789');
+    expect(await (await get('bytes=-3')).text()).toBe('789');
+    expect((await get('bytes=20-')).status).toBe(416);
+    const whole = await get();
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('accept-ranges')).toBe('bytes');
+    expect(await whole.text()).toBe('0123456789');
   });
 });
 

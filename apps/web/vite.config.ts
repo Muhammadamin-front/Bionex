@@ -199,6 +199,11 @@ export default defineConfig(({ command, mode }) => {
       // Transpile JavaScript for the same old phones (see LEGACY_BROWSERS).
       target: ['es2019', 'chrome70', 'safari12', 'firefox68', 'edge79'],
       sourcemap: false,
+      rollupOptions: {
+        // Videos under /video/: the Worker serves those itself, with byte ranges (apps/worker
+        // src/video.ts) — iPhones play nothing from a server that ignores Range.
+        output: { assetFileNames: (a) => (/\.mp4$/i.test(a.names?.[0] ?? a.name ?? '') ? 'video/[name]-[hash][extname]' : 'assets/[name]-[hash][extname]') },
+      },
     },
   };
 });
