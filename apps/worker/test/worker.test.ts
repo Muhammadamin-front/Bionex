@@ -212,7 +212,7 @@ describe('a new order', () => {
     // No signals (a direct post) or a program sign: still the trap.
     await order({ phone: '+998 90 312 45 51', contactFax: 'x' }, { ip: '203.0.113.51' });
     expect(leadMessages().at(-1)!.text).toMatch(/бот бўлиши мумкин/);
-    await order({ phone: '+998 90 312 45 52', contactFax: 'x', signals: { ...person, synthetic: 2 } }, { ip: '203.0.113.52' });
+    await order({ phone: '+998 90 312 45 52', contactFax: 'x', signals: { ...person, webdriver: true } }, { ip: '203.0.113.52' });
     expect(leadMessages().at(-1)!.text).toMatch(/бот бўлиши мумкин/);
   });
 
@@ -755,12 +755,16 @@ describe("the operators' Mini App panel", () => {
     expect(warned.leads.some((l) => l.name === 'Шубҳали Киши')).toBe(true);
   });
 
-  it('flags the browser bot traps: a made-up click, or a touch screen nobody touched', async () => {
+  it('flags the browser bot traps: the automation mark, or a touch screen nobody touched; a made-up click alone only warns', async () => {
     const panelNames = async () =>
       ((await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> }).leads.map((l) => l.name);
-    await order({ fullName: 'Тузоқ Бир', phone: '+998 90 312 45 60', signals: { touch: 5, taps: 3, synthetic: 1, keys: 12 } }, { ip: '203.0.113.60' });
+    await order({ fullName: 'Тузоқ Бир', phone: '+998 90 312 45 60', signals: { touch: 5, taps: 3, webdriver: true, keys: 12 } }, { ip: '203.0.113.60' });
     expect(leadMessages().at(-1)!.text).toContain('бот тузоғига тушди');
-    expect(leadMessages().at(-1)!.text).toContain('дастур босган ×1');
+    // Made-up clicks alone: confirmed customers had them, so a warning and the panel shows it.
+    await order({ fullName: 'Босган Одам', phone: '+998 90 312 45 64', signals: { touch: 5, taps: 3, synthetic: 2, keys: 12 } }, { ip: '203.0.113.64' });
+    expect(leadMessages().at(-1)!.text).not.toContain('тузоғига');
+    expect(leadMessages().at(-1)!.text).toContain('дастур босиши сезилди');
+    expect(leadMessages().at(-1)!.text).toContain('дастур босган ×2');
     await order({ fullName: 'Тузоқ Икки', phone: '+998 90 312 45 61', signals: { touch: 5, taps: 0, keys: 12 } }, { ip: '203.0.113.61' });
     expect(leadMessages().at(-1)!.text).toContain('экранга тегилмаган');
     // A person who touched the screen, or a page too old to count touches, is not caught.
@@ -772,7 +776,7 @@ describe("the operators' Mini App panel", () => {
     const names = await panelNames();
     expect(names).not.toContain('Тузоқ Бир');
     expect(names).not.toContain('Тузоқ Икки');
-    expect(names).toEqual(expect.arrayContaining(['Одам Бир', 'Одам Икки']));
+    expect(names).toEqual(expect.arrayContaining(['Одам Бир', 'Одам Икки', 'Босган Одам']));
   });
 
   it('keeps campaign, ad set (utm_term) and video (utm_content) per lead', async () => {
@@ -1058,6 +1062,21 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(leadMessages()).toHaveLength(3);
     });
 
+    it('a made-up click alone (a confirmed customer) goes to «Lidlar» with a warning; with the automation mark it is a trap', async () => {
+      const person = { touch: 5, taps: 4, keys: 5, synthetic: 2, pageMs: 35_000 };
+      await order({ fullName: 'Ҳақиқий Мижоз', signals: person }, { ip: '203.0.113.71' });
+      await order({ fullName: 'Дастур Киши', phone: '+998 90 312 45 72', signals: { ...person, webdriver: true } }, { ip: '203.0.113.72' });
+      for (let i = 0; i < 50 && sheets.rows.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      const lidlar = sheets.rows.filter((r) => r.sheet === 'Lidlar');
+      expect(lidlar.map((r) => r.row[2])).toEqual(['Ҳақиқий Мижоз']);
+      expect(lidlar[0]!.row[7]).toContain('dastur bosishi sezildi');
+      expect(sheets.rows.filter((r) => r.sheet === 'Spam').map((r) => r.row[2])).toEqual(['Дастур Киши']);
+      // It can be reported once marked.
+      await mark(1, 'Kerakli');
+      expect(await settled()).toHaveLength(1);
+    });
+
     it('«/spam N» copies earlier suspect orders into the «Spam» tab once, and says so in the group', async () => {
       // The sheet is down when they arrive: nothing is written, so «/spam» has something to copy.
       sheets.refuse = true;
@@ -1167,7 +1186,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   it('never reports a bot trap to Meta, whatever the operator presses', async () => {
     expect((await order({ contactFax: 'x' })).status).toBe(201);
     await mark(1, 'Sotildi');
-    expect((await order({ phone: '+998 90 312 45 48', signals: { synthetic: 1 } }, { ip: '203.0.113.48' })).status).toBe(201);
+    expect((await order({ phone: '+998 90 312 45 48', signals: { touch: 5, taps: 0 } }, { ip: '203.0.113.48' })).status).toBe(201);
     await mark(2, 'Sotildi');
     expect(await quiet()).toHaveLength(0);
   });
@@ -1452,6 +1471,12 @@ describe('the partner site (sites.ts t2)', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(sheets.rows).toHaveLength(2);
     expect(meta.bodies).toHaveLength(leadsBefore);
+  });
+
+  it('keeps its old rule: a made-up click alone is still a trap here', async () => {
+    await partnerOrder({ fullName: 'Босган Мижоз', phone: '+998 90 312 45 77', signals: { touch: 5, taps: 3, synthetic: 2, keys: 9 } }, '203.0.113.77');
+    await new Promise((r) => setTimeout(r, 150));
+    expect(sheets.rows).toHaveLength(0);
   });
 
   it('numbers its own orders, and is no repeat of a main-site order', async () => {

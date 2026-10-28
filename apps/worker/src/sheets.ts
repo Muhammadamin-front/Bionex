@@ -46,6 +46,7 @@ const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video'
 const FLAG_TEXT: Record<string, string> = {
   honeypot: "bot bo'lishi mumkin",
   bot_trap: "bot tuzog'iga tushdi",
+  synthetic_click: "sahifada dastur bosishi sezildi, lekin boshqa bot belgisi yo'q (Instagram brauzeri bo'lishi mumkin, odam ham bo'lishi mumkin)",
   decoy_filled: "yashirin maydon to'ldirilgan, lekin dastur belgisi yo'q (avto-to'ldirish bo'lishi mumkin, odam ham bo'lishi mumkin)",
   phone_pattern: "raqam soxtaga o'xshaydi",
   reused_click: "shu reklama bosilishi avval boshqa raqamdan ishlatilgan (havola ko'chirilgan bo'lishi mumkin)",

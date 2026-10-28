@@ -150,6 +150,16 @@ const WORDS = {
  * A trap only a program falls into: a made-up click, a touch screen nobody touched before the
  * order was sent, or the automation mark. Missing signals (an old cached page) never count.
  */
+/**
+ * The traps that held up with real customers: the automation mark, or a touch screen nobody touched.
+ * A made-up click alone is left out — two confirmed customers on the main site carried «×2» and
+ * nothing else odd (2026-10-28); some in-app browsers make such clicks themselves.
+ */
+export function programDriven(s: DeviceSignals | undefined): boolean {
+  if (!s) return false;
+  return Boolean(s.webdriver) || (s.taps === 0 && Boolean(s.touch));
+}
+
 export function caughtByBotTrap(s: DeviceSignals | undefined): boolean {
   if (!s) return false;
   return Boolean(s.webdriver) || Boolean(s.synthetic) || (s.taps === 0 && Boolean(s.touch));

@@ -6,7 +6,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { isGroupMember, panelApi, panelPage, signWebToken } from './panel';
 import { pwaIcon, pwaManifest, pwaServiceWorker } from './panel/pwa';
 import { callTelegram, HELP_TEXT, outcomeKeyboard, panelKeyboard, STATUS_MARK, takeKeyboard, webhookSecret, type LeadOutcome } from './telegram';
-import { caughtByBotTrap, describeSignals, fromSocialApp, modelFromUserAgent } from '@bionex/shared/device';
+import { caughtByBotTrap, describeSignals, fromSocialApp, modelFromUserAgent, programDriven } from '@bionex/shared/device';
 import { readableModel } from './models';
 import { readSheetStatuses, sheetOutcome, sheetsConfig } from './sheets';
 import type { SiteId } from './sites';
@@ -203,7 +203,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       // mark) may be a person whose autofill filled it — a warning, not a trap (owner, 2026-10-28).
       // No signals at all (a direct post to the API) or any program sign stays a trap. The partner
       // site keeps its rule: any filled decoy is a trap.
-      flags.push(site === 'main' && data.signals && !caughtByBotTrap(data.signals) ? 'decoy_filled' : 'honeypot');
+      flags.push(site === 'main' && data.signals && !programDriven(data.signals) ? 'decoy_filled' : 'honeypot');
     }
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     if (!check.ok) flags.push('no_captcha');
@@ -213,8 +213,11 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     const userAgent = request.headers.get('user-agent');
     if (!check.ok && !fromSocialApp(userAgent)) flags.push('likely_bot');
     // The browser's own traps — a made-up click, a touch screen nobody touched, or a browser that
-    // says a program drives it (device.ts): only a program does that, so these are hidden.
-    if (caughtByBotTrap(data.signals)) flags.push('bot_trap');
+    // says a program drives it (device.ts): hidden as a program's. On the main site a made-up click
+    // alone is only a warning (`synthetic_click`): confirmed customers had it (owner, 2026-10-28).
+    // The partner site keeps the old rule.
+    if (site === 'main' ? programDriven(data.signals) : caughtByBotTrap(data.signals)) flags.push('bot_trap');
+    else if (caughtByBotTrap(data.signals)) flags.push('synthetic_click');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the
     //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is

@@ -282,6 +282,15 @@ user's Mac.
     (only then is `mainSiteHead` applied). #19's `deploy:old-design` is gone; #16's design is no
     longer the default.
 
+29. **A made-up click alone no longer traps a main-site order** (2026-10-28): two orders the owner
+    confirmed as real customers carried only «dastur bosgan ×2» (sensor 5, a few letters typed, Uzbek
+    clock, 35–94 s on the page); earlier №117/№119/an iPhone 12 looked the same with ×3. Some in-app
+    browsers seem to make untrusted clicks. Main site: `bot_trap` = `programDriven` (webdriver, or a
+    touch screen nobody touched); `synthetic` alone → `synthetic_click`, a warning: «Lidlar», panel,
+    `meta_pending`. `decoy_filled` also uses `programDriven`. Partner site unchanged (`caughtByBotTrap`).
+    Orders trapped this way before the deploy sit in the «Spam» tab with «dastur bosgan ×N» and no
+    «webdriver» / «ekranga tegilmagan»: worth a call.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
