@@ -236,6 +236,19 @@ export function OrderForm({
     if (errors.phone) setErrors((x) => ({ ...x, phone: undefined }));
     pendingCaret.current = caretAfterDigits(formatted, digitsBefore);
     setCaretTick((t) => t + 1); // re-render even when the text did not change
+    // The number is complete: bring the order button up above the open keyboard. Older customers
+    // often do not know how to close the keyboard, and the button sat hidden under it.
+    if (digits.length === 9 && prevDigits.length < 9) requestAnimationFrame(() => window.setTimeout(showSubmitButton, 150));
+  }
+
+  /** Scrolls just enough for the submit button to sit above the keyboard (the visual viewport). */
+  function showSubmitButton() {
+    const button = formRef.current?.querySelector<HTMLElement>('button[type=submit]');
+    if (!button) return;
+    const vv = window.visualViewport;
+    const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const below = button.getBoundingClientRect().bottom + 16 - visibleBottom;
+    if (below > 0) window.scrollBy({ top: below, behavior: 'smooth' });
   }
 
   // Which widget size to ask for, if a visitor is ever shown one. Measured on the form, not

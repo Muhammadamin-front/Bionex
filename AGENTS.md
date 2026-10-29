@@ -324,6 +324,12 @@ user's Mac.
     still adds Purchase when `META_ORDER_VALUE` is set). Suspect non-trap orders wait for the sheet as
     before. Still no browser `Lead` on the main site. A later «Keraksiz» cannot take a sent Lead back.
 
+33. **The order button rises above the keyboard** (2026-10-29, owner: older customers do not know how
+    to close a phone keyboard): when the phone field reaches 9 digits, `OrderForm.showSubmitButton`
+    scrolls just enough (by `visualViewport`) for the submit button to sit above the keyboard. The
+    keyboard's own «send» key already submits (`enterKeyHint="send"`). Shared `OrderForm`: reaches the
+    partner site only with `deploy:t2`.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
