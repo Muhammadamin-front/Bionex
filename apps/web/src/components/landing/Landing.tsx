@@ -22,11 +22,11 @@ import {
 /**
  * `proof`: what the main site adds right under the first form (real customers' videos, the certificate).
  * `popup: false`: no order dialog on arrival.
- * `barOverForms: false`: the bottom order bar steps aside while a form is on screen (the main site),
- * so it can never cover the form's own button.
+ * `barOverForms` (default false, both sites since 2026-10-29): false = the bottom order bar steps aside
+ * while a form is on screen, so it can never cover the form's own button.
  * The partner site passes nothing, so its page stays exactly as it was.
  */
-export function Landing({ proof, popup = true, barOverForms = true }: { proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
+export function Landing({ proof, popup = true, barOverForms = false }: { proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);

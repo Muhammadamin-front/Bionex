@@ -85,6 +85,8 @@ const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_
  * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
  */
 const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
+const PARTNER_SHEET_WRITE_ALERT =
+  '⚠️ <b>2-сайт жадвали буюртмани қабул қилмади.</b> У буюртмаларни бошқа ҳеч ким кўрмайди. Жадвалнинг Apps Script’ини текширинг ёки дастурчига ёзинг.';
 const SHEET_WRITE_ALERT =
   '⚠️ <b>Google жадвал буюртмани қабул қилмади.</b> Буюртмалар Telegram’да бор, лекин жадвалга тушмаяпти. Apps Script’ни текширинг ёки дастурчига ёзинг.';
 const META_ALERT =
@@ -605,7 +607,11 @@ export class LeadRegistry extends DurableObject<Env> {
     if (sheet && !flags.some((f) => PARTNER_SHEET_HIDDEN_FLAGS.includes(f))) {
       const { campaign, adset, ad } = utmParts(input.utm);
       this.ctx.waitUntil(
-        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }),
+        sendSheetOrder(sheet, { number: seq, at: now, fullName: input.fullName, phone: input.phone, campaign, adset, ad, flags, model: input.model, details: input.details?.latn }).then(
+          async (ok) => {
+            if (!ok) await this.ownerAlert('partner-sheet-write', PARTNER_SHEET_WRITE_ALERT, Date.now());
+          },
+        ),
       );
     } else if (!sheet) {
       console.error(`Partner order ${site}#${seq} has nowhere to go: set SHEETS_T2_URL and SHEETS_T2_SECRET`);
@@ -690,6 +696,30 @@ export class LeadRegistry extends DurableObject<Env> {
     const next = Number(this.sql.exec<{ v: string }>('SELECT v FROM meta WHERE k = ?', key).toArray()[0]?.v ?? 0) + 1;
     this.sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', key, String(next));
     return next;
+  }
+
+  /**
+   * «/ogohlantirish» sent to the bot in a private chat by a member of the operators' group: that chat
+   * now gets the alerts that must not reach the group (the partner site's sheet, #2 in AGENTS.md).
+   */
+  async setOwnerChat(chatId: number): Promise<void> {
+    this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('owner_chat', ?)", String(chatId));
+  }
+
+  /** An alert for the owner alone, at most hourly per kind; nowhere to send it yet → only logged. */
+  async ownerAlert(kind: string, text: string, now: number): Promise<void> {
+    const chat = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'owner_chat'").toArray()[0]?.v;
+    if (!chat) {
+      console.error(`Owner alert ${kind} has nowhere to go: send /ogohlantirish to the bot privately`);
+      return;
+    }
+    const last = this.sql.exec<{ at: number }>('SELECT at FROM alerts WHERE kind = ?', kind).toArray()[0];
+    if (last && now - last.at < HOUR) return;
+    this.sql.exec('INSERT OR REPLACE INTO alerts (kind, at) VALUES (?, ?)', kind, now);
+    if (this.env.TELEGRAM_DRY_RUN === '1') return void console.log(`[TELEGRAM_DRY_RUN] owner alert: ${text}`);
+    await callTelegram(this.telegramConfig(), 'sendMessage', { chat_id: Number(chat), text, parse_mode: 'HTML' }).catch((err: unknown) =>
+      console.error('Owner alert not delivered', (err as Error)?.message),
+    );
   }
 
   /** The main dataset refused or never got an event: Leads are being lost, so the group hears of it (hourly at most). */

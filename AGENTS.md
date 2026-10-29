@@ -298,9 +298,9 @@ user's Mac.
 
 30. **The bottom order bar covered the form's submit button** (2026-10-28): with the button near the
     bottom of the screen, a tap landed on the always-on «Бепул консультация» bar (it slides back in
-    when the keyboard closes) and only scrolled to the form — the order was never sent. Main site:
-    `Landing` `barOverForms={false}` hides the bar while either form is on screen. The partner page
-    still has the bug (shared default `true`; ask before changing it there). Same day the owner saw no
+    when the keyboard closes) and only scrolled to the form — the order was never sent. `Landing`
+    `barOverForms` (default false since 2026-10-29, both sites — the owner allowed the partner fix) hides
+    the bar while either form is on screen. Same day the owner saw no
     orders after 15:57 — no deploy happened then (09:38, 16:21 were the deploys); a live test order
     at ~18:20 returned 201 and logged no Telegram/Sheets error. Worker/DO invocations did fall after
     16:00, so look at the ads (edits put an ad back into review) before the code.
@@ -361,6 +361,14 @@ user's Mac.
     the group (#2). Also: `buildUserData` makes `fbc` = `fb.1.<now>.<clickId>` when the `_fbc` cookie
     is not set yet (the Pixel loads only once the page is idle), so an early order still carries its
     ad click to Meta.
+
+37. **The owner's private alerts** (2026-10-29): the partner's sheet is the only place its orders go,
+    so a refused write (`acceptPartner` → `ownerAlert('partner-sheet-write')`) or an unreadable
+    «Holat» (`syncPartnerSheet` → `ownerAlert('partner-sheet-read')`) goes to ONE private chat, never
+    the group. That chat is set by sending **/ogohlantirish** to the bot privately (group members
+    only; `setOwnerChat`, `meta.owner_chat`; the last one to send it wins). Unset → only logged.
+    The main sheet's Apps Script still sends its own `QualifiedLead` on «Kerakli» (docs/main-sheet-script.js):
+    a different event from the site's `Lead`, left as it is (the owner was told).
 
 ## Open items
 

@@ -301,8 +301,14 @@ async function syncPartnerSheet(env: Env, now: number): Promise<void> {
   const cfg = sheetsConfig(env, 't2');
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
-  if (rows) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncPartnerSpam({ site: 't2', rows, now });
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  if (rows) await registry.syncPartnerSpam({ site: 't2', rows, now });
+  // Its sheet is the only place its orders go: the owner hears of a broken one privately, never the group.
+  else await registry.ownerAlert('partner-sheet-read', PARTNER_SHEET_READ_ALERT, now);
 }
+
+const PARTNER_SHEET_READ_ALERT =
+  '⚠️ <b>2-сайт жадвали ўқилмаяпти.</b> Унинг Apps Script’и ишламаяпти бўлиши мумкин — шунда янги буюртмалар ҳам жадвалга тушмайди. Текширинг ёки дастурчига ёзинг.';
 
 /**
  * «Holat» in the main site's own sheet, read with the partner's: the outcome the people
@@ -485,6 +491,16 @@ async function customerChat(message: TelegramMessage, env: Env, origin: string):
             },
           }
         : {}),
+    });
+    return;
+  }
+  // The owner's private alerts (the partner site's sheet): only a member of the operators' group may ask.
+  if (/^\/(ogohlantirish|alerts)\b/i.test(message.text?.trim() ?? '')) {
+    const member = await isGroupMember(cfg, message.from.id);
+    if (member) await env.REGISTRY.get(env.REGISTRY.idFromName('main')).setOwnerChat(Number(message.chat.id));
+    await callTelegram(cfg, 'sendMessage', {
+      chat_id: message.chat.id,
+      text: member ? '✅ Энди 2-сайт жадвали ишламай қолса, шу ерга хабар келади.' : 'Бу буйруқ фақат операторлар учун.',
     });
     return;
   }

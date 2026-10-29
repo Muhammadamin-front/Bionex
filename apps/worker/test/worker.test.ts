@@ -1570,6 +1570,22 @@ describe('the partner site (sites.ts t2)', () => {
     expect(sheets.rows).toHaveLength(0);
   });
 
+  it("tells the owner privately — never the group — when its sheet refuses an order", async () => {
+    const dm = async (text: string, from = 11) =>
+      mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+        body: JSON.stringify({ update_id: 1, message: { message_id: 5, from: { id: from, first_name: 'Эга' }, chat: { id: from, type: 'private' }, text } }),
+      });
+    await dm('/ogohlantirish');
+    sheets.refuse = true;
+    await partnerOrder({ fullName: 'Йўқолган Мижоз', phone: '+998 90 312 45 70' }, '203.0.113.70');
+    await new Promise((r) => setTimeout(r, 200));
+    const sent = telegram.messages as Array<{ chat_id: number | string; text: string }>;
+    expect(sent.some((m) => m.chat_id === 11 && m.text.includes('2-сайт жадвали буюртмани қабул қилмади'))).toBe(true);
+    expect(sent.some((m) => String(m.chat_id) === CHAT && m.text.includes('2-сайт'))).toBe(false);
+  });
+
   it('numbers its own orders, and is no repeat of a main-site order', async () => {
     expect((await order({ phone: '+998 90 312 45 81' }, { ip: '203.0.113.81' })).status).toBe(201);
     // The same customer on the partner site: theirs, not a repeat of ours.
