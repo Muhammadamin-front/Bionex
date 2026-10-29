@@ -342,6 +342,17 @@ user's Mac.
     anything again. Also seen in Ads Manager that day: a campaign «Instant form test» (Instant Form leads
     stay in Meta, never reach the sheet/Telegram) and two ads with unpublished edits — the owner was told.
 
+35. **Limits count the phone, not the network** (2026-10-29, owner's choice after the targetologist
+    pointed out CGNAT: Beeline/Ucell/Mobiuz put hundreds of customers behind one IP, and the
+    network limits — 3 attempts/hour, 3 numbers/day — could refuse real buyers unseen). `check` now
+    takes `device` (the browser's `deviceId`): the 3-per-hour limit (`IP_ORDERS_PER_HOUR`, name kept)
+    is per device, the network only capped at `NETWORK_ATTEMPTS_PER_HOUR` = 30; `numbersToday`
+    makes `LEADS_PER_IP_PER_DAY` (name kept) per device, network cap `NETWORK_PHONES_PER_DAY` = 30, and
+    from 3 numbers a day a network's orders carry `multi_phone_ip` (warning). No device id → the old
+    per-network limits. Every refusal goes to table `refusals` (7 days) and the daily /hisobot shows
+    «🚧 Лимит сабабли қабул қилинмади: N та (…)» for the main site. Both sites (shared Worker).
+    Before this, refusals were logged nowhere, so how many customers the old limits lost is unknown.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

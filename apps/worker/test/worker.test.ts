@@ -240,6 +240,40 @@ describe('videos', () => {
   });
 });
 
+describe('limits count the phone, not the network (many customers share one mobile address)', () => {
+  const dev = (n: number) => `aaaaaaaa-1111-4111-8111-00000000000${n}`;
+  const report = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    const secret = [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    await mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': secret },
+      body: JSON.stringify({ update_id: 1, message: { message_id: 9, chat: { id: Number(CHAT), type: 'supergroup' }, text: '/hisobot' } }),
+    });
+    return telegram.messages.at(-1)!.text;
+  };
+
+  it('takes many customers from one network, each from their own phone, and warns about the network', async () => {
+    const statuses = [];
+    for (let i = 1; i <= 6; i++) statuses.push((await order({ phone: `+998 90 312 46 0${i}`, deviceId: dev(i) }, { ip: '203.0.113.200' })).status);
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 201]);
+    expect(leadMessages().at(-1)!.text).toContain('бу манбадан бугун бир нечта рақам юборилди');
+  });
+
+  it('stops one phone trying many times or for many numbers, and counts it in the day report', async () => {
+    const statuses = [];
+    for (let i = 1; i <= 4; i++) statuses.push((await order({ phone: `+998 90 312 46 1${i}`, deviceId: dev(9) }, { ip: `198.51.100.${20 + i}` })).status);
+    expect(statuses).toEqual([201, 201, 201, 429]);
+    expect(await report()).toMatch(/Лимит сабабли қабул қилинмади: 1 та \(битта телефондан соатига кўп уриниш — 1\)/);
+  });
+
+  it('keeps the small limit for a page with no device id (a script posting straight to the server)', async () => {
+    const statuses = [];
+    for (let i = 1; i <= 4; i++) statuses.push((await order({ phone: `+998 90 312 46 2${i}` }, { ip: '203.0.113.201' })).status);
+    expect(statuses).toEqual([201, 201, 201, 429]);
+  });
+});
+
 describe('numbers and lists for the operators', () => {
   it('numbers every new order', async () => {
     await order({ phone: '+998 90 312 45 31' });
@@ -1544,6 +1578,12 @@ describe('the partner site (sites.ts t2)', () => {
   });
 
   it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {
+    // Four orders from one phone in an hour: allowed here, the hourly per-phone limit is not the point.
+    await mf.dispose();
+    mf = start({
+      META_PIXEL_ID: MAIN_PIXEL, META_CAPI_TOKEN: 'EAA-main', META_T2_PIXEL_ID: PARTNER_PIXEL, META_T2_CAPI_TOKEN: 'EAA-partner',
+      META_API_BASE: 'https://graph.mock', SHEETS_T2_URL: 'https://sheets.mock/exec', SHEETS_T2_SECRET: 'sheet-secret', IP_ORDERS_PER_HOUR: '10', LEADS_PER_IP_PER_DAY: '10',
+    });
     const DEVICE = '11111111-2222-4333-8444-555555555555';
     const readSheet = async () => {
       const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };

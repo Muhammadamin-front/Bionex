@@ -156,7 +156,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
 
   try {
     // 1. Already answered (the customer's phone lost our reply and retried)? Same answer again.
-    const pre = await registry.check({ submissionId: data.submissionId, ip, phone: data.phone, now });
+    const pre = await registry.check({ submissionId: data.submissionId, ip, phone: data.phone, device: data.deviceId, site, now });
     if (pre.kind === 'replay') return answer(pre.status);
     if (pre.kind === 'limited') return fail(429, 'rate_limited', MESSAGES.rateLimited);
 

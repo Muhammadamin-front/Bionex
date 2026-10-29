@@ -26,12 +26,12 @@
   "triggers": { "crons": ["0 15 * * *", "*/5 * * * *"] },
 
   "vars": {
-    // Order attempts one IP may make per hour (failed ones count too). Deliberately low: the
-    // spam on this site is sent by hand by one hostile person, and this is the cap that makes
-    // him pay for every attempt. Do not raise it to give customers more retries — see
-    // docs/SPAM.md.
+    // Order attempts one PHONE (its device id; the network when it has none) may make per hour,
+    // failed ones too. Since 2026-10-29 it no longer counts the network: mobile operators put many
+    // customers behind one address. The network itself is capped only against floods (registry.ts
+    // NETWORK_ATTEMPTS_PER_HOUR). The names stay for compatibility.
     "IP_ORDERS_PER_HOUR": "3",
-    // How many different phone numbers one IP may order for per day.
+    // How many different phone numbers one PHONE (device id; else the network) may order for per day.
     "LEADS_PER_IP_PER_DAY": "3",
     // The same number again within this time is a repeat, not a new order.
     "DUPLICATE_WINDOW_HOURS": "24",

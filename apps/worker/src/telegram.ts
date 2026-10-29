@@ -248,6 +248,8 @@ export interface DayReport {
   repeats: number;
   /** Orders, of any day, still without an outcome — so Meta has not been told about them. */
   unreported: number;
+  /** Order attempts refused by a limit today, by reason (registry.ts `refused`). */
+  refused?: Record<string, number>;
   operators: Array<{ name: string; taken: number; sold: number }>;
 }
 
@@ -258,11 +260,28 @@ export interface DayReport {
  */
 const unreportedLine = (n: number) => `📣 Натижаси белгиланмаган: ${n} та — буларни реклама ҳисобга олмайди.`;
 
+const REFUSAL_TEXT: Record<string, string> = {
+  device: 'битта телефондан соатига кўп уриниш',
+  device_numbers: 'битта телефондан кунига кўп рақам',
+  network: 'битта тармоқдан жуда кўп уриниш',
+  network_numbers: 'битта тармоқдан жуда кўп рақам',
+  phone: 'битта рақамга соатига кўп уриниш',
+};
+
+/** «🚧 Лимит сабабли қабул қилинмади: 4 та (…)» — or nothing when no attempt was refused. */
+function refusedLine(refused: Record<string, number> | undefined): string | null {
+  const parts = Object.entries(refused ?? {}).filter(([, n]) => n > 0);
+  if (!parts.length) return null;
+  const total = parts.reduce((s, [, n]) => s + n, 0);
+  return `🚧 Лимит сабабли қабул қилинмади: ${total} та (${parts.map(([k, n]) => `${REFUSAL_TEXT[k] ?? k} — ${n}`).join('; ')})`;
+}
+
 export function formatReport(r: DayReport): string {
   const day = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit' }).format(new Date(r.date));
+  const refused = refusedLine(r.refused);
   if (r.total === 0) {
     const idle = `📊 <b>Ҳисобот (${day})</b>\nБугун янги буюртма бўлмади. Бот ишлаяпти ✅`;
-    return r.unreported > 0 ? `${idle}\n${unreportedLine(r.unreported)}` : idle;
+    return [idle, ...(r.unreported > 0 ? [unreportedLine(r.unreported)] : []), ...(refused ? [refused] : [])].join('\n');
   }
   const lines = [
     `📊 <b>Ҳисобот (${day})</b>`,
@@ -277,6 +296,7 @@ export function formatReport(r: DayReport): string {
   ];
   if (r.repeats > 0) lines.push(`🔁 Такрор юборганлар: ${r.repeats}`);
   if (r.unreported > 0) lines.push(unreportedLine(r.unreported));
+  if (refused) lines.push(refused);
   if (r.operators.length > 0) {
     lines.push('', '<b>Операторлар:</b>', ...r.operators.map((o) => `• ${escapeHtml(o.name)} — ${o.taken} та олди, ${o.sold} та сотди`));
   }

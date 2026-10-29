@@ -34,6 +34,15 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** Order attempts per phone number per hour, on top of Turnstile and the per-IP limit. */
 const PHONE_REQUESTS_PER_HOUR = 5;
+/**
+ * The network's own caps: only a flood stops here. Mobile operators in Uzbekistan put hundreds of
+ * customers behind one address (CGNAT), so the everyday limits count the phone (its device id),
+ * not the network (2026-10-29). A page with no device id falls back to the network's small limit.
+ */
+const NETWORK_ATTEMPTS_PER_HOUR = 30;
+const NETWORK_PHONES_PER_DAY = 30;
+/** From this many different numbers a day, one network's orders carry «бу манбадан бугун бир нечта рақам». */
+const NETWORK_PHONES_WARNING = 3;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Meta's Conversions API refuses events older than this, so unmarked orders expire with it. */
@@ -237,6 +246,7 @@ export class LeadRegistry extends DurableObject<Env> {
         next_try INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS hits (key TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS refusals (at INTEGER NOT NULL, site TEXT NOT NULL, reason TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS hits_key ON hits (key, at);
       CREATE TABLE IF NOT EXISTS alerts (kind TEXT PRIMARY KEY, at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS list_items (
@@ -339,18 +349,56 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
-  async check(input: { submissionId: string; ip: string; phone: string; now: number }): Promise<CheckResult> {
+  async check(input: { submissionId: string; ip: string; phone: string; device?: string; site?: SiteId; now: number }): Promise<CheckResult> {
     const prior = this.sql.exec<{ status: 'accepted' | 'duplicate' }>('SELECT status FROM submissions WHERE id = ?', input.submissionId).toArray()[0];
     if (prior) return { kind: 'replay', status: prior.status };
     const ipKey = `ip:${await this.hash(input.ip)}`;
     const phoneKey = `phone:${await this.hash(input.phone)}`;
+    // The everyday limit is per phone (its device id); without one, per network as before.
+    const sourceKey = input.device ? `dev:${await this.hash(`device:${input.device}`)}` : ipKey;
     const count = (key: string, since: number) =>
       this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', key, since).one().n;
     this.sql.exec('INSERT INTO hits (key, at) VALUES (?, ?), (?, ?)', ipKey, input.now, phoneKey, input.now);
+    if (sourceKey !== ipKey) this.sql.exec('INSERT INTO hits (key, at) VALUES (?, ?)', sourceKey, input.now);
     // Every attempt counts, failed ones too: a competitor's script gets a few tries an hour, not hundreds.
-    if (count(ipKey, input.now - HOUR) > Number(this.env.IP_ORDERS_PER_HOUR || 3)) return { kind: 'limited' };
-    if (count(phoneKey, input.now - HOUR) > PHONE_REQUESTS_PER_HOUR) return { kind: 'limited' };
+    const since = input.now - HOUR;
+    const reason =
+      count(sourceKey, since) > Number(this.env.IP_ORDERS_PER_HOUR || 3)
+        ? (sourceKey === ipKey ? 'network' : 'device')
+        : count(ipKey, since) > NETWORK_ATTEMPTS_PER_HOUR
+          ? 'network'
+          : count(phoneKey, since) > PHONE_REQUESTS_PER_HOUR
+            ? 'phone'
+            : null;
+    if (reason) {
+      this.refused(input.site ?? 'main', reason, input.now);
+      return { kind: 'limited' };
+    }
     return { kind: 'go' };
+  }
+
+  /** A refused order attempt, counted for the daily report: a limit that stops real customers must show. */
+  private refused(site: SiteId, reason: string, now: number): void {
+    this.sql.exec('INSERT INTO refusals (at, site, reason) VALUES (?, ?, ?)', now, site, reason);
+  }
+
+  /**
+   * How many numbers this source ordered for today, and whether that is too many. The source is the
+   * phone (device id) when known, else the network; the network itself is capped only against floods
+   * and otherwise just warned about (`multi_phone_ip`).
+   */
+  private numbersToday(table: 'leads' | 'partner_leads', site: SiteId, ipHash: string, deviceHash: string | null, now: number): { limited: boolean; networkPhones: number } {
+    const scope = table === 'partner_leads' ? ' AND site = ?' : '';
+    const extra = table === 'partner_leads' ? [site] : [];
+    const distinct = (column: 'ip_hash' | 'device_hash', value: string) =>
+      this.sql
+        .exec<{ n: number }>(`SELECT count(DISTINCT phone_hash) AS n FROM ${table} WHERE ${column} = ? AND at > ?${scope}`, value, now - DAY, ...extra)
+        .one().n;
+    const networkPhones = distinct('ip_hash', ipHash);
+    const perSource = deviceHash ? distinct('device_hash', deviceHash) : networkPhones;
+    const reason = perSource >= Number(this.env.LEADS_PER_IP_PER_DAY || 3) ? (deviceHash ? 'device_numbers' : 'network_numbers') : networkPhones >= NETWORK_PHONES_PER_DAY ? 'network_numbers' : null;
+    if (reason) this.refused(site, reason, now);
+    return { limited: Boolean(reason), networkPhones };
   }
 
   /** After Turnstile passed: decide new / repeat / refused, record it, and queue the Telegram message. */
@@ -380,11 +428,11 @@ export class LeadRegistry extends DurableObject<Env> {
       return { status: 'duplicate' };
     }
 
-    // Someone typing strangers' numbers: one network may order for only a few numbers a day.
-    const otherPhones = this.sql
-      .exec<{ n: number }>('SELECT count(DISTINCT phone_hash) AS n FROM leads WHERE ip_hash = ? AND at > ?', ipHash, now - DAY)
-      .one().n;
-    if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
+    // Someone typing strangers' numbers: one phone may order for only a few numbers a day. A busy
+    // network is only warned about — many customers share one mobile address.
+    const { limited, networkPhones: otherPhones } = this.numbersToday('leads', 'main', ipHash, deviceHash, now);
+    if (limited) return { status: 'ip_limited' };
+    if (otherPhones >= NETWORK_PHONES_WARNING) input = { ...input, flags: [...input.flags, 'multi_phone_ip'] };
 
     // Operators marked an earlier order from this network or device as spam: say so on this one.
     input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)] };
@@ -520,12 +568,10 @@ export class LeadRegistry extends DurableObject<Env> {
       this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'duplicate', now);
       return { status: 'duplicate' };
     }
-    const otherPhones = this.sql
-      .exec<{ n: number }>('SELECT count(DISTINCT phone_hash) AS n FROM partner_leads WHERE ip_hash = ? AND at > ?', ipHash, now - DAY)
-      .one().n;
-    if (otherPhones >= Number(this.env.LEADS_PER_IP_PER_DAY || 3)) return { status: 'ip_limited' };
+    const { limited, networkPhones } = this.numbersToday('partner_leads', site, ipHash, deviceHash, now);
+    if (limited) return { status: 'ip_limited' };
 
-    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)];
+    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now), ...(networkPhones >= NETWORK_PHONES_WARNING ? ['multi_phone_ip'] : [])];
     const seq = this.nextSiteNumber(site);
     this.sql.exec(
       'INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, device_hash, fp_hash, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1053,9 +1099,13 @@ export class LeadRegistry extends DurableObject<Env> {
     // Orders of any day still waiting for an outcome: until one is pressed, the ads are not
     // told about them, so this is the number the operators are costing in cheaper leads.
     const unreported = this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM meta_pending').one().n;
+    const refusals = this.sql
+      .exec<{ reason: string; n: number }>("SELECT reason, count(*) AS n FROM refusals WHERE at >= ? AND site = 'main' GROUP BY reason", dayStart)
+      .toArray();
     this.enqueue(
       formatReport({
         date: now,
+        refused: Object.fromEntries(refusals.map((r) => [r.reason, r.n])),
         total: rows.length,
         unreported,
         sold: count((r) => r.outcome === 'sold'),
@@ -1323,6 +1373,7 @@ export class LeadRegistry extends DurableObject<Env> {
 
   private prune(now: number) {
     this.sql.exec('DELETE FROM hits WHERE at < ?', now - DAY);
+    this.sql.exec('DELETE FROM refusals WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM submissions WHERE at < ?', now - 7 * DAY);
     this.sql.exec('DELETE FROM leads WHERE at < ?', now - 30 * DAY);
     this.sql.exec('DELETE FROM list_items WHERE at < ?', now - 30 * DAY);
