@@ -268,7 +268,7 @@ user's Mac.
     landing page views, few leads): the main build's `#site` is now `src/sites/classic/index.tsx` —
     the original page (`components/landing/Landing.tsx`; its arrival popup off here — `popup={false}`,
     the same day, as it covered the videos; the partner keeps it) plus a
-    `proof` section between the hero and the first form (moved above it the same day): six real customers' videos — three filmed stories with the
+    `proof` section between the hero and the first form (moved above it the same day; back under it on 10-29, #34): six real customers' videos — three filmed stories with the
     box in hand (`story-1..3`, 9:16 at 540×960, 2–8.5 MB) and three Telegram video messages
     (`review-1..3`, cropped square, ~2.5 MB), one swipeable row on phones, `preload="none"` + poster. Videos are built into
     `/video/` and served by the Worker with byte ranges (`src/video.ts`, `run_worker_first`): static assets
@@ -329,6 +329,18 @@ user's Mac.
     scrolls just enough (by `visualViewport`) for the submit button to sit above the keyboard. The
     keyboard's own «send» key already submits (`enterKeyHint="send"`). Shared `OrderForm`: reaches the
     partner site only with `deploy:t2`.
+
+34. **Main site: the first form is above the videos again, and the arrival dialog is back** (2026-10-29,
+    owner: «lead ham spam ham kelmay qo'ydi»). Checked end to end: the ads kept delivering (~78 link clicks
+    after 16:00 on 10-28, ~48 by 09:00 on 10-29), the Worker had no errors, the main sheet's Apps Script ran
+    every 5 minutes without failure, and the partner page (same OrderForm and Worker, form under the hero,
+    arrival dialog on) kept getting orders through the night. The main site went from an order every ~20
+    minutes to 3 in 16 hours right after the 16:21 deploy of 10-28; the Pixel's InitiateCheckout (form
+    focus) fell with it. Cause: the `proof` section above the first form put the form ~3000 px (four phone
+    screens) down, and `popup={false}` removed the dialog. `Landing` now renders `proof` right under
+    `QuickOrder`, and the main site uses the default `popup`. Ask the owner before moving the form below
+    anything again. Also seen in Ads Manager that day: a campaign «Instant form test» (Instant Form leads
+    stay in Meta, never reach the sheet/Telegram) and two ads with unpublished edits — the owner was told.
 
 ## Open items
 

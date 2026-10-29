@@ -20,8 +20,8 @@ import {
 } from './Sections';
 
 /**
- * `proof`: what the main site adds above the first form (real customers' videos, the certificate).
- * `popup: false`: no order dialog on arrival (the main site — it would cover the proof).
+ * `proof`: what the main site adds right under the first form (real customers' videos, the certificate).
+ * `popup: false`: no order dialog on arrival.
  * `barOverForms: false`: the bottom order bar steps aside while a form is on screen (the main site),
  * so it can never cover the form's own button.
  * The partner site passes nothing, so its page stays exactly as it was.
@@ -86,10 +86,10 @@ export function Landing({ proof, popup = true, barOverForms = true }: { proof?: 
             the illness and the product, so they are ready to order: the form comes first and
             the symptom check stays right below it for whoever still needs convincing. */}
         <Hero />
-        {/* Main site: the proof between the product and the form, so whoever scrolls on undecided
-            meets the videos and the certificate first and the form right under them. */}
-        {proof}
         <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+        {/* Main site: the proof right under the first form, for whoever scrolls on undecided. Above
+            the form (2026-10-28) it pushed the form four phone screens down and orders stopped. */}
+        {proof}
         <Symptoms />
         <Promises />
         <Risks />

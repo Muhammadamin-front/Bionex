@@ -1,6 +1,8 @@
 // The main site: the original page (the one the partner site also shows) plus what makes it
 // believable — real customers' video messages and the product's state certificate, right under
-// the first form (above it since 2026-10-28). The media live only on the Mac that deploys (.gitignore): the public repo never
+// the first form. Above it (2026-10-28) the form sat four phone screens down and orders all but
+// stopped while the partner page kept getting them; back under it, with the arrival dialog, on
+// 2026-10-29. The media live only on the Mac that deploys (.gitignore): the public repo never
 // carries customers' faces. A missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
@@ -201,7 +203,8 @@ function Proof() {
 }
 
 export function Landing() {
-  // No order dialog on arrival (owner, 2026-10-28): it covered the videos before anyone saw them.
+  // The order dialog on arrival is back (2026-10-29): without it and with the form under the
+  // videos, orders stopped. The videos now sit below the form, so it covers only the product.
   // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
-  return <Page proof={<Proof />} popup={false} barOverForms={false} />;
+  return <Page proof={<Proof />} barOverForms={false} />;
 }
