@@ -45,8 +45,9 @@ user's Mac.
 
 ## Principles already settled — do not undo without asking
 
-1. **Main site: Meta `Lead` only after an operator confirms a real person, and only through the
-   main sheet's «Holat»** («Sotildi» / «Kerakli» — see #20). Since 2026-10-27 (owner: «telegramga
+1. **Main site: a clean order is a server `Lead` at once (since 2026-10-29, #32); a suspect one only
+   after the main sheet's «Holat»** («Sotildi» / «Kerakli» — see #20). Earlier rule (until 2026-10-29):
+   Lead only after an operator confirmed a real person. Since 2026-10-27 (owner: «telegramga
    faqat malumot borsin») Telegram buttons send NOTHING to Meta (they still mark/track; 🚫 still
    withholds the order). 🚫 Спам and unmarked orders are never reported. No browser `Lead` on the main
    site. Reason: 5 of the first 8 leads were fake; see `docs/META-CAPI.md`, `docs/SPAM.md`.
@@ -313,6 +314,15 @@ user's Mac.
     is sent is still verified (old cached pages). The partner site keeps Turnstile unchanged. The
     honeypot and `bot_trap` (webdriver / untouched touch screen) stay on the main site. Turnstile
     widget «Zeynara» (managed, both hostnames) untouched in Cloudflare.
+
+32. **Main site: clean orders are a Lead at once** (2026-10-29, owner's choice). After the stray
+    Events Manager rule went (#27) the main Pixel got almost no Leads (only sheet-confirmed ones) and
+    the ads' signal collapsed — the targetologist read it as «the site stopped sending Lead». Now
+    `accept` sends the CAPI `Lead` (event_id = submissionId) on arrival unless the order has a
+    `NO_INSTANT_LEAD_FLAGS` flag (`MAIN_SPAM_SHEET_FLAGS` + `spam_lookalike` + `reused_click`);
+    `meta_pending.lead_sent = 1` then keeps «Sotildi»/«Kerakli» from sending a second Lead («Sotildi»
+    still adds Purchase when `META_ORDER_VALUE` is set). Suspect non-trap orders wait for the sheet as
+    before. Still no browser `Lead` on the main site. A later «Keraksiz» cannot take a sent Lead back.
 
 ## Open items
 

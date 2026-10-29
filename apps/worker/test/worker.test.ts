@@ -1029,12 +1029,13 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret' });
     });
 
-    it('reports «Sotildi» and «Kerakli» as a Lead, once, and waits on the others', async () => {
+    it('reports a suspect order («Sotildi», «Kerakli») as a Lead, once, and waits on the others', async () => {
+      // A failed check: no Lead on arrival, so the sheet decides (a clean order's Lead went already).
       const first = sid();
-      await order({ submissionId: first }, { ip: '203.0.113.41' });
+      await order({ submissionId: first, turnstileToken: 'bad' }, { ip: '203.0.113.41' });
       const second = sid();
-      await order({ submissionId: second, phone: '+998 90 312 45 42' }, { ip: '203.0.113.42' });
-      await order({ phone: '+998 90 312 45 43' }, { ip: '203.0.113.43' });
+      await order({ submissionId: second, phone: '+998 90 312 45 42', turnstileToken: 'bad' }, { ip: '203.0.113.42' });
+      await order({ phone: '+998 90 312 45 43', turnstileToken: 'bad' }, { ip: '203.0.113.43' });
       // Waiting statuses send nothing.
       sheets.statuses = [[1, "Ko'tarmadi"], [2, "Qaytib qo'ng'iroq"], [3, '']];
       await readSheet();
@@ -1142,12 +1143,13 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       await readSheet();
       await order({ deviceId: DEVICE, phone: '+998 90 312 45 45' }, { ip: '198.51.100.45' });
       expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
-      expect(await quiet()).toHaveLength(0);
+      // Only the first (clean on arrival) order's Lead: the marked device gets none.
+      expect(await quiet()).toHaveLength(1);
     });
   });
 
   it('reports nothing to Meta for any Telegram button: the group is for information only', async () => {
-    await order();
+    await order({ turnstileToken: 'bad' });
     for (const action of ['sold', 'rejected', 'noanswer', 'callback']) await press(`s:1:${action}`);
     expect(await quiet()).toHaveLength(0);
     // The sheet is still the way in: the order stayed pending, so «Sotildi» there reports it.
@@ -1156,7 +1158,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('a Telegram 🚫 withholds the order, so a later «Sotildi» in the sheet cannot report it', async () => {
-    await order();
+    await order({ turnstileToken: 'bad' });
     await press('s:1:spam');
     await mark(1, 'Sotildi');
     expect(await quiet()).toHaveLength(0);
@@ -1178,10 +1180,21 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     expect(await (await mf.dispatchFetch(`${SITE}/api/health`)).json()).toMatchObject({ meta: true });
   });
 
-  it('tells Meta nothing when the order arrives: a filled-in form is not a customer yet', async () => {
-    expect((await order()).status).toBe(201);
-    expect(leadMessages()).toHaveLength(1); // the operators hear about it immediately
-    expect(await quiet()).toHaveLength(0); // Meta does not
+  it('sends a clean order as a Lead at once, and never a second Lead when it is marked later', async () => {
+    const submissionId = sid();
+    expect((await order({ submissionId, signals: { touch: 5, taps: 4, keys: 12 } })).status).toBe(201);
+    expect(leadMessages()).toHaveLength(1);
+    const [event] = await settled();
+    expect(event).toMatchObject({ event_name: 'Lead', event_id: submissionId });
+    await mark(1, 'Sotildi');
+    expect(await quiet()).toHaveLength(1);
+  });
+
+  it('sends no Lead on arrival for a suspect order: it waits for a person', async () => {
+    await order({ turnstileToken: 'bad' }); // failed check
+    await order({ phone: '+998 90 312 45 46', signals: { webdriver: true, touch: 5, taps: 3 } }, { ip: '203.0.113.46' }); // bot
+    await order({ phone: '+998 90 312 45 47', turnstileToken: undefined }, { ip: '203.0.113.47' }); // no browser
+    expect(await quiet()).toHaveLength(0);
   });
 
   it('never invites the browser to report the order, so one order cannot become two events', async () => {
@@ -1229,13 +1242,13 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('never reports an order marked spam — that is the whole point', async () => {
-    await order();
+    await order({ turnstileToken: 'bad' });
     await mark(1, 'Keraksiz');
     expect(await quiet()).toHaveLength(0);
   });
 
   it('keeps an unanswered order waiting, and reports it when the call finally connects', async () => {
-    await order();
+    await order({ turnstileToken: 'bad' });
     await mark(1, "Ko'tarmadi");
     expect(await quiet()).toHaveLength(0);
     await mark(1, 'Sotildi');
@@ -1243,7 +1256,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('keeps a "ring me later" order waiting: the customer answered but has not decided', async () => {
-    await order();
+    await order({ turnstileToken: 'bad' });
     await mark(1, "Qaytib qo'ng'iroq");
     expect(await quiet()).toHaveLength(0);
     await mark(1, 'Sotildi');
@@ -1514,19 +1527,20 @@ describe('the partner site (sites.ts t2)', () => {
     expect(leadMessages()).toHaveLength(1); // only the main site's order
   });
 
-  it("sends its Lead to the partner's dataset at once; the main site's waits for the operator, to ours", async () => {
+  it("sends its Lead to the partner's dataset; the main site's goes to ours", async () => {
     expect((await partnerOrder({ fullName: 'Бир Киши', phone: '+998 90 312 45 85' }, '203.0.113.85')).status).toBe(201);
     await until(() => meta.bodies.length >= 1);
     expect(meta.paths).toEqual([`/v21.0/${PARTNER_PIXEL}/events`]);
     expect(meta.bodies[0]).toMatchObject({ access_token: 'EAA-partner', data: [{ event_name: 'Lead' }] });
 
     expect((await order({ phone: '+998 90 312 45 84' }, { ip: '203.0.113.84' })).status).toBe(201);
-    await new Promise((r) => setTimeout(r, 100));
-    expect(meta.bodies).toHaveLength(1);
-    // A Telegram button reports nothing to the main dataset (its Lead comes from the sheet's «Holat»).
+    await until(() => meta.bodies.length >= 2);
+    expect(meta.paths[1]).toBe(`/v21.0/${MAIN_PIXEL}/events`);
+    expect(meta.bodies[1]!.access_token).toBe('EAA-main');
+    // A Telegram button reports nothing more.
     await press('s:1:sold');
     await new Promise((r) => setTimeout(r, 150));
-    expect(meta.bodies).toHaveLength(1);
+    expect(meta.bodies).toHaveLength(2);
   });
 
   it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {

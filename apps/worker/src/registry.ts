@@ -70,6 +70,12 @@ const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
  * until a person copies the row into «Lidlar» (with its №) and sets «Sotildi» / «Kerakli».
  */
 const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device'];
+/**
+ * Main-site orders that get NO Lead the moment they arrive (owner, 2026-10-29: every other order is a
+ * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
+ * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
+ */
+const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
 /** Rows of «/spam N» written per run; the rest follow on the 5-minute cron (the Worker's request time is short). */
 const SPAM_EXPORT_BATCH = 12;
 /**
@@ -327,6 +333,9 @@ export class LeadRegistry extends DurableObject<Env> {
         at INTEGER NOT NULL
       );
     `);
+    // 1: its Lead already went when the order arrived; a later «Sotildi» adds only the Purchase.
+    const pendingColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(meta_pending)').toArray().map((c) => c.name);
+    if (!pendingColumns.includes('lead_sent')) this.sql.exec('ALTER TABLE meta_pending ADD COLUMN lead_sent INTEGER NOT NULL DEFAULT 0');
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
@@ -402,14 +411,24 @@ export class LeadRegistry extends DurableObject<Env> {
     // operator rings the customer and presses an outcome (see button()). A bot trap (TRAP_FLAGS)
     // is a program, whatever an operator later presses: Meta never hears of it.
     if (input.meta && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
+      // A clean order is a Lead at once (owner, 2026-10-29): with Leads only from the sheet the ads
+      // had a few signals a day. A suspect one (NO_INSTANT_LEAD_FLAGS) waits for a person.
+      const instant = !input.flags.some((f) => NO_INSTANT_LEAD_FLAGS.includes(f));
       this.sql.exec(
-        'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at, lead_sent) VALUES (?, ?, ?, ?, ?, ?)',
         leadId,
         input.submissionId,
         JSON.stringify(input.meta.userData),
         input.meta.sourceUrl,
         now,
+        instant ? 1 : 0,
       );
+      const cfg = instant ? metaConfig(this.env) : null;
+      if (cfg) {
+        this.ctx.waitUntil(
+          sendMetaEvent(cfg, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
+        );
+      }
     }
     // Almost certainly a bot: still goes to the group (operators see it) and keeps its buttons,
     // but is hidden from the panel and the lists so nobody calls it.
@@ -887,8 +906,8 @@ export class LeadRegistry extends DurableObject<Env> {
   private reportToMeta(leadId: number, outcome: LeadOutcome, now: number): void {
     if (META_WAIT.has(outcome)) return;
     const row = this.sql
-      .exec<{ event_id: string; user_data: string; source_url: string; at: number }>(
-        'SELECT event_id, user_data, source_url, at FROM meta_pending WHERE lead_id = ?',
+      .exec<{ event_id: string; user_data: string; source_url: string; at: number; lead_sent: number }>(
+        'SELECT event_id, user_data, source_url, at, lead_sent FROM meta_pending WHERE lead_id = ?',
         leadId,
       )
       .toArray()[0];
@@ -911,8 +930,8 @@ export class LeadRegistry extends DurableObject<Env> {
     }
     // The moment the customer ordered, not the moment the operator pressed the button.
     const common = { eventId: row.event_id, userData, eventTime: row.at, sourceUrl: row.source_url };
-    // Leaves after the operator's answer, never in front of it.
-    this.ctx.waitUntil(sendMetaEvent(cfg, { ...common, eventName: 'Lead' }));
+    // Leaves after the operator's answer, never in front of it — unless it already went on arrival.
+    if (!row.lead_sent) this.ctx.waitUntil(sendMetaEvent(cfg, { ...common, eventName: 'Lead' }));
     if (outcome === 'sold' && cfg.orderValue !== undefined) {
       // A different event_id, so Meta's de-duplication never mistakes the two for one event.
       this.ctx.waitUntil(
