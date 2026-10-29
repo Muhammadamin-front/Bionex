@@ -48,14 +48,14 @@ const PANEL_LIMIT = 1000;
  * there with its warnings. A failed check is NOT here (likely_bot): real
  * customers turned up among those, so they stay visible with a warning.
  */
-const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'spam_device', 'spam_lookalike'];
+const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'no_browser', 'spam_device', 'spam_lookalike'];
 /**
  * What only a program does — the hidden fields (honeypot) and the browser's traps (bot_trap).
  * Such an order stays out of both Google Sheets and is never reported to Meta, on either site;
  * every other order goes to the sheets with its warnings (the owner's rules, 2026-10-25/26:
  * their "honeypot" means both traps).
  */
-const TRAP_FLAGS = ['honeypot', 'bot_trap'];
+const TRAP_FLAGS = ['honeypot', 'bot_trap', 'no_browser'];
 /**
  * The partner's sheet also drops `likely_bot`: a failed check from a browser that is not the
  * Instagram / Facebook app the ads run in (owner, 2026-10-27, after the sheet filled with such

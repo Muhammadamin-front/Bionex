@@ -13,6 +13,11 @@ import { AntiMetalButton } from '../ui/AntiMetalButton';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
+/**
+ * The «not a robot» check (Turnstile). Off on the main site (vite.config.ts): in the Instagram app it
+ * often would not pass and people left. The partner site keeps it.
+ */
+const HUMAN_CHECK = import.meta.env.VITE_HUMAN_CHECK !== '0';
 /** Validation schemas (Zod) are fetched with the form, not with the first paint. */
 const loadSchemas = () => import('@bionex/shared/lead');
 
@@ -104,6 +109,7 @@ export function OrderForm({
   };
 
   const renderWidget = useCallback(async (submissionId: string, gen: number) => {
+    if (!HUMAN_CHECK) return;
     const turnstile = await loadTurnstile();
     if (!widgetBox.current || gen !== generation.current) return;
     if (widgetId.current) turnstile.remove(widgetId.current);
@@ -288,8 +294,8 @@ export function OrderForm({
       // The id is set synchronously, even if the widget itself never loads.
       if (!verification.current) void refreshVerification().catch(() => undefined);
 
-      setWaitingForCheck(!turnstileToken.current);
-      const token = await waitForTurnstile(8_000);
+      setWaitingForCheck(HUMAN_CHECK && !turnstileToken.current);
+      const token = HUMAN_CHECK ? await waitForTurnstile(8_000) : null;
       setWaitingForCheck(false);
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;

@@ -184,6 +184,8 @@ export default defineConfig(({ command, mode }) => {
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
     plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(oromgoh ? [mainSiteHead()] : [])],
+    // The «not a robot» check only on the partner site (OrderForm HUMAN_CHECK, owner 2026-10-29).
+    define: { 'import.meta.env.VITE_HUMAN_CHECK': JSON.stringify(mode === 't2' ? '1' : '0') },
     resolve: {
       // Each site is its own tree: the partner build never even sees the main site's page.
       alias: {

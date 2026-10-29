@@ -304,6 +304,16 @@ user's Mac.
     at ~18:20 returned 201 and logged no Telegram/Sheets error. Worker/DO invocations did fall after
     16:00, so look at the ads (edits put an ad back into review) before the code.
 
+31. **No «not a robot» check on the main site** (2026-10-29, owner: their own phone, from the ad in
+    Instagram, could not pass «Verify you are human»; on submit the form also waited up to 14 s
+    «Текширилмоқда…»). Vite defines `VITE_HUMAN_CHECK` = '0' except for `--mode t2`; `OrderForm`
+    then never loads Turnstile and sends at once. Worker, main site: no token is normal (no
+    `no_captcha` / `likely_bot`); no token AND no browser `signals` (a direct API post) → `no_browser`,
+    in `TRAP_FLAGS` and `LIKELY_BOT_FLAGS` (Spam tab, hidden from panel, never Meta). A token that
+    is sent is still verified (old cached pages). The partner site keeps Turnstile unchanged. The
+    honeypot and `bot_trap` (webdriver / untouched touch screen) stay on the main site. Turnstile
+    widget «Zeynara» (managed, both hostnames) untouched in Cloudflare.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

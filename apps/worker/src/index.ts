@@ -206,12 +206,18 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       flags.push(site === 'main' && data.signals && !programDriven(data.signals) ? 'decoy_filled' : 'honeypot');
     }
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
-    if (!check.ok) flags.push('no_captcha');
+    // The main site's page no longer asks for the check (owner, 2026-10-29: in the Instagram app it
+    // would not pass, and people left). No token there is normal; a page that ran no script at all
+    // (no browser signals: a direct post to the API) is a program's. A token that was sent is still
+    // checked — an old page in a phone's cache still asks.
+    const noCheckAsked = site === 'main' && !data.turnstileToken;
+    if (noCheckAsked && !data.signals) flags.push('no_browser');
+    if (!check.ok && !noCheckAsked) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
     // robot, but real customers turned up among them too (their Telegram name matched), so it
     // is a warning for the call and the order stays in the panel and the sheet.
     const userAgent = request.headers.get('user-agent');
-    if (!check.ok && !fromSocialApp(userAgent)) flags.push('likely_bot');
+    if (!check.ok && !noCheckAsked && !fromSocialApp(userAgent)) flags.push('likely_bot');
     // The browser's own traps — a made-up click, a touch screen nobody touched, or a browser that
     // says a program drives it (device.ts): hidden as a program's. On the main site a made-up click
     // alone is only a warning (`synthetic_click`): confirmed customers had it (owner, 2026-10-28).

@@ -913,11 +913,14 @@ describe('spam protection', () => {
       ['bad', '198.51.100.7', '+998 90 312 45 21'],
       ['other-site', '198.51.100.8', '+998 90 312 45 22'],
       ['other-form', '198.51.100.9', '+998 90 312 45 23'],
-      [undefined, '198.51.100.10', '+998 90 312 45 24'], // the widget never loaded
     ];
     for (const [token, ip, phone] of cases) expect((await order({ turnstileToken: token, phone }, { ip })).status).toBe(201);
-    expect(leadMessages()).toHaveLength(4);
+    expect(leadMessages()).toHaveLength(3);
     expect(leadMessages().every((m) => m.text.includes('«бот эмасман» текшируви ўтмади'))).toBe(true);
+    // No token at all is the main page as it is now (no check asked): not marked. (The partner site
+    // still asks; its tests cover a missing token there.)
+    expect((await order({ turnstileToken: undefined, phone: '+998 90 312 45 24', signals: { touch: 5, taps: 2, keys: 9 } }, { ip: '198.51.100.10' })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
     // A passed check carries no such mark.
     await order({ phone: '+998 90 312 45 25' }, { ip: '198.51.100.11' });
     expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
@@ -1075,6 +1078,23 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       // It can be reported once marked.
       await mark(1, 'Kerakli');
       expect(await settled()).toHaveLength(1);
+    });
+
+    it('the main page asks for no check: no token with browser signals is a clean order; no signals at all is a bot', async () => {
+      await order({ fullName: 'Инстаграм Мижоз', turnstileToken: undefined, signals: { touch: 5, taps: 6, keys: 14 } }, { ip: '203.0.113.81' });
+      await order({ fullName: 'Тўғри Пост', phone: '+998 90 312 45 82', turnstileToken: undefined }, { ip: '203.0.113.82' });
+      for (let i = 0; i < 50 && sheets.rows.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      const tab = (name: string) => sheets.rows.filter((r) => r.sheet === name);
+      expect(tab('Lidlar').map((r) => r.row[2])).toEqual(['Инстаграм Мижоз']);
+      expect(tab('Lidlar')[0]!.row[7]).toBe('');
+      expect(tab('Spam').map((r) => r.row[2])).toEqual(['Тўғри Пост']);
+      expect(leadMessages().at(-1)!.text).toContain('тўғридан-тўғри юборилган');
+      // Neither can reach Meta unless marked; the bot never can.
+      await mark(2, 'Sotildi');
+      await mark(1, 'Kerakli');
+      expect((await settled()).length).toBe(1);
+      expect(await quiet()).toHaveLength(1);
     });
 
     it('«/spam N» copies earlier suspect orders into the «Spam» tab once, and says so in the group', async () => {
