@@ -85,6 +85,10 @@ const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_
  * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
  */
 const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
+const SHEET_WRITE_ALERT =
+  '⚠️ <b>Google жадвал буюртмани қабул қилмади.</b> Буюртмалар Telegram’да бор, лекин жадвалга тушмаяпти. Apps Script’ни текширинг ёки дастурчига ёзинг.';
+const META_ALERT =
+  '⚠️ <b>Meta Lead’ни қабул қилмади.</b> Реклама буюртмаларни кўрмаяпти. Events Manager’даги Conversions API токенини текширинг ёки дастурчига ёзинг.';
 /** Rows of «/spam N» written per run; the rest follow on the 5-minute cron (the Worker's request time is short). */
 const SPAM_EXPORT_BATCH = 12;
 /**
@@ -474,7 +478,7 @@ export class LeadRegistry extends DurableObject<Env> {
       const cfg = instant ? metaConfig(this.env) : null;
       if (cfg) {
         this.ctx.waitUntil(
-          sendMetaEvent(cfg, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl }),
+          this.watchMeta(sendMetaEvent(cfg, { eventName: 'Lead', eventId: input.submissionId, userData: input.meta.userData, eventTime: now, sourceUrl: input.meta.sourceUrl })),
         );
       }
     }
@@ -533,8 +537,14 @@ export class LeadRegistry extends DurableObject<Env> {
         },
         suspect ? SPAM_SHEET : undefined,
       );
-      // Written once: «/spam N» skips what the live path has already put in the tab.
-      this.ctx.waitUntil(sent.then((ok) => suspect && ok && this.sql.exec('INSERT OR IGNORE INTO spam_exported (lead_id) VALUES (?)', leadId)));
+      // Written once: «/spam N» skips what the live path has already put in the tab. A sheet that
+      // refuses is told to the group: the operators ring from it, and nothing else would show it.
+      this.ctx.waitUntil(
+        sent.then(async (ok) => {
+          if (!ok) return this.alert('sheet-write', SHEET_WRITE_ALERT, Date.now());
+          if (suspect) this.sql.exec('INSERT OR IGNORE INTO spam_exported (lead_id) VALUES (?)', leadId);
+        }),
+      );
     }
     if (list?.full) this.sendList(now);
     this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
@@ -680,6 +690,11 @@ export class LeadRegistry extends DurableObject<Env> {
     const next = Number(this.sql.exec<{ v: string }>('SELECT v FROM meta WHERE k = ?', key).toArray()[0]?.v ?? 0) + 1;
     this.sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', key, String(next));
     return next;
+  }
+
+  /** The main dataset refused or never got an event: Leads are being lost, so the group hears of it (hourly at most). */
+  private async watchMeta(sent: Promise<boolean>): Promise<void> {
+    if (!(await sent)) await this.alert('meta', META_ALERT, Date.now());
   }
 
   /** A configuration problem that silently loses every order: tell the group, at most hourly. */
@@ -977,7 +992,7 @@ export class LeadRegistry extends DurableObject<Env> {
     // The moment the customer ordered, not the moment the operator pressed the button.
     const common = { eventId: row.event_id, userData, eventTime: row.at, sourceUrl: row.source_url };
     // Leaves after the operator's answer, never in front of it — unless it already went on arrival.
-    if (!row.lead_sent) this.ctx.waitUntil(sendMetaEvent(cfg, { ...common, eventName: 'Lead' }));
+    if (!row.lead_sent) this.ctx.waitUntil(this.watchMeta(sendMetaEvent(cfg, { ...common, eventName: 'Lead' })));
     if (outcome === 'sold' && cfg.orderValue !== undefined) {
       // A different event_id, so Meta's de-duplication never mistakes the two for one event.
       this.ctx.waitUntil(

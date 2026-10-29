@@ -1132,6 +1132,18 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await quiet()).toHaveLength(1);
     });
 
+    it('tells the group when the sheet refuses an order or cannot be read', async () => {
+      sheets.refuse = true;
+      await order({ signals: { touch: 5, taps: 3, keys: 9 } });
+      await new Promise((r) => setTimeout(r, 150));
+      expect(telegram.messages.some((m) => m.text.includes('Google жадвал буюртмани қабул қилмади'))).toBe(true);
+      // An unreadable «Holat» (the script answers with an error page) is said too.
+      sheets.statuses = 'broken' as unknown as Array<[unknown, unknown]>;
+      await readSheet();
+      await new Promise((r) => setTimeout(r, 100));
+      expect(telegram.messages.some((m) => m.text.includes('Google жадвал ўқилмаяпти'))).toBe(true);
+    });
+
     it('«/spam N» copies earlier suspect orders into the «Spam» tab once, and says so in the group', async () => {
       // The sheet is down when they arrive: nothing is written, so «/spam» has something to copy.
       sheets.refuse = true;
@@ -1424,6 +1436,18 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     await new Promise((r) => setTimeout(r, 150));
     const edit = telegram.calls.filter((c) => c.method === 'editMessageText').at(-1)!.body as { text: string };
     expect(edit.text).toMatch(/✅ Сотилди — Ойша/);
+  });
+
+  it('tells the group when Meta refuses the Lead, and sends the ad click as fbc even without the cookie', async () => {
+    const CLICK = 'IwAR0abcDEF123_click';
+    await order({ clickId: CLICK, signals: { touch: 5, taps: 3, keys: 9 } });
+    const [event] = await settled();
+    expect(event!.user_data.fbc).toMatch(new RegExp(`^fb\\.1\\.\\d{13}\\.${CLICK}$`));
+    await mf.dispose();
+    mf = withMeta({ META_API_BASE: 'https://graph-down.mock' });
+    await order({ signals: { touch: 5, taps: 3, keys: 9 } });
+    await new Promise((r) => setTimeout(r, 200));
+    expect(telegram.messages.some((m) => m.text.includes('Meta Lead’ни қабул қилмади'))).toBe(true);
   });
 
   it('counts the orders nobody has marked in the daily report, since the ads ignore those', async () => {

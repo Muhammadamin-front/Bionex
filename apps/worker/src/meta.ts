@@ -59,6 +59,10 @@ export interface MetaIdentity {
   userAgent: string | null;
   /** Raw Cookie header: _fbp / _fbc are what Meta matches best on. */
   cookie: string | null;
+  /** The ad click's fbclid as the page saw it: the click id when no _fbc cookie was set yet. */
+  clickId?: string;
+  /** When the order arrived (ms), for an fbc made from `clickId`. */
+  now?: number;
 }
 
 export interface MetaEvent {
@@ -114,7 +118,9 @@ export async function buildUserData(who: MetaIdentity): Promise<MetaUserData> {
   if (ln) user_data.ln = ln;
   if (who.userAgent) user_data.client_user_agent = who.userAgent;
   const fbp = cookie(who.cookie, '_fbp');
-  const fbc = cookie(who.cookie, '_fbc');
+  // The Pixel loads only once the page is idle and sets _fbc then; a quick order, or a browser
+  // that keeps no cookie, arrives without it. Meta's own format from the fbclid is the same click.
+  const fbc = cookie(who.cookie, '_fbc') ?? (who.clickId ? `fb.1.${who.now ?? Date.now()}.${who.clickId}` : undefined);
   if (fbp) user_data.fbp = fbp;
   if (fbc) user_data.fbc = fbc;
   return user_data;
@@ -125,7 +131,8 @@ export async function buildUserData(who: MetaIdentity): Promise<MetaUserData> {
  * event and never allowed to affect anything the operator or the customer sees — the order
  * is already safe in the registry and the outcome is already saved.
  */
-export async function sendMetaEvent(cfg: MetaConfig, event: MetaEvent): Promise<void> {
+/** True once Meta has taken the event; a refusal is logged (and alerted by the caller). */
+export async function sendMetaEvent(cfg: MetaConfig, event: MetaEvent): Promise<boolean> {
   const body = {
     // The access token travels in the body, never in the URL (URLs end up in logs).
     access_token: cfg.token,
@@ -159,13 +166,15 @@ export async function sendMetaEvent(cfg: MetaConfig, event: MetaEvent): Promise<
     if (!res.ok) {
       // Meta's message names the bad field; the token itself is never echoed back.
       console.error(`Meta CAPI refused the ${event.eventName} (${res.status})`, (await res.text()).slice(0, 300));
-      return;
+      return false;
     }
     const data = (await res.json().catch(() => null)) as { events_received?: number } | null;
-    if (data?.events_received !== 1) console.error('Meta CAPI accepted nothing', JSON.stringify(data)?.slice(0, 200));
+    if (data?.events_received === 1) return true;
+    console.error('Meta CAPI accepted nothing', JSON.stringify(data)?.slice(0, 200));
   } catch (err) {
     console.error('Meta CAPI unreachable', (err as Error)?.message);
   }
+  return false;
 }
 
 /** Meta matches on lower-case, trimmed values hashed with SHA-256 and written as hex. */

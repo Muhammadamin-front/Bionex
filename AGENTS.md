@@ -353,6 +353,15 @@ user's Mac.
     «🚧 Лимит сабабли қабул қилинмади: N та (…)» for the main site. Both sites (shared Worker).
     Before this, refusals were logged nowhere, so how many customers the old limits lost is unknown.
 
+36. **Silent failures now reach the operators' group** (2026-10-29, own audit): a main-site order the
+    sheet refuses (`SHEET_WRITE_ALERT`), an unreadable «Holat» on the 5-minute read
+    (`SHEET_READ_ALERT`, index.ts `syncMainSheet`), and a Lead the main dataset refuses or never gets
+    (`META_ALERT`; `sendMetaEvent` now returns a boolean, `watchMeta`) each post one ⚠️ message to the
+    reports thread, at most hourly per kind (`alert`). The partner's sheet/dataset raise nothing in
+    the group (#2). Also: `buildUserData` makes `fbc` = `fb.1.<now>.<clickId>` when the `_fbc` cookie
+    is not set yet (the Pixel loads only once the page is idle), so an early order still carries its
+    ad click to Meta.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

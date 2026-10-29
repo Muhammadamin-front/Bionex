@@ -240,6 +240,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
             ip,
             userAgent: request.headers.get('user-agent'),
             cookie: request.headers.get('cookie'),
+            clickId: data.clickId,
+            now,
           }),
           sourceUrl: request.headers.get('referer') || url.origin,
         }
@@ -306,11 +308,18 @@ async function syncPartnerSheet(env: Env, now: number): Promise<void> {
  * «Holat» in the main site's own sheet, read with the partner's: the outcome the people
  * ringing from the sheet chose, reported to Meta like a Telegram button (sheets.ts `sheetOutcome`).
  */
+const SHEET_READ_ALERT =
+  '⚠️ <b>Google жадвал ўқилмаяпти.</b> «Holat» устунидаги «Sotildi» / «Kerakli» Meta’га кетмаяпти. Жадвалнинг Apps Script’ини текширинг (Начать развертывание → Управление развертываниями) ёки дастурчига ёзинг.';
+
 async function syncMainSheet(env: Env, now: number): Promise<void> {
   const cfg = sheetsConfig(env, 'main');
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
-  if (!rows) return;
+  if (!rows) {
+    // While «Holat» cannot be read, no «Sotildi» / «Kerakli» reaches Meta: say so (hourly at most).
+    await env.REGISTRY.get(env.REGISTRY.idFromName('main')).alert('sheet-read', SHEET_READ_ALERT, now);
+    return;
+  }
   const marked = rows.map((r) => ({ leadId: r.number, outcome: sheetOutcome(r.status) }));
   await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncMainSheet({ rows: marked, now });
 }
