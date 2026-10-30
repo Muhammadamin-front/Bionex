@@ -10,6 +10,7 @@ import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } fr
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
+import { ConcernQuestion } from '../../lib/concern';
 import { OfferBanner, useOffer } from '../../lib/offer';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
@@ -45,6 +46,8 @@ export interface OrderResult {
   message: string;
   /** Formatted for display: "+998 90 123 45 67". */
   phone: string;
+  /** The order's id, for the thank-you screen's question (lib/concern.tsx). */
+  submissionId?: string;
 }
 
 interface Verification {
@@ -362,7 +365,7 @@ export function OrderForm({
       // The heading already says the order was received; for a new order the body only
       // adds what happens next. A repeat keeps the server's "already received" wording.
       const message = response.status === 'accepted' ? 'Раҳмат! Оператор тез орада сизга қўнғироқ қилади.' : response.message;
-      onSuccess({ message, phone: formatUzPhone(fullPhone) });
+      onSuccess({ message, phone: formatUzPhone(fullPhone), ...(response.status === 'accepted' ? { submissionId } : {}) });
     } catch (err) {
       setWaitingForCheck(false);
       setBusy(false);
@@ -430,6 +433,8 @@ export function OrderForm({
             </li>
           ))}
         </ol>
+        {/* Only in the form the order was sent from: the other one shows the same confirmation. */}
+        {completed.submissionId && submittedHere.current && <ConcernQuestion submissionId={completed.submissionId} />}
         {callButton && <div className="mx-auto mt-6 max-w-sm">{callButton}</div>}
       </div>
     );

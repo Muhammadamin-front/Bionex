@@ -435,6 +435,19 @@ user's Mac.
     still a clean order and an instant Lead), «Tafsilot» «рақам автоматик ёзилган». Shared form: the
     partner site gets it only with `deploy:t2`; workers.dev with the Worker deploy.
 
+44. **«Сизни нима безовта қилади?» on the thank-you screen** (2026-10-30, owner's choice: asked after
+    the order, so it costs none; a dropdown in the form would neither stop bots nor be free). Main site
+    only (`AskConcernContext`, provided by sites/classic). `ConcernQuestion` (lib/concern.tsx): six
+    toggles from `@bionex/shared/concerns` `CONCERNS`, «Операторга юбориш» → POST
+    `/api/leads/concern` {submissionId, concerns} (also forwarded by apps/site). Worker `takeConcern` →
+    `addConcern`: `submissions.lead_id` (new column) finds the order; once per order
+    (`list_items.concern`); reply under the order in Telegram «📝 Мижоз ўзи белгилади: …»; and, only
+    when the secret `SHEETS_NOTES=1`, the sheet script's new `note` action writes «Shikoyat» on the
+    order's row (Lidlar or Spam; header made if missing; retried once if the row is not there yet).
+    The script without `note` would append an empty row — so update the Apps Script (new version)
+    BEFORE setting SHEETS_NOTES. The arrival dialog no longer closes itself after an order when the
+    question is asked.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

@@ -1,5 +1,6 @@
 import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorCode, type LeadSubmitResponse } from '@bionex/shared/lead';
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
+import { concernAnswerSchema } from '@bionex/shared/concerns';
 import { site } from '../../web/src/config/product';
 import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -99,6 +100,7 @@ export default {
         waitingForTelegram: queued,
       });
     }
+    if (url.pathname === '/api/leads/concern' && request.method === 'POST') return takeConcern(request, env, url);
     if (url.pathname !== '/api/leads') return fail(404, 'not_found', MESSAGES.notFound);
     if (request.method !== 'POST') return fail(405, 'not_found', MESSAGES.notFound);
     return takeOrder(request, env, ctx, url, 'main');
@@ -119,6 +121,28 @@ export default {
     ctx.waitUntil(env.REGISTRY.get(env.REGISTRY.idFromName('main')).dailyReport(Date.now()));
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * The thank-you screen's optional «Сизни нима безовта қилади?» (main site): the answer joins the order
+ * it follows — a reply under its Telegram message and the sheet row's «Shikoyat». Only for an order this
+ * browser has just placed (its submission id), once.
+ */
+async function takeConcern(request: Request, env: Env, url: URL): Promise<Response> {
+  const origin = request.headers.get('origin');
+  if (origin && origin !== url.origin) return fail(403, 'forbidden', MESSAGES.forbidden);
+  const raw = await request.text();
+  if (raw.length > 2048) return fail(413, 'validation_failed', MESSAGES.validation);
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return fail(400, 'validation_failed', MESSAGES.validation);
+  }
+  const parsed = concernAnswerSchema.safeParse(body);
+  if (!parsed.success) return fail(400, 'validation_failed', MESSAGES.validation);
+  const done = await env.REGISTRY.get(env.REGISTRY.idFromName('main')).addConcern({ ...parsed.data, now: Date.now() });
+  return done ? json(200, { ok: true }) : fail(404, 'not_found', MESSAGES.notFound);
+}
 
 /**
  * A POST /api/leads, from this Worker's own site or from the partner site (`PartnerSite`).

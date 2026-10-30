@@ -1,5 +1,6 @@
 import type { Utm } from '@bionex/shared/utm';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AskConcernContext } from '../../lib/concern';
 import { OrderForm, type OrderResult } from './OrderForm';
 
 /**
@@ -104,12 +105,14 @@ export function OrderModal({
     };
   }, [open, close]);
 
-  // Ordered: show the confirmation, then step aside so the page can be read.
+  // Ordered: show the confirmation, then step aside so the page can be read — unless the thank-you
+  // screen asks a question (lib/concern.tsx): then the visitor closes it.
+  const asks = useContext(AskConcernContext);
   useEffect(() => {
-    if (!open || !order) return;
+    if (!open || !order || asks) return;
     const timer = window.setTimeout(close, CLOSE_AFTER_SUCCESS_MS);
     return () => window.clearTimeout(timer);
-  }, [open, order, close]);
+  }, [open, order, close, asks]);
 
   if (!open) return null;
 

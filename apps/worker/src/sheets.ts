@@ -125,6 +125,35 @@ export async function readSheetStatuses(cfg: SheetsConfig): Promise<Array<{ numb
 }
 
 /** Appends the order to `tab`; true only when the sheet answered «ok». */
+/**
+ * Sets one cell of an order's row (by its №, in «Lidlar» or «Spam»), the header made if missing —
+ * the `note` action of the main sheet's script (docs/main-sheet-script.js). An order's row is added a
+ * moment after it arrives, so a «not found» is tried once more a few seconds later.
+ */
+export async function sendSheetNote(cfg: SheetsConfig, note: { number: number; column: string; value: string }): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(cfg.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ secret: cfg.secret, action: 'note', ...note }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const text = (await res.text()).trim();
+      if (res.ok && text === 'ok') return true;
+      if (text !== 'notfound') {
+        console.error(`Google Sheets refused the note for order ${note.number} (${res.status} ${text.slice(0, 40)})`);
+        return false;
+      }
+    } catch (err) {
+      console.error('Google Sheets unreachable', (err as Error)?.message);
+      return false;
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  return false;
+}
+
 export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder, tab: string = SHEET): Promise<boolean> {
   const row = [
     order.number,

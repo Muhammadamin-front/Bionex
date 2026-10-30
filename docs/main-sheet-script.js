@@ -137,6 +137,9 @@ function doPost(e) {
 
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
 
+  // Mijozning «rahmat» ekranidagi javobi: № bo'yicha qatorni topib, data.column ustuniga yozadi
+  if (data.action === 'note') return note_(data);
+
   // Worker har 5 daqiqada so'raydigan format: [[№, Holat], ...] — faqat «Lidlar»dan
   if (data.action === 'statuses') {
     const values = sh.getDataRange().getValues();
@@ -173,6 +176,29 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Bitta katak: № bo'yicha qator («Lidlar», keyin «Spam»), ustun sarlavha nomi bo'yicha (bo'lmasa qo'shiladi)
+function note_(data) {
+  const ss = SpreadsheetApp.getActive();
+  for (const name of [SHEET_NAME, SPAM_SHEET]) {
+    const sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) continue;
+    const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim());
+    const n = head.indexOf('№');
+    if (n < 0) continue;
+    const nums = sh.getRange(2, n + 1, sh.getLastRow() - 1, 1).getValues();
+    const i = nums.findIndex(r => String(r[0]) === String(data.number));
+    if (i < 0) continue;
+    let col = head.indexOf(String(data.column)) + 1;
+    if (!col) {
+      col = sh.getLastColumn() + 1;
+      sh.getRange(1, col).setValue(String(data.column));
+    }
+    sh.getRange(i + 2, col).setValue(String(data.value));
+    return ContentService.createTextOutput('ok');
+  }
+  return ContentService.createTextOutput('notfound');
 }
 
 // «Spam» varag'i: bo'lmasa ochadi, bo'sh bo'lsa sarlavha qatorini yozadi

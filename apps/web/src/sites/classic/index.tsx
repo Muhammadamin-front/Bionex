@@ -8,6 +8,7 @@ import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
 import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
+import { AskConcernContext } from '../../lib/concern';
 import { OfferContext, type Offer } from '../../lib/offer';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
@@ -213,7 +214,10 @@ export function Landing() {
   // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
   return (
     <OfferContext.Provider value={OFFER}>
-      <Page proof={<Proof />} barOverForms={false} />
+      {/* «Сизни нима безовта қилади?» after the order (owner, 2026-10-30). */}
+      <AskConcernContext.Provider value={true}>
+        <Page proof={<Proof />} barOverForms={false} />
+      </AskConcernContext.Provider>
     </OfferContext.Provider>
   );
 }

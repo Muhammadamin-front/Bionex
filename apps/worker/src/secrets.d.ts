@@ -41,6 +41,8 @@ interface WorkerSecrets {
    * ads still pointing at the old link keep working. Unset: no redirect.
    */
   SITE_HOST?: string;
+  /** '1' once the main sheet's Apps Script has the `note` action: the thank-you answer then goes to its «Shikoyat» column. */
+  SHEETS_NOTES?: string;
   /** Test overrides for the outside services. */
   TELEGRAM_API_BASE?: string;
   TURNSTILE_VERIFY_URL?: string;

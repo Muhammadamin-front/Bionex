@@ -4,7 +4,8 @@ import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
-import { sendSheetOrder, SPAM_SHEET, sheetsConfig } from './sheets';
+import { sendSheetNote, sendSheetOrder, SPAM_SHEET, sheetsConfig } from './sheets';
+import { CONCERNS, type ConcernId } from '@bionex/shared/concerns';
 import type { SiteId } from './sites';
 import {
   callTelegram,
@@ -286,6 +287,9 @@ export class LeadRegistry extends DurableObject<Env> {
     const sessionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(bot_sessions)').toArray().map((c) => c.name);
     if (!sessionColumns.includes('test')) this.sql.exec('ALTER TABLE bot_sessions ADD COLUMN test INTEGER NOT NULL DEFAULT 0');
     // Orders now stay listable after their 10-order list went out (for /royxat): mark, don't delete.
+    // Which order a submission became (main site): the thank-you screen's answer finds its order by it.
+    const submissionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(submissions)').toArray().map((c) => c.name);
+    if (!submissionColumns.includes('lead_id')) this.sql.exec('ALTER TABLE submissions ADD COLUMN lead_id INTEGER');
     const listColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(list_items)').toArray().map((c) => c.name);
     if (!listColumns.includes('listed')) this.sql.exec('ALTER TABLE list_items ADD COLUMN listed INTEGER NOT NULL DEFAULT 0');
     // For the operators' panel: the order's group message (to update it) and where it came from.
@@ -302,6 +306,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('details')) this.sql.exec('ALTER TABLE list_items ADD COLUMN details TEXT');
     // Main-site bot/spam orders: in the table but kept out of the panel and lists (see accept).
     if (!listColumns.includes('hidden')) this.sql.exec('ALTER TABLE list_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+    // «Сизни нима безовта қилади?», answered on the thank-you screen.
+    if (!listColumns.includes('concern')) this.sql.exec('ALTER TABLE list_items ADD COLUMN concern TEXT');
     // Orders already written to the «Spam» tab (live or by «/spam N»), so none is written twice.
     this.sql.exec('CREATE TABLE IF NOT EXISTS spam_exported (lead_id INTEGER PRIMARY KEY)');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
@@ -549,7 +555,7 @@ export class LeadRegistry extends DurableObject<Env> {
       );
     }
     if (list?.full) this.sendList(now);
-    this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'accepted', now);
+    this.sql.exec('INSERT INTO submissions (id, status, at, lead_id) VALUES (?, ?, ?, ?)', input.submissionId, 'accepted', now, leadId);
     this.prune(now);
     await this.flush();
     return { status: 'accepted', number: leadId };
@@ -720,6 +726,31 @@ export class LeadRegistry extends DurableObject<Env> {
     await callTelegram(this.telegramConfig(), 'sendMessage', { chat_id: Number(chat), text, parse_mode: 'HTML' }).catch((err: unknown) =>
       console.error('Owner alert not delivered', (err as Error)?.message),
     );
+  }
+
+  /**
+   * The thank-you screen's answer for the order this submission became: kept with the order, told to
+   * the operators under its Telegram message and written to its sheet row («Shikoyat»). Once per order.
+   */
+  async addConcern(input: { submissionId: string; concerns: ConcernId[]; now: number }): Promise<boolean> {
+    const leadId = this.sql
+      .exec<{ lead_id: number | null }>("SELECT lead_id FROM submissions WHERE id = ? AND status = 'accepted'", input.submissionId)
+      .toArray()[0]?.lead_id;
+    if (!leadId) return false;
+    const item = this.sql.exec<{ concern: string | null }>('SELECT concern FROM list_items WHERE lead_id = ?', leadId).toArray()[0];
+    if (!item || item.concern) return Boolean(item);
+    const cyrl = input.concerns.map((c) => CONCERNS[c].cyrl).join(', ');
+    this.sql.exec('UPDATE list_items SET concern = ? WHERE lead_id = ?', cyrl, leadId);
+    this.enqueue(`📝 Мижоз ўзи белгилади: <b>${cyrl}</b>`, { replyToLead: leadId, now: input.now, thread: 'leads' });
+    // Only once the sheet's script knows the `note` action (docs/main-sheet-script.js): an older one
+    // would take it for an order and append an empty row. Switched on with the SHEETS_NOTES secret.
+    const sheet = this.env.SHEETS_NOTES === '1' ? sheetsConfig(this.env, 'main') : null;
+    if (sheet) {
+      const latn = input.concerns.map((c) => CONCERNS[c].latn).join(', ');
+      this.ctx.waitUntil(sendSheetNote(sheet, { number: leadId, column: 'Shikoyat', value: latn }));
+    }
+    await this.flush();
+    return true;
   }
 
   /** The main dataset refused or never got an event: Leads are being lost, so the group hears of it (hourly at most). */

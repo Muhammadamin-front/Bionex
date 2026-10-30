@@ -59,6 +59,11 @@ export function submitLead(body: unknown): Promise<LeadSubmitResponse> {
   return apiFetch<LeadSubmitResponse>('/api/leads', { method: 'POST', body: JSON.stringify(body) });
 }
 
+/** The thank-you screen's optional answer (lib/concern.tsx), for the order just placed. */
+export function sendConcern(body: { submissionId: string; concerns: string[] }): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>('/api/leads/concern', { method: 'POST', body: JSON.stringify(body) });
+}
+
 /**
  * A random id for one order attempt (UUID v4). `crypto.randomUUID` only exists since
  * iOS 15.4 / Chrome 92, so older phones build it from `getRandomValues` (available everywhere).

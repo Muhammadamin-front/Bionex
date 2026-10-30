@@ -11,7 +11,8 @@
     "./utm": "./src/utm.ts",
     "./lead": "./src/lead.ts",
     "./constants": "./src/constants.ts",
-    "./device": "./src/device.ts"
+    "./device": "./src/device.ts",
+    "./concerns": "./src/concerns.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
