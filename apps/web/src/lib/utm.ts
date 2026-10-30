@@ -8,6 +8,7 @@ const KEY = 'bx_utm';
  * reload or an in-page navigation does not lose the source.
  */
 export function captureUtm(): Utm {
+  if (typeof window === 'undefined') return {}; // the build's prerender: no address yet
   const params = new URLSearchParams(window.location.search);
   const fromUrl = sanitizeUtm({
     source: params.get('utm_source'),

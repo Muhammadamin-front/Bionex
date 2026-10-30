@@ -31,6 +31,9 @@ function turnstileLanguage(): string {
   return /^(uz|ru|kk|ky|tg)/i.test(lang) || !lang ? 'ru' : 'auto';
 }
 
+/** Set once React has taken over the prerendered page (see `ready` in OrderForm). */
+let pageTakenOver = false;
+
 type Field = 'fullName' | 'phone';
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -93,6 +96,15 @@ export function OrderForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [waitingForCheck, setWaitingForCheck] = useState(false);
+  /** The built page shows the form before its script runs (prerender): typing then would be lost
+   *  and «send» would reload the page, so the fields are read-only and the button a plain one
+   *  (not `disabled`: that fades it) until React has taken the page over. A form opened later
+   *  (the pop-up) is ready at once. */
+  const [ready, setReady] = useState(() => pageTakenOver);
+  useEffect(() => {
+    pageTakenOver = true;
+    setReady(true);
+  }, []);
 
   const verification = useRef<Verification | null>(null);
   const turnstileToken = useRef<string | null>(null);
@@ -454,6 +466,7 @@ export function OrderForm({
             enterKeyHint="next"
             maxLength={80}
             required
+            readOnly={!ready}
             value={fullName}
             onChange={(e) => {
               setFullName(e.target.value);
@@ -496,6 +509,7 @@ export function OrderForm({
               autoComplete="off"
               enterKeyHint="send"
               required
+              readOnly={!ready}
               value={phone}
               onChange={onPhoneChange}
               onBlur={() => void onBlur('phone')}
@@ -540,7 +554,7 @@ export function OrderForm({
           </div>
         )}
 
-        <AntiMetalButton type="submit" busy={busy} disabled={busy} className="w-full sm:col-span-2">
+        <AntiMetalButton type={ready ? 'submit' : 'button'} busy={busy} disabled={busy} className="w-full sm:col-span-2">
           {busy ? (
             <>
               <svg className="spinner h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">

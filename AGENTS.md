@@ -380,6 +380,16 @@ user's Mac.
     `"SITE_HOST": "zeynara.com.uz"` in wrangler.jsonc vars, `VITE_SITE_URL` in apps/web/.env.production,
     Meta domain verification (Business Settings → Brand safety → Domains, DNS TXT), new ads on the domain.
 
+39. **The main page is prerendered** (2026-10-30, ported from the Mega-Akula project, which was forked
+    from this code): `npm run build` (main only — `build:t2` unchanged) renders the page into
+    dist/index.html (`src/entry-server.tsx`, `scripts/prerender.mjs`: HTML filled in, CSS inlined)
+    and `main.tsx` takes it over with `hydrateRoot`; the `landing` class is in index.html. Code that
+    runs during render must not touch `window`/`document` (`captureUtm` returns {} then). The order
+    form is read-only, its button a plain one, until hydrated (`ready`). Measured on the built page,
+    slow 4G + 4× CPU: first paint/LCP 1.56 s (live, unprerendered) → 0.49 s; no hydration errors; an
+    order goes through after hydration. NOT deployed when written: the owner said not to touch the
+    Worker while active ad sets point at it.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

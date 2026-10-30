@@ -1,12 +1,14 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { App } from './App';
 
-// Larger base font for older visitors.
-document.documentElement.classList.add('landing');
-
-createRoot(document.getElementById('root')!).render(
+// The main site's built page arrives already drawn (scripts/prerender.mjs): React takes it over
+// instead of drawing it again. The partner build and `vite dev` serve an empty #root, drawn here.
+const root = document.getElementById('root')!;
+const app = (
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 );
+if (root.firstElementChild) hydrateRoot(root, app);
+else createRoot(root).render(app);
