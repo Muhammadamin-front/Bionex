@@ -78,6 +78,9 @@ export interface DeviceSignals {
   adClick?: boolean;
   /** Chrome's real major version, from userAgentData (the user agent string can be edited). */
   chrome?: string;
+  /** The phone number appeared all at once, not typed or pasted: autofill (Instagram's from the
+   *  Meta account, the keyboard's) — often an old number the person no longer uses. */
+  autofill?: boolean;
 }
 
 const short = (v: unknown, max: number) => cleanDeviceModel(typeof v === 'string' ? v : undefined)?.slice(0, max);
@@ -102,6 +105,7 @@ export function cleanSignals(value: unknown): DeviceSignals | undefined {
     lang: short(v.lang, 20),
     adClick: flag(v.adClick),
     chrome: typeof v.chrome === 'string' && /^\d{1,4}$/.test(v.chrome) ? v.chrome : undefined,
+    autofill: flag(v.autofill),
   };
   for (const key of Object.keys(out) as Array<keyof DeviceSignals>) if (out[key] === undefined) delete out[key];
   return Object.keys(out).length ? out : undefined;
@@ -117,6 +121,7 @@ const WORDS = {
     seconds: 'soniyada',
     keys: 'ta harf yozilgan',
     pasted: "nusxa qo'yilgan",
+    autofill: "raqam avtomatik yozilgan",
     noTyping: 'hech narsa yozilmagan',
     noTouch: 'ekranga tegilmagan',
     synthetic: 'dastur bosgan',
@@ -134,6 +139,7 @@ const WORDS = {
     seconds: 'сонияда',
     keys: 'та ҳарф ёзилган',
     pasted: 'нусха қўйилган',
+    autofill: 'рақам автоматик ёзилган',
     noTyping: 'ҳеч нарса ёзилмаган',
     noTouch: 'экранга тегилмаган',
     synthetic: 'дастур босган',
@@ -181,6 +187,7 @@ export function describeSignals(s: DeviceSignals | undefined, userAgent: string 
   if (s.fillMs !== undefined) parts.push(`${Math.round(s.fillMs / 1000)} ${w.seconds}`);
   if (s.keys) parts.push(`${s.keys} ${w.keys}`);
   if (s.pasted) parts.push(w.pasted);
+  if (s.autofill) parts.push(w.autofill);
   if (!s.keys && !s.pasted) parts.push(w.noTyping);
   if (s.synthetic) parts.push(`${w.synthetic} ×${s.synthetic}`);
   if (s.taps === 0 && s.touch) parts.push(w.noTouch);

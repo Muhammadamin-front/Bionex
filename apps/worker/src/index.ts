@@ -212,6 +212,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       flags.push(site === 'main' && data.signals && !programDriven(data.signals) ? 'decoy_filled' : 'honeypot');
     }
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
+    // The number was filled in by autofill (Instagram's from the Meta account): often an old one.
+    if (data.signals?.autofill) flags.push('phone_autofill');
     // The main site's page no longer asks for the check (owner, 2026-10-29: in the Instagram app it
     // would not pass, and people left). No token there is normal; a page that ran no script at all
     // (no browser signals: a direct post to the API) is a program's. A token that was sent is still

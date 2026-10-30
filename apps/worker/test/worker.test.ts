@@ -216,6 +216,11 @@ describe('a new order', () => {
     expect(leadMessages().at(-1)!.text).toMatch(/бот бўлиши мумкин/);
   });
 
+  it('marks a number that autofill put in (often an old one), and still delivers it as a clean order', async () => {
+    expect((await order({ signals: { touch: 5, taps: 3, keys: 8, autofill: true } })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('рақам автоматик тўлдирилган');
+  });
+
   it('flags a filled honeypot or a made-up looking number but still delivers it', async () => {
     await order({ contactFax: 'spam', phone: '+998 90 111 11 11' });
     expect(leadMessages()[0]!.text).toMatch(/бот бўлиши мумкин/);

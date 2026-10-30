@@ -98,6 +98,8 @@ export function OrderForm({
   const [busy, setBusy] = useState(false);
   const [waitingForCheck, setWaitingForCheck] = useState(false);
   const offer = useOffer();
+  /** The number arrived all at once (autofill, often an old one): ask the visitor to check it. */
+  const [phoneAutofilled, setPhoneAutofilled] = useState(false);
   /** The built page shows the form before its script runs (prerender): typing then would be lost
    *  and «send» would reload the page, so the fields are read-only and the button a plain one
    *  (not `disabled`: that fades it) until React has taken the page over. A form opened later
@@ -245,6 +247,12 @@ export function OrderForm({
     }
     digitsBefore = Math.max(0, Math.min(digits.length, digitsBefore - dropped));
 
+    // Typed or pasted by the person: fine. Several digits at once by anything else is autofill —
+    // Instagram's (from the Meta account) or the keyboard's — and often a number no longer in use.
+    const inputType = (e.nativeEvent as InputEvent).inputType;
+    if (inputType === 'insertText' || inputType === 'deleteContentBackward' || inputType === 'insertFromPaste') setPhoneAutofilled(false);
+    else if (digits.length - prevDigits.length >= 5) setPhoneAutofilled(true);
+
     const formatted = formatNationalAsTyped(digits);
     setPhone(formatted);
     if (errors.phone) setErrors((x) => ({ ...x, phone: undefined }));
@@ -336,7 +344,7 @@ export function OrderForm({
         clickId: adClickId(),
         fingerprint,
         deviceModel: model,
-        signals,
+        signals: { ...signals, autofill: phoneAutofilled || undefined },
         turnstileToken: token ?? undefined,
         // Either decoy filled is the same trap.
         [HONEYPOT_FIELD]: `${honeypotRef.current?.value ?? ''}${websiteRef.current?.value ?? ''}`.slice(0, 500),
@@ -498,7 +506,7 @@ export function OrderForm({
           <div
             className={cn(
               'flex h-16 min-w-0 items-center rounded-2xl border-2 bg-paper transition-[border-color,background-color,box-shadow] focus-within:border-brand focus-within:bg-card focus-within:shadow-[0_0_0_4px_rgba(23,120,74,0.2)]',
-              errors.phone ? 'border-danger' : 'border-line',
+              errors.phone ? 'border-danger' : phoneAutofilled ? 'border-accent-2 bg-accent/15' : 'border-line',
             )}
           >
             <span className="select-none border-r-2 border-line px-3.5 font-display text-xl font-bold tabular-nums text-ink-2" aria-hidden="true">
@@ -508,7 +516,8 @@ export function OrderForm({
               ref={phoneRef}
               id={`${id}-phone`}
               name="zn-number"
-              type="tel"
+              // `text`, not `tel`: fewer autofills recognise it as a phone field; the keypad stays numeric.
+              type="text"
               inputMode="tel"
               autoComplete="off"
               enterKeyHint="send"
@@ -525,6 +534,10 @@ export function OrderForm({
           {errors.phone ? (
             <p id={errorId('phone')} className="mt-2 text-base font-semibold text-danger">
               {errors.phone}
+            </p>
+          ) : phoneAutofilled ? (
+            <p id={`${id}-phone-hint`} role="status" className="mt-2 rounded-xl bg-accent/30 px-3 py-2 text-base font-bold text-ink">
+              Рақам автоматик ёзилди. Шу рақам ҳозир ишлайдими? Текшириб, керак бўлса тузатинг.
             </p>
           ) : (
             <p id={`${id}-phone-hint`} className="mt-2 text-base text-muted">

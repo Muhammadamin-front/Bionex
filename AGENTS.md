@@ -424,6 +424,17 @@ user's Mac.
     Events Manager's window. `META_ORDER_VALUE` unset → no Purchase on «Sotildi» (owner asked if a
     price is required: yes for Purchase; not chosen).
 
+43. **Autofilled phone numbers** (2026-10-30, owner: Instagram's in-app browser puts in the Meta
+    account's phone — sometimes 10 years old — and orders arrive with dead numbers). The owner's idea
+    (a div/span instead of an input) was declined: contenteditable is unreliable on Android / in-app
+    browsers and the keyboard still offers the old number. Instead, in `OrderForm`: the phone input is
+    `type="text"` (keypad still `inputMode="tel"`) so fewer autofills see a phone field; 5+ digits
+    arriving in one change that is not typing/paste set `phoneAutofilled` — a yellow field and «Рақам
+    автоматик ёзилди. Шу рақам ҳозир ишлайдими? Текшириб, керак бўлса тузатинг.»; any typing clears it.
+    It travels as `signals.autofill` → Worker flag `phone_autofill` (warning, Telegram and sheet;
+    still a clean order and an instant Lead), «Tafsilot» «рақам автоматик ёзилган». Shared form: the
+    partner site gets it only with `deploy:t2`; workers.dev with the Worker deploy.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

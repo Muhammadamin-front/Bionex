@@ -50,6 +50,7 @@ const FLAG_TEXT: Record<string, string> = {
   no_browser: "bot: sahifa ochilmasdan to'g'ridan-to'g'ri yuborilgan",
   synthetic_click: "sahifada dastur bosishi sezildi, lekin boshqa bot belgisi yo'q (Instagram brauzeri bo'lishi mumkin, odam ham bo'lishi mumkin)",
   decoy_filled: "yashirin maydon to'ldirilgan, lekin dastur belgisi yo'q (avto-to'ldirish bo'lishi mumkin, odam ham bo'lishi mumkin)",
+  phone_autofill: "raqam avtomatik to'ldirilgan (Instagram/telefon) — eski, ishlamaydigan raqam bo'lishi mumkin",
   phone_pattern: "raqam soxtaga o'xshaydi",
   reused_click: "shu reklama bosilishi avval boshqa raqamdan ishlatilgan (havola ko'chirilgan bo'lishi mumkin)",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
