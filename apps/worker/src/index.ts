@@ -60,6 +60,12 @@ const CONFIG_ALERT: Record<string, string> = {
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
+    // The page on the old address or «www.» → the site's own domain, query string (fbclid, utm) kept.
+    // Only the page: the order API, the panel and the bot's webhook keep answering on every address.
+    if (url.pathname === '/' && env.SITE_HOST && url.hostname !== env.SITE_HOST && (url.hostname.endsWith('.workers.dev') || url.hostname === `www.${env.SITE_HOST}`)) {
+      return Response.redirect(`https://${env.SITE_HOST}/${url.search}`, 301);
+    }
+    if (url.pathname === '/') return env.ASSETS.fetch(request);
     // The operators' Mini App & Table CRM (served by the Worker for its own CSP).
     if ((url.pathname === '/panel' || url.pathname === '/crm') && (request.method === 'GET' || request.method === 'HEAD')) return panelPage();
     // The panel's installable-app (PWA) files: public, no lead data. See panel/pwa.ts.

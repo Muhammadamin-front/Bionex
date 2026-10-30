@@ -240,6 +240,25 @@ describe('videos', () => {
   });
 });
 
+describe('the site\'s own domain', () => {
+  it('sends the page from the old address and www to the domain, keeping the ad\'s query; the API stays put', async () => {
+    await mf.dispose();
+    mf = start({ SITE_HOST: 'zeynara.com.uz' });
+    const old = await mf.dispatchFetch('https://zeynara.example.workers.dev/?fbclid=IwAR1&utm_source=facebook', { redirect: 'manual' });
+    expect(old.status).toBe(301);
+    expect(old.headers.get('location')).toBe('https://zeynara.com.uz/?fbclid=IwAR1&utm_source=facebook');
+    const www = await mf.dispatchFetch('https://www.zeynara.com.uz/', { redirect: 'manual' });
+    expect(www.headers.get('location')).toBe('https://zeynara.com.uz/');
+    expect((await mf.dispatchFetch('https://zeynara.com.uz/', { redirect: 'manual' })).status).toBe(200);
+    // Orders posted to the old address (a page still open in a phone) are still taken.
+    expect((await order()).status).toBe(201);
+  });
+
+  it('redirects nothing while no domain is set', async () => {
+    expect((await mf.dispatchFetch('https://zeynara.example.workers.dev/', { redirect: 'manual' })).status).toBe(200);
+  });
+});
+
 describe('limits count the phone, not the network (many customers share one mobile address)', () => {
   const dev = (n: number) => `aaaaaaaa-1111-4111-8111-00000000000${n}`;
   const report = async () => {

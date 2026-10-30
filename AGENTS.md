@@ -370,6 +370,16 @@ user's Mac.
     The main sheet's Apps Script still sends its own `QualifiedLead` on «Kerakli» (docs/main-sheet-script.js):
     a different event from the site's `Lead`, left as it is (the owner was told).
 
+38. **Own domain `zeynara.com.uz`** (2026-10-30, bought by the owner at ahost.uz). Not yet on
+    Cloudflare when this was written (no NS records; the wrangler OAuth token has `zone (read)` only,
+    so the owner adds the zone in the dashboard and points the domain's NS at Cloudflare at ahost).
+    Prepared and inert until then: `SITE_HOST` (index.ts) — when set, `/` on *.workers.dev and on
+    `www.` answers 301 to `https://SITE_HOST/` with the query (fbclid, utm) kept, so ads on the old
+    link keep working; the API, panel, video and webhook answer on every host. `run_worker_first`
+    gained `/` for that. Still to do once the zone is active: `routes` custom domains (apex + www) and
+    `"SITE_HOST": "zeynara.com.uz"` in wrangler.jsonc vars, `VITE_SITE_URL` in apps/web/.env.production,
+    Meta domain verification (Business Settings → Brand safety → Domains, DNS TXT), new ads on the domain.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

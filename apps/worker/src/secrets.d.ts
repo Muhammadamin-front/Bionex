@@ -35,6 +35,12 @@ interface WorkerSecrets {
   /** The main site's own Google Sheet («Bionex-Zeynara»): a copy of every order. Off until both are set. */
   SHEETS_URL?: string;
   SHEETS_SECRET?: string;
+  /**
+   * The main site's own domain (e.g. «zeynara.com.uz»), once it is attached to this Worker. Set, the
+   * old *.workers.dev address and «www.» send the page there (301, the ad's ?fbclid / utm kept), so
+   * ads still pointing at the old link keep working. Unset: no redirect.
+   */
+  SITE_HOST?: string;
   /** Test overrides for the outside services. */
   TELEGRAM_API_BASE?: string;
   TURNSTILE_VERIFY_URL?: string;
