@@ -390,6 +390,19 @@ user's Mac.
     order goes through after hydration. NOT deployed when written: the owner said not to touch the
     Worker while active ad sets point at it.
 
+40. **zeynara.com.uz is a separate Pages site; the Worker's address is left alone** (2026-10-30,
+    owner: active ad sets point at zeynara.8pj6jsdbgr.workers.dev, do not touch the Worker). Zone
+    `zeynara.com.uz` active since 2026-10-30 03:35Z. `apps/site` = Cloudflare Pages project
+    `zeynara-com-uz` serving apps/web `build:site` (prerendered, `dist-site`, `VITE_SITE_URL`
+    https://zeynara.com.uz). `functions/api/[[path]].ts` forwards only POST /api/leads over the
+    `MAIN` service binding to the Worker's normal entrypoint, rewritten as a post to `MAIN_ORIGIN`
+    (the workers.dev address) after its own Origin check — because the Worker re-points the
+    Telegram webhook (`drop_pending_updates`!) at whatever origin an order arrives on, and two
+    alternating origins would drop operators' button presses. `functions/video/[[path]].ts` serves
+    the videos with byte ranges from the site's own files (worker `serveVideo`). Panel, webhook and
+    health stay on the Worker. Deploy: `npm run deploy:site --workspace=@bionex/worker` (Worker not
+    redeployed). The `SITE_HOST` redirect (#38) stays unset: the old address must keep its page.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

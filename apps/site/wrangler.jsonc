@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The main site on its own domain, https://zeynara.com.uz (2026-10-30): the same page, built
+  // prerendered (apps/web `build:site`), on Cloudflare Pages. The Worker's own address
+  // (zeynara.8pj6jsdbgr.workers.dev) is left exactly as it is — active ad sets point at it.
+  // Deploy with `npm run deploy:site --workspace=@bionex/worker`. The Worker is not redeployed.
+  "name": "zeynara-com-uz",
+  "compatibility_date": "2026-10-01",
+  "pages_build_output_dir": "../web/dist-site",
+
+  // Orders go to the main Worker (its normal entrypoint, as from its own page) inside Cloudflare.
+  "services": [{ "binding": "MAIN", "service": "zeynara" }],
+  "vars": {
+    // The Worker's own address: an order is handed over as if posted there, so the Worker keeps
+    // its one Telegram webhook (it re-points the webhook at whatever address an order arrives on).
+    "MAIN_ORIGIN": "https://zeynara.8pj6jsdbgr.workers.dev"
+  }
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.mjs",
+    "build:site": "tsc -p tsconfig.json && vite build --outDir dist-site && vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.mjs dist-site",
     "build:t2": "tsc -p tsconfig.json && vite build --mode t2 --outDir dist-t2",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json"

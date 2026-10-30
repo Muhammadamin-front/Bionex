@@ -7,6 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "STRICT_PRODUCTION_BUILD=1 npm run build --workspace=@bionex/web && wrangler deploy",
     "deploy:oromgoh": "MAIN_DESIGN=oromgoh STRICT_PRODUCTION_BUILD=1 npm run build --workspace=@bionex/web && wrangler deploy",
+    "deploy:site": "STRICT_PRODUCTION_BUILD=1 VITE_SITE_URL=https://zeynara.com.uz npm run build:site --workspace=@bionex/web && cd ../site && wrangler pages deploy --branch main",
     "deploy:t2": "STRICT_PRODUCTION_BUILD=1 npm run build:t2 --workspace=@bionex/web && cd ../partner && wrangler pages deploy --branch main",
     "types": "wrangler types",
     "typecheck": "tsc -p tsconfig.json",
