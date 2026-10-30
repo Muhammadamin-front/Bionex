@@ -8,6 +8,7 @@ import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
 import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
+import { OfferContext, type Offer } from '../../lib/offer';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
@@ -17,6 +18,7 @@ const file = (name: string) => media[`./media/${name}`];
  * Telegram video messages (square, `contain` keeps the round message whole).
  */
 const videos = [
+  { name: 'story-0', length: '0:46', fit: 'object-cover' },
   { name: 'story-1', length: '0:41', fit: 'object-cover' },
   { name: 'story-2', length: '1:48', fit: 'object-cover' },
   { name: 'story-3', length: '3:00', fit: 'object-cover' },
@@ -202,9 +204,16 @@ function Proof() {
   );
 }
 
+/** The discount the ad video announces (owner, 2026-10-30): shown until the end of 8 November, Tashkent time. */
+const OFFER: Offer = { percent: 25, pensioners: 35, until: '2026-11-08T23:59:59+05:00', untilText: '8 ноябргача' };
+
 export function Landing() {
   // The order dialog on arrival is back (2026-10-29): without it and with the form under the
   // videos, orders stopped. The videos now sit below the form, so it covers only the product.
   // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
-  return <Page proof={<Proof />} barOverForms={false} />;
+  return (
+    <OfferContext.Provider value={OFFER}>
+      <Page proof={<Proof />} barOverForms={false} />
+    </OfferContext.Provider>
+  );
 }

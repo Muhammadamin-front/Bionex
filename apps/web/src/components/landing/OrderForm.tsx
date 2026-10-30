@@ -10,6 +10,7 @@ import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } fr
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
+import { OfferBanner, useOffer } from '../../lib/offer';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
@@ -96,6 +97,7 @@ export function OrderForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [waitingForCheck, setWaitingForCheck] = useState(false);
+  const offer = useOffer();
   /** The built page shows the form before its script runs (prerender): typing then would be lost
    *  and «send» would reload the page, so the fields are read-only and the button a plain one
    *  (not `disabled`: that fades it) until React has taken the page over. A form opened later
@@ -446,9 +448,11 @@ export function OrderForm({
       )}
       aria-describedby={`${id}-privacy`}
     >
+      <OfferBanner className="mb-4" />
       {compact && (
         <p className="mb-4 font-display text-xl font-extrabold leading-snug">
-          Рақамингизни қолдиринг. <span className="text-brand">Консультация бепул.</span>
+          Рақамингизни қолдиринг.{' '}
+          <span className="text-brand">{offer ? 'Оператор чегирмали нархни айтади.' : 'Консультация бепул.'}</span>
         </p>
       )}
       <div className={cn(compact ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-5')}>
@@ -562,6 +566,8 @@ export function OrderForm({
               </svg>
               {waitingForCheck ? 'Текширилмоқда…' : 'Юборилмоқда…'}
             </>
+          ) : offer ? (
+            `−${offer.percent}% чегирма билан буюртма`
           ) : (
             'Батафсил маълумот олиш'
           )}

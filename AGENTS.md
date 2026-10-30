@@ -403,6 +403,15 @@ user's Mac.
     health stay on the Worker. Deploy: `npm run deploy:site --workspace=@bionex/worker` (Worker not
     redeployed). The `SITE_HOST` redirect (#38) stays unset: the old address must keep its page.
 
+41. **The ad's discount is on the page** (2026-10-30): the new ad video (Gulchehra opa, now `story-0`,
+    first in the video row) ends with «−25% chegirma, nafaqaxo'rlarga −35%» — the page offered only a
+    «free consultation». The owner confirmed the offer runs until 8 November. `lib/offer.tsx`:
+    `OfferContext` (provided only by sites/classic, `OFFER`), `useOffer` (gone after `until`, checked
+    after hydration), `OfferBanner` (red ticket) in the hero and on every order form; form heading
+    «Оператор чегирмали нархни айтади», submit and bottom-bar text «−25% чегирма билан буюртма».
+    No price is shown (the operator tells it). Partner page untouched (no provider). After 8 Nov
+    remove or change `OFFER`.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

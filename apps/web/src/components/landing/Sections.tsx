@@ -5,6 +5,7 @@ import { cn } from '../../lib/cn';
 import { AntiMetalLink } from '../ui/AntiMetalButton';
 import { AlertIcon, CheckIcon, PhoneIcon, QuoteMark } from '../ui/Icons';
 import { ProductPack } from '../ui/ProductPack';
+import { useOffer } from '../../lib/offer';
 import { OrderForm, type OrderResult } from './OrderForm';
 
 function Title({ id, children, className }: { id?: string; children: React.ReactNode; className?: string }) {
@@ -520,6 +521,7 @@ export function Footer() {
 }
 
 export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; quickFormOnScreen: boolean }) {
+  const offer = useOffer();
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_28px_-18px_rgba(13,58,39,0.55)] transition-transform duration-300 ease-out md:hidden"
@@ -558,7 +560,7 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
           tabIndex={visible ? 0 : -1}
           className="inline-flex h-16 min-w-0 flex-1 items-center justify-center rounded-2xl bg-forest px-4 font-display text-[1.05rem] font-bold text-white shadow-[0_10px_24px_-10px_rgba(13,58,39,0.6)] active:scale-[0.98]"
         >
-          Бепул консультация
+          {offer ? `−${offer.percent}% чегирма билан буюртма` : 'Бепул консультация'}
         </a>
       </div>
     </div>

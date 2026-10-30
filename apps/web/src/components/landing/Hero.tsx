@@ -2,6 +2,7 @@ import type { Utm } from '@bionex/shared/utm';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { formatPrice, product, site } from '../../config/product';
 import { useInView } from '../../lib/in-view';
+import { OfferBanner } from '../../lib/offer';
 import { AuroraBackdrop } from '../ui/AuroraBackdrop';
 import { CheckIcon, icons, PhoneIcon } from '../ui/Icons';
 import { ProductPack } from '../ui/ProductPack';
@@ -162,6 +163,7 @@ export function Hero() {
         </div>
 
         <div className="min-w-0">
+          <OfferBanner className="mb-6 w-fit" />
           <h1 className="text-[2.05rem] font-extrabold leading-[1.1] tracking-[-0.02em] text-balance sm:text-5xl lg:text-[3.35rem]">
             {hero.titleStart}{' '}
             <span className="relative inline-block whitespace-nowrap text-accent text-[min(1em,11.5vw)]">
