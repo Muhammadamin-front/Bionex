@@ -412,6 +412,18 @@ user's Mac.
     No price is shown (the operator tells it). Partner page untouched (no provider). After 8 Nov
     remove or change `OFFER`.
 
+42. **QualifiedLead from the Worker, with full match data** (2026-10-30, owner: optimise the ads on
+    «Kerakli» — the operators sell well; «Sotildi» alone would be too few). On «Kerakli» or «Sotildi» in
+    the main sheet, `reportToMeta` also sends `QualifiedLead` (event_time = now) with the order's stored
+    user_data (ph, fn, ln, IP, user agent, fbp, fbc) under the sheet script's own event_id
+    `zeynara_<phone digits>_QualifiedLead`, so Meta keeps one of the two (the script's version had match
+    quality 3.4/10). Never for a trap order (no meta_pending row) or «Keraksiz». Plan: once ~50
+    QualifiedLead a week, a NEW ad set optimised on a custom conversion built from QualifiedLead.
+    Also checked that day: the main Pixel config has no estRules (no browser Lead); the
+    targetologist's «browser Leads ≫ server, dedup warning» is the 23–28 Oct rule (#27) still in
+    Events Manager's window. `META_ORDER_VALUE` unset → no Purchase on «Sotildi» (owner asked if a
+    price is required: yes for Purchase; not chosen).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

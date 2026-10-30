@@ -70,7 +70,7 @@ export interface MetaEvent {
    * 'Lead' — a prospect an operator reached and confirmed is real.
    * 'Purchase' — that prospect bought ("✅ Сотилди"), sent alongside the Lead.
    */
-  eventName: 'Lead' | 'Purchase';
+  eventName: 'Lead' | 'Purchase' | 'QualifiedLead';
   /** The order's submissionId, so one order is one event however often this runs. */
   eventId: string;
   userData: MetaUserData;

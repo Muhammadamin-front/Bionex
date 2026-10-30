@@ -1023,6 +1023,18 @@ export class LeadRegistry extends DurableObject<Env> {
     const common = { eventId: row.event_id, userData, eventTime: row.at, sourceUrl: row.source_url };
     // Leaves after the operator's answer, never in front of it — unless it already went on arrival.
     if (!row.lead_sent) this.ctx.waitUntil(this.watchMeta(sendMetaEvent(cfg, { ...common, eventName: 'Lead' })));
+    // «Kerakli» or «Sotildi»: a real person who wants it — what the ads should look for (owner,
+    // 2026-10-30), with everything Meta matches on (the sheet's own script sends only phone and name,
+    // match quality 3.4/10). The script's event_id, so Meta keeps one of the two. Timed now: the
+    // moment the person was found real.
+    const phone = this.sql.exec<{ phone: string }>('SELECT phone FROM list_items WHERE lead_id = ?', leadId).toArray()[0]?.phone;
+    if (phone) {
+      this.ctx.waitUntil(
+        this.watchMeta(
+          sendMetaEvent(cfg, { ...common, eventName: 'QualifiedLead', eventId: `zeynara_${phone.replace(/\D/g, '')}_QualifiedLead`, eventTime: now }),
+        ),
+      );
+    }
     if (outcome === 'sold' && cfg.orderValue !== undefined) {
       // A different event_id, so Meta's de-duplication never mistakes the two for one event.
       this.ctx.waitUntil(

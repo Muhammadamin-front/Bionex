@@ -1056,15 +1056,17 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       },
     });
 
+  /** Lead and Purchase only: QualifiedLead (sent beside them on «Kerakli» / «Sotildi») has its own test. */
+  const counted = () => meta.events.filter((e) => e.event_name !== 'QualifiedLead');
   /** The event leaves after the operator's answer (waitUntil), so give it a moment. */
   const settled = async (n = 1) => {
-    for (let i = 0; i < 50 && meta.events.length < n; i++) await new Promise((r) => setTimeout(r, 10));
-    return meta.events;
+    for (let i = 0; i < 50 && counted().length < n; i++) await new Promise((r) => setTimeout(r, 10));
+    return counted();
   };
   /** Proof that nothing was sent: waiting the same time an event would have needed. */
   const quiet = async () => {
     await new Promise((r) => setTimeout(r, 150));
-    return meta.events;
+    return counted();
   };
 
   beforeEach(async () => {
@@ -1255,6 +1257,25 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     expect(await quiet()).toHaveLength(1);
   });
 
+  it('sends QualifiedLead on «Kerakli» or «Sotildi», with full match data and the sheet script\'s event id; never for spam', async () => {
+    const cookie = '_fbp=fb.1.1760000000000.111; _fbc=fb.1.1760000000000.IwAR-q';
+    await order({ phone: '+998 90 312 45 31', signals: { touch: 5, taps: 3, keys: 9 } }, { ip: '203.0.113.31', cookie, userAgent: 'Mozilla/5.0 (Linux; Android 14) Instagram' });
+    await order({ phone: '+998 90 312 45 32', signals: { touch: 5, taps: 3, keys: 9 } }, { ip: '203.0.113.32' });
+    await order({ phone: '+998 90 312 45 33', signals: { touch: 5, taps: 3, keys: 9 } }, { ip: '203.0.113.33' });
+    sheets.statuses = [[1, 'Kerakli'], [2, 'Sotildi'], [3, 'Keraksiz']];
+    const worker = (await mf.getWorker()) as unknown as { scheduled(o: { cron: string }): Promise<unknown> };
+    await worker.scheduled({ cron: '*/5 * * * *' });
+    await new Promise((r) => setTimeout(r, 200));
+    const q = meta.events.filter((e) => e.event_name === 'QualifiedLead');
+    expect(q.map((e) => e.event_id).sort()).toEqual(['zeynara_998903124531_QualifiedLead', 'zeynara_998903124532_QualifiedLead']);
+    expect(q.find((e) => e.event_id.includes('4531'))!.user_data).toMatchObject({
+      fbc: 'fb.1.1760000000000.IwAR-q',
+      fbp: 'fb.1.1760000000000.111',
+      client_ip_address: '203.0.113.31',
+      client_user_agent: 'Mozilla/5.0 (Linux; Android 14) Instagram',
+    });
+  });
+
   it('sends no Lead on arrival for a suspect order: it waits for a person', async () => {
     await order({ turnstileToken: 'bad' }); // failed check
     await order({ phone: '+998 90 312 45 46', signals: { webdriver: true, touch: 5, taps: 3 } }, { ip: '203.0.113.46' }); // bot
@@ -1277,8 +1298,10 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     const [event] = await settled();
     expect(event).toMatchObject({ event_name: 'Lead', action_source: 'website', event_id: submissionId });
     expect(meta.bodies[0]!.access_token).toBe('EAA-test-token');
-    // One dataset, one event, and the token never travels in the URL.
-    expect(meta.bodies).toHaveLength(1);
+    // One Lead (and the QualifiedLead beside it), and the token never travels in the URL.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(meta.bodies.map((b) => b.data[0]!.event_name).sort()).toEqual(['Lead', 'QualifiedLead']);
+    expect(meta.paths.every((path) => !path.includes('access_token'))).toBe(true);
   });
 
   it('never reports a bot trap to Meta, whatever the operator presses', async () => {
