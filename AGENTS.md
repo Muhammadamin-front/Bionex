@@ -446,7 +446,8 @@ user's Mac.
     order's row (Lidlar or Spam; header made if missing; retried once if the row is not there yet).
     The script without `note` would append an empty row — so update the Apps Script (new version)
     BEFORE setting SHEETS_NOTES. The arrival dialog no longer closes itself after an order when the
-    question is asked.
+    question is asked. Live 2026-10-30 on both addresses; the owner updated the Apps Script and
+    `SHEETS_NOTES=1` was set the same day.
 
 ## Open items
 
