@@ -88,6 +88,8 @@ export function makeLeadSubmissionSchema(opts: { phonePrefixes?: readonly string
     /** What tells a phone from a computer, a person from a program (device.ts); never refused. */
     signals: z.unknown().optional().transform(cleanSignals),
     turnstileToken: z.string().max(2048).optional(),
+    /** The visitor pressed the main site's discount (its percent) before ordering: a sticker by the name for the operators. */
+    offerTap: z.number().int().min(1).max(90).optional(),
     [HONEYPOT_FIELD]: z.string().max(500).optional(),
     utm: utmInputSchema,
   });

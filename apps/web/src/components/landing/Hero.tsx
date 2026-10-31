@@ -77,7 +77,7 @@ export function Header() {
 }
 
 /** Hand-drawn stroke under the accent word; drawn once, after the letters roll. */
-function DrawnUnderline() {
+export function DrawnUnderline() {
   return (
     <svg
       viewBox="0 0 300 24"
@@ -104,7 +104,7 @@ const SEAL_POSITIONS = [
   'left-[-40%] bottom-[6%] sm:left-[-6%] sm:bottom-[12%] [--r:-4deg]',
 ];
 
-function ProductStage() {
+export function ProductStage() {
   return (
     <div className="relative mx-auto w-full max-w-[11rem] sm:max-w-[19rem] lg:max-w-[22rem]">
       {/* Grounding shadow: offset and soft, so the pack stands on something. */}

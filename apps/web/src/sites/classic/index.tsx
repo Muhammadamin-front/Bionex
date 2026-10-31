@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 import { AskConcernContext } from '../../lib/concern';
 import { OfferContext, type Offer } from '../../lib/offer';
+import { AdHero } from './AdHero';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
@@ -205,6 +206,10 @@ function Proof() {
   );
 }
 
+/** The ad's own video (Gulchehra opa) opens the page; without its files, the original first screen. */
+const ad = { video: file('story-0.mp4'), poster: file('story-0.jpg'), face: file('story-0-face.jpg') };
+const adHero = ad.video && ad.poster && ad.face ? <AdHero video={ad.video} poster={ad.poster} face={ad.face} /> : undefined;
+
 /** The discount the ad video announces (owner, 2026-10-30): shown until the end of 8 November, Tashkent time. */
 const OFFER: Offer = { percent: 25, pensioners: 35, until: '2026-11-08T23:59:59+05:00', untilText: '8 ноябргача' };
 
@@ -216,7 +221,7 @@ export function Landing() {
     <OfferContext.Provider value={OFFER}>
       {/* «Сизни нима безовта қилади?» after the order (owner, 2026-10-30). */}
       <AskConcernContext.Provider value={true}>
-        <Page proof={<Proof />} barOverForms={false} />
+        <Page hero={adHero} proof={<Proof />} barOverForms={false} />
       </AskConcernContext.Provider>
     </OfferContext.Provider>
   );

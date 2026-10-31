@@ -28,6 +28,32 @@ export function useOffer(): Offer | null {
   return offer && !over ? offer : null;
 }
 
+/**
+ * Whether the visitor pressed the discount itself (the first screen's ticket and button, the bottom
+ * bar) before ordering (owner, 2026-10-31): the order then arrives with a sticker by the name, so the
+ * operator knows the customer came for it. Kept for the tab, so a reload in between still counts.
+ */
+const TAPPED_KEY = 'zeynara.offer-tapped';
+let tapped = false;
+
+export function tapOffer(): void {
+  tapped = true;
+  try {
+    sessionStorage.setItem(TAPPED_KEY, '1');
+  } catch {
+    // Storage blocked: this page view still remembers it.
+  }
+}
+
+export function offerTapped(): boolean {
+  if (tapped) return true;
+  try {
+    return sessionStorage.getItem(TAPPED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** The discount as a red ticket, as in the ad: «−25% ЧЕГИРМА · 8 ноябргача · нафақахўрларга −35%». */
 export function OfferBanner({ className }: { className?: string }) {
   const offer = useOffer();

@@ -11,7 +11,7 @@ import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
 import { ConcernQuestion } from '../../lib/concern';
-import { OfferBanner, useOffer } from '../../lib/offer';
+import { OfferBanner, offerTapped, useOffer } from '../../lib/offer';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
@@ -362,6 +362,7 @@ export function OrderForm({
         deviceModel: model,
         signals: { ...signals, autofill: phoneAutofilled || undefined },
         turnstileToken: token ?? undefined,
+        offerTap: offer && offerTapped() ? offer.percent : undefined,
         // Either decoy filled is the same trap.
         [HONEYPOT_FIELD]: `${honeypotRef.current?.value ?? ''}${websiteRef.current?.value ?? ''}`.slice(0, 500),
         utm,

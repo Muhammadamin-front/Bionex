@@ -1158,6 +1158,17 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(inTab('Lidlar')).not.toContain('Ўхшаш Киши');
     });
 
+    it('an order after pressing the discount carries a sticker by the name, in the group and the sheet', async () => {
+      await order({ fullName: 'Чегирма Киши', phone: '+998 90 312 45 51', offerTap: 25 }, { ip: '203.0.113.51' });
+      await order({ fullName: 'Оддий Киши', phone: '+998 90 312 45 52' }, { ip: '203.0.113.52' });
+      for (let i = 0; i < 50 && sheets.rows.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(leadMessages()[0]!.text).toContain('👤 Чегирма Киши 🎁−25%');
+      expect(leadMessages()[1]!.text).toContain('👤 Оддий Киши\n');
+      expect(sheets.rows.map((r) => r.row[2]).sort()).toEqual(['Оддий Киши', 'Чегирма Киши 🎁−25%']);
+      // Anything but a plain percent is refused as a malformed order.
+      expect((await order({ phone: '+998 90 312 45 53', offerTap: '25' }, { ip: '203.0.113.53' })).status).toBe(400);
+    });
+
     it('a made-up click alone (a confirmed customer) goes to «Lidlar» with a warning; with the automation mark it is a trap', async () => {
       const person = { touch: 5, taps: 4, keys: 5, synthetic: 2, pageMs: 35_000 };
       await order({ fullName: 'Ҳақиқий Мижоз', signals: person }, { ip: '203.0.113.71' });

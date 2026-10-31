@@ -20,13 +20,19 @@ import {
 } from './Sections';
 
 /**
+ * `hero`: the main site's own first screen (sites/classic AdHero); without it, the original one.
  * `proof`: what the main site adds right under the first form (real customers' videos, the certificate).
  * `popup: false`: no order dialog on arrival.
  * `barOverForms` (default false, both sites since 2026-10-29): false = the bottom order bar steps aside
  * while a form is on screen, so it can never cover the form's own button.
  * The partner site passes nothing, so its page stays exactly as it was.
  */
-export function Landing({ proof, popup = true, barOverForms = false }: { proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
+export function Landing({
+  hero,
+  proof,
+  popup = true,
+  barOverForms = false,
+}: { hero?: ReactNode; proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
@@ -73,6 +79,17 @@ export function Landing({ proof, popup = true, barOverForms = false }: { proof?:
   }, [barOverForms]);
   const formOnScreen = !barOverForms && (quickVisible || orderVisible);
 
+  // A site's own first screen may carry its own order button ([data-order-button], the main site's
+  // AdHero): two order buttons on one screen, the bar steps aside while that one is in view.
+  const [heroButtonVisible, setHeroButtonVisible] = useState(false);
+  useEffect(() => {
+    const el = document.querySelector('[data-order-button]');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setHeroButtonVisible(Boolean(e?.isIntersecting)), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <>
       <a
@@ -85,7 +102,7 @@ export function Landing({ proof, popup = true, barOverForms = false }: { proof?:
         {/* The visitor's path. Most arrive from the Instagram video, which has already named
             the illness and the product, so they are ready to order: the form comes first and
             the symptom check stays right below it for whoever still needs convincing. */}
-        <Hero />
+        {hero ?? <Hero />}
         <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
         {/* Main site: the proof right under the first form, for whoever scrolls on undecided. Above
             the form (2026-10-28) it pushed the form four phone screens down and orders stopped. */}
@@ -104,7 +121,7 @@ export function Landing({ proof, popup = true, barOverForms = false }: { proof?:
       </main>
       <Footer />
       {/* Always on screen (except while typing), as the owner asked. */}
-      <StickyCta visible={!typing && !formOnScreen} quickFormOnScreen={quickVisible && !order} />
+      <StickyCta visible={!typing && !formOnScreen && !heroButtonVisible} quickFormOnScreen={quickVisible && !order} />
       {/* Over everything: the form meets the visitor instead of waiting to be scrolled to. */}
       {popup && <OrderModal utm={utm} order={order} onOrdered={setOrder} />}
     </>

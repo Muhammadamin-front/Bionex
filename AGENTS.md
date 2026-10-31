@@ -502,6 +502,26 @@ user's Mac.
     a script can fake. If «Lidlar» stays junky with in-app user agents, the next step is asking
     everyone (the partner's rule) — the owner's call (#31).
 
+47. **The main site's first screen continues the ad** (2026-10-31, owner approved the mock). Numbers that
+    led here: Events Manager 15–30 Oct PageView 1.5K → InitiateCheckout 383 (25 % touch the form); the
+    ad set «V1 | UZ 30-65» 285 link clicks → 203 landing views → 27 Leads (13 % of views): the page
+    converts; the old first screen showed only the box and badges (headline on screen 2), then the
+    arrival dialog. `sites/classic/AdHero.tsx` (main only, via `Landing`'s new `hero` prop; partner keeps
+    `Hero`): the ad's words «Юрак ва қон томирлар учун табиий ўсимлик сиропи», Gulchehra opa's face
+    (`media/story-0-face.jpg`, cropped from story-0 at 12 s; gitignored like all media — a missing file
+    falls back to the old hero) and her words from the ad; ▶ opens her video in place, with sound.
+    A compact red ticket, «Ҳозироқ буюртма беринг» (the ad's button), three promises. The phones' order
+    bar steps aside while that button is in view (`[data-order-button]`, Landing.tsx). The arrival
+    dialog is unchanged: the owner was asked (now / after 20 s) and did not choose — ask before changing it.
+
+48. **A sticker by the name for a discount order** (2026-10-31, owner's request): pressing the discount
+    (the first screen's red ticket or its button, or the bottom bar while it shows the offer) calls
+    `tapOffer` (lib/offer.tsx, kept in sessionStorage); the next order sends `offerTap` = the percent
+    (shared lead schema). The Worker, main site only, makes the name «Исм 🎁−25%» for Telegram, the
+    panel, the lists and the sheet; Meta gets the name as typed. The forms' own submit («−25% чегирма
+    билан буюртма») does not count, or every order would carry it. Deploy the Worker before (or with) any
+    page that sends `offerTap`: the schema is strict, an old Worker would refuse such an order.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

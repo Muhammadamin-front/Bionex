@@ -290,7 +290,9 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       submissionId: data.submissionId,
       ip,
       phone: data.phone,
-      fullName: data.fullName,
+      // The visitor pressed the main site's discount before ordering (owner, 2026-10-31): a sticker
+      // by the name in Telegram, the panel, the lists and the sheet. Meta gets the name as typed (above).
+      fullName: site === 'main' && data.offerTap ? `${data.fullName} 🎁−${data.offerTap}%` : data.fullName,
       utm: data.utm,
       flags,
       now,

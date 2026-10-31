@@ -5,7 +5,7 @@ import { cn } from '../../lib/cn';
 import { AntiMetalLink } from '../ui/AntiMetalButton';
 import { AlertIcon, CheckIcon, PhoneIcon, QuoteMark } from '../ui/Icons';
 import { ProductPack } from '../ui/ProductPack';
-import { useOffer } from '../../lib/offer';
+import { tapOffer, useOffer } from '../../lib/offer';
 import { OrderForm, type OrderResult } from './OrderForm';
 
 function Title({ id, children, className }: { id?: string; children: React.ReactNode; className?: string }) {
@@ -543,6 +543,7 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
         <a
           href="#forma"
           onClick={(e) => {
+            if (offer) tapOffer();
             // The nearest form, not the last one: until the visitor has scrolled past the first
             // form, go there. The bottom form is ~14 screens down on a phone, and a smooth
             // scroll that long stops halfway as soon as a finger touches the screen.
