@@ -449,6 +449,21 @@ user's Mac.
     question is asked. Live 2026-10-30 on both addresses; the owner updated the Apps Script and
     `SHEETS_NOTES=1` was set the same day.
 
+45. **external_id on every main-site CAPI event** (2026-10-31, after the targetologist read Events
+    Manager: Lead match quality 3.4 → 7.8 with our server data; Meta suggested external_id). `buildUserData`
+    adds `external_id` = SHA-256 of `device:<deviceId>` (else the phone digits), so the arrival Lead and the
+    later QualifiedLead carry the same person id. Declined the same day: their snippet re-running
+    `fbq('init')` and firing a browser `fbq('track','Lead')` with a fresh UUID at submit (it would send a
+    Lead for every submission, spam included, before the server's verdict, and its id would not match
+    the server's); an e-mail field. Safe if the owner wants it: Events Manager «Automatic advanced
+    matching» — but never «Track events automatically without code» (#27). The «Improve deduplication»
+    warning is the 23–28 Oct browser Leads still in Meta's window.
+    Same day: `npm test` failed with «pico is not a function» — iCloud (Desktop & Documents sync,
+    upload error CKErrorDomain 25 ≈ quota) had evicted ~4 200 node_modules files, 33 source files
+    (incl. the gitignored `.env.production` / `.env.t2`) and ~1 000 .git objects to «dataless». Fixed with
+    `find . -flags +dataless -print0 | xargs -0 brctl download`; the owner was advised to move
+    ~/Desktop/Projects out of iCloud. If tools fail oddly, check `find . -flags +dataless` first.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

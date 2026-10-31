@@ -63,6 +63,8 @@ export interface MetaIdentity {
   clickId?: string;
   /** When the order arrived (ms), for an fbc made from `clickId`. */
   now?: number;
+  /** The browser's own random id (apps/web lib/device.ts): sent hashed as external_id. */
+  deviceId?: string;
 }
 
 export interface MetaEvent {
@@ -115,6 +117,9 @@ export async function buildUserData(who: MetaIdentity): Promise<MetaUserData> {
   ]);
 
   const user_data: MetaUserData = { ph, fn, country, client_ip_address: who.ip };
+  // external_id: one id per person across their events (the Lead now, the QualifiedLead later) —
+  // the phone's device id when the page sent one, else the number itself. Hashed like the rest.
+  user_data.external_id = await sha256(who.deviceId ? `device:${who.deviceId}` : who.phone.replace(/\D/g, ''));
   if (ln) user_data.ln = ln;
   if (who.userAgent) user_data.client_user_agent = who.userAgent;
   const fbp = cookie(who.cookie, '_fbp');

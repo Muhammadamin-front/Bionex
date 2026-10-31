@@ -1463,6 +1463,8 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     expect(event!.user_data.fn).toMatch(/^[0-9a-f]{64}$/);
     expect(event!.user_data.ln).toMatch(/^[0-9a-f]{64}$/);
     expect(event!.user_data.ph).toBe(await sha256('998903124567'));
+    // external_id: hashed, and never the raw number either.
+    expect(event!.user_data.external_id).toBe(await sha256('998903124567'));
     expect(event!.user_data.fn).toBe(await sha256('ойша'));
   });
 

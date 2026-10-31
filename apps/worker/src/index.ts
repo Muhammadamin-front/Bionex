@@ -274,6 +274,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
             cookie: request.headers.get('cookie'),
             clickId: data.clickId,
             now,
+            deviceId: data.deviceId,
           }),
           sourceUrl: request.headers.get('referer') || url.origin,
         }
