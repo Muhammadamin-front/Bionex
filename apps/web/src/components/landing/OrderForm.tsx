@@ -364,7 +364,7 @@ export function OrderForm({
       setBusy(false);
       // The heading already says the order was received; for a new order the body only
       // adds what happens next. A repeat keeps the server's "already received" wording.
-      const message = response.status === 'accepted' ? 'Раҳмат! Оператор тез орада сизга қўнғироқ қилади.' : response.message;
+      const message = response.status === 'accepted' ? 'Раҳмат! Мутахассисларимиз тез орада сизга қўнғироқ қилади.' : response.message;
       onSuccess({ message, phone: formatUzPhone(fullPhone), ...(response.status === 'accepted' ? { submissionId } : {}) });
     } catch (err) {
       setWaitingForCheck(false);
@@ -421,8 +421,8 @@ export function OrderForm({
         </p>
         <ol className="mx-auto mt-6 max-w-sm space-y-3 border-t border-line pt-5 text-left">
           {[
-            'Телефонингизни ёнингизда сақланг: оператор 15 дақиқа ичида қўнғироқ қилади.',
-            'Оператор саволларингизга жавоб беради ва бепул маслаҳат беради.',
+            'Телефонингизни ёнингизда сақланг: мутахассисларимиз 15 дақиқа ичида қўнғироқ қилади.',
+            'Мутахассисларимиз саволларингизга жавоб беради ва бепул маслаҳат беради.',
             'Маҳсулотни олишга қарор қилсангиз, 1–3 кунда етказилади. Тўловни олганингизда қиласиз.',
           ].map((t, i) => (
             <li key={t} className="flex gap-3 text-[1.02rem] leading-snug">
@@ -465,7 +465,7 @@ export function OrderForm({
       {compact && (
         <p className="mb-4 font-display text-xl font-extrabold leading-snug">
           Рақамингизни қолдиринг.{' '}
-          <span className="text-brand">{offer ? 'Оператор чегирмали нархни айтади.' : 'Консультация бепул.'}</span>
+          <span className="text-brand">{offer ? 'Мутахассисларимиз чегирмали нархни айтади.' : 'Консультация бепул.'}</span>
         </p>
       )}
       <div className={cn(compact ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-5')}>
@@ -592,7 +592,7 @@ export function OrderForm({
         </AntiMetalButton>
 
         <p className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
-          Оператор 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.
+          Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.
         </p>
 
         <ul className={cn('grid gap-2 text-base font-semibold text-brand-2 sm:grid-cols-3', compact && 'hidden')}>

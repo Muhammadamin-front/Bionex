@@ -16,7 +16,7 @@ export function ConcernQuestion({ submissionId }: { submissionId: string }) {
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   if (!ask) return null;
   if (state === 'sent') {
-    return <p className="mx-auto mt-6 max-w-sm rounded-2xl bg-paper px-4 py-3 text-lg font-bold text-brand-2" role="status">Раҳмат! Операторга етказилди.</p>;
+    return <p className="mx-auto mt-6 max-w-sm rounded-2xl bg-paper px-4 py-3 text-lg font-bold text-brand-2" role="status">Раҳмат! Мутахассисларимизга етказилди.</p>;
   }
   const toggle = (c: ConcernId) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
   const send = async () => {
@@ -28,7 +28,7 @@ export function ConcernQuestion({ submissionId }: { submissionId: string }) {
   return (
     <div className="mx-auto mt-6 max-w-sm border-t border-line pt-5 text-left">
       <p className="font-display text-xl font-extrabold leading-snug">Сизни кўпроқ нима безовта қилади?</p>
-      <p className="mt-1 text-base text-muted">Оператор шунга қараб маслаҳат беради. Бир нечтасини белгилаш мумкин.</p>
+      <p className="mt-1 text-base text-muted">Мутахассисларимиз шунга қараб маслаҳат беради. Бир нечтасини белгилаш мумкин.</p>
       <div className="mt-4 grid grid-cols-1 gap-2">
         {CONCERN_IDS.map((c) => {
           const on = picked.includes(c);
@@ -57,7 +57,7 @@ export function ConcernQuestion({ submissionId }: { submissionId: string }) {
         disabled={!picked.length || state === 'sending'}
         className="mt-4 min-h-14 w-full rounded-2xl bg-forest px-4 font-display text-lg font-bold text-white disabled:opacity-40"
       >
-        {state === 'sending' ? 'Юборилмоқда…' : 'Операторга юбориш'}
+        {state === 'sending' ? 'Юборилмоқда…' : 'Мутахассисга юбориш'}
       </button>
     </div>
   );
