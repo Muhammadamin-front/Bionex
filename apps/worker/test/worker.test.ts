@@ -1146,6 +1146,16 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(sheets.rows.find((r) => r.row[2] === 'Текширув Киши')!.row[7]).toMatch(/^! /);
       // The operators still hear of every one of them.
       expect(leadMessages()).toHaveLength(3);
+      // A phone that looks like one marked spam (its browser data cleared) is bot-like too.
+      const LOOKS = 'ab'.repeat(32);
+      await order({ fullName: 'Белги Киши', phone: '+998 90 312 45 48', deviceId: 'aaaaaaaa-0000-4000-8000-000000000001', fingerprint: LOOKS }, { ip: '203.0.113.48' });
+      await press('s:4:spam');
+      await order({ fullName: 'Ўхшаш Киши', phone: '+998 90 312 45 49', deviceId: 'aaaaaaaa-0000-4000-8000-000000000002', fingerprint: LOOKS }, { ip: '198.51.100.49' });
+      for (let i = 0; i < 50 && sheets.rows.length < 5; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(leadMessages().at(-1)!.text).toContain('ўхшайди');
+      expect(inTab('Spam')).toContain('Ўхшаш Киши');
+      expect(inTab('Lidlar')).not.toContain('Ўхшаш Киши');
     });
 
     it('a made-up click alone (a confirmed customer) goes to «Lidlar» with a warning; with the automation mark it is a trap', async () => {

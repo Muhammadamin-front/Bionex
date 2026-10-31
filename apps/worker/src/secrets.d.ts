@@ -41,11 +41,6 @@ interface WorkerSecrets {
    * ads still pointing at the old link keep working. Unset: no redirect.
    */
   SITE_HOST?: string;
-  /**
-   * The main site's page served from other addresses (comma-separated, e.g. «zeynara.com.uz»: apps/site,
-   * which forwards each order to this Worker's own address). A «not a robot» check solved there is ours.
-   */
-  MAIN_SITE_HOSTS?: string;
   /** '1' once the main sheet's Apps Script has the `note` action: the thank-you answer then goes to its «Shikoyat» column. */
   SHEETS_NOTES?: string;
   /** Test overrides for the outside services. */

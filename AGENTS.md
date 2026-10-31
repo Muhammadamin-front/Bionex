@@ -495,7 +495,8 @@ user's Mac.
     it turns on the redirect). The «Zeynara» widget's Hostnames list in Cloudflare must also contain
     zeynara.com.uz, or the widget errors in the browser, sends no token, and every plain-browser
     order there lands in «Spam». Order: hostname in Cloudflare → `deploy` (Worker) → `deploy:site`.
-    Not yet like the partner: the in-app exemption trusts the user agent («Instagram», «FBAN»), which
+    `spam_lookalike` joined `MAIN_SPAM_SHEET_FLAGS` (it was already hidden from the panel and kept from
+    the instant Lead, yet written to «Lidlar»). Not yet like the partner: the in-app exemption trusts the user agent («Instagram», «FBAN»), which
     a script can fake. If «Lidlar» stays junky with in-app user agents, the next step is asking
     everyone (the partner's rule) — the owner's call (#31).
 

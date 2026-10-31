@@ -75,11 +75,12 @@ const TRAP_FLAGS = ['honeypot', 'bot_trap', 'no_browser'];
 const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
 /**
  * The main site's orders that go to the «Spam» tab of its spreadsheet instead of «Lidlar»
- * (owner, 2026-10-28): bot traps, a failed "not a robot" check, a device marked spam before. One
+ * (owner, 2026-10-28): bot traps, a failed "not a robot" check, a device marked spam before, or one
+ * that looks like it (owner, 2026-10-31: «bot ehtimoli bo'lsa Spam listga tushsin»). One
  * place for each order, never both. «Holat» is read from «Lidlar» only, so nothing here reaches Meta
  * until a person copies the row into «Lidlar» (with its №) and sets «Sotildi» / «Kerakli».
  */
-const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device'];
+const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device', 'spam_lookalike'];
 /**
  * Main-site orders that get NO Lead the moment they arrive (owner, 2026-10-29: every other order is a
  * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
