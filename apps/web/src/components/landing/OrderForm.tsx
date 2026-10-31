@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
-import { caughtByBotTrap } from '@bionex/shared/device';
+import { caughtByBotTrap, fromSocialApp } from '@bionex/shared/device';
 import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } from '../../lib/device';
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
@@ -16,22 +16,27 @@ import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
 /**
- * The «not a robot» check (Turnstile). Off on the main site (vite.config.ts): in the Instagram app it
- * often would not pass and people left. The partner site keeps it.
+ * The «not a robot» check (Turnstile). `'1'` asks everyone (the partner site), `'web'` everyone but
+ * the visitors inside the Instagram / Facebook app, where it often would not pass and people left
+ * (vite.config.ts). The ads open there, so almost no customer is asked — while the plain browsers
+ * the spam arrives from are (owner, 2026-10-31; the main site asked nobody from 2026-10-29).
+ * A function, not a constant: the main page is prerendered at build, where there is no navigator.
  */
-const HUMAN_CHECK = import.meta.env.VITE_HUMAN_CHECK !== '0';
+const humanCheck = () => {
+  const mode = import.meta.env.VITE_HUMAN_CHECK;
+  if (mode !== 'web') return mode !== '0';
+  return !fromSocialApp(typeof navigator === 'undefined' ? null : navigator.userAgent);
+};
 /** Validation schemas (Zod) are fetched with the form, not with the first paint. */
 const loadSchemas = () => import('@bionex/shared/lead');
 
 /**
- * Cloudflare offers no Uzbek. For an audience of older Uzbek speakers Russian is far more
- * likely to be understood than English, so the (rarely shown) challenge uses Russian
- * unless the browser asks for another language Cloudflare supports.
+ * Cloudflare offers no Uzbek, and never English to this audience: the customers are 40–60 and do
+ * not read it (owner, 2026-10-31, after «Verify you are a human» was shown). Russian, always —
+ * following the browser's language asked Cloudflare for English on every phone set to English,
+ * which says nothing about what its owner reads. The Uzbek line above the widget says what it is.
  */
-function turnstileLanguage(): string {
-  const lang = (typeof navigator !== 'undefined' && navigator.language) || '';
-  return /^(uz|ru|kk|ky|tg)/i.test(lang) || !lang ? 'ru' : 'auto';
-}
+const TURNSTILE_LANGUAGE = 'ru';
 
 /** Set once React has taken over the prerendered page (see `ready` in OrderForm). */
 let pageTakenOver = false;
@@ -100,6 +105,8 @@ export function OrderForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [waitingForCheck, setWaitingForCheck] = useState(false);
+  /** The «not a robot» widget is asking the visitor to do something, so it needs an Uzbek line. */
+  const [challenging, setChallenging] = useState(false);
   const offer = useOffer();
   /** The number arrived all at once (autofill, often an old one): ask the visitor to check it. */
   const [phoneAutofilled, setPhoneAutofilled] = useState(false);
@@ -128,7 +135,7 @@ export function OrderForm({
   };
 
   const renderWidget = useCallback(async (submissionId: string, gen: number) => {
-    if (!HUMAN_CHECK) return;
+    if (!humanCheck()) return;
     const turnstile = await loadTurnstile();
     if (!widgetBox.current || gen !== generation.current) return;
     if (widgetId.current) turnstile.remove(widgetId.current);
@@ -144,10 +151,15 @@ export function OrderForm({
       appearance: 'interaction-only',
       // 'flexible' is at least 300 px wide and would push narrow phones into zoom-out.
       size: compactRef.current ? 'compact' : 'flexible',
-      language: turnstileLanguage(),
+      language: TURNSTILE_LANGUAGE,
       'refresh-expired': 'auto',
+      // The widget's own words are Russian at best, so the Uzbek line is shown exactly while it
+      // is asking for something.
+      'before-interactive-callback': () => setChallenging(true),
+      'after-interactive-callback': () => setChallenging(false),
       callback: (token) => {
         turnstileToken.current = token;
+        setChallenging(false);
         resolveWaiters(token);
       },
       'expired-callback': () => {
@@ -332,8 +344,9 @@ export function OrderForm({
       // The id is set synchronously, even if the widget itself never loads.
       if (!verification.current) void refreshVerification().catch(() => undefined);
 
-      setWaitingForCheck(HUMAN_CHECK && !turnstileToken.current);
-      const token = HUMAN_CHECK ? await waitForTurnstile(8_000) : null;
+      const asksCheck = humanCheck();
+      setWaitingForCheck(asksCheck && !turnstileToken.current);
+      const token = asksCheck ? await waitForTurnstile(8_000) : null;
       setWaitingForCheck(false);
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;
@@ -568,6 +581,11 @@ export function OrderForm({
         {/* Turnstile mounts here, and with appearance 'interaction-only' it usually stays empty
             and takes no height at all. No space is reserved for it: reserving 72–147 px of the
             form for something almost no visitor is shown cost more orders than the rare jump. */}
+        {challenging && (
+          <p className="text-center text-base font-semibold text-ink-2 sm:col-span-2">
+            Сиз робот эмаслигингизни тасдиқлаш учун қуйидаги катакчани белгиланг 👇
+          </p>
+        )}
         <div ref={widgetBox} className="flex justify-center empty:hidden sm:col-span-2" />
 
         {formError && (

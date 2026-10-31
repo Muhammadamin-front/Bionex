@@ -16,6 +16,9 @@ export interface TurnstileRenderOptions {
   language?: string;
   'refresh-expired'?: 'auto' | 'manual' | 'never';
   callback?: (token: string) => void;
+  /** The challenge is about to ask the visitor to act, and (after) has stopped asking. */
+  'before-interactive-callback'?: () => void;
+  'after-interactive-callback'?: () => void;
   'expired-callback'?: () => void;
   'error-callback'?: (code: string) => void;
   'timeout-callback'?: () => void;

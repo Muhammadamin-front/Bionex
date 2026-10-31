@@ -66,7 +66,7 @@ async function outbound(request: Request): Promise<Response> {
       success: true,
       action: 'lead-submit',
       cdata: token === 'other-form' ? 'something-else' : cdata,
-      hostname: token === 'other-site' ? 'evil.example' : token === 'partner' ? 'zeynaraa-uz.example' : 'zeynara.example',
+      hostname: token === 'other-site' ? 'evil.example' : token === 'partner' ? 'zeynaraa-uz.example' : token === 'own-domain' ? 'zeynara.com.uz' : 'zeynara.example',
     });
   }
   if (url.hostname === 'telegram.mock') {
@@ -975,13 +975,35 @@ describe('spam protection', () => {
     for (const [token, ip, phone] of cases) expect((await order({ turnstileToken: token, phone }, { ip })).status).toBe(201);
     expect(leadMessages()).toHaveLength(3);
     expect(leadMessages().every((m) => m.text.includes('«бот эмасман» текшируви ўтмади'))).toBe(true);
-    // No token at all is the main page as it is now (no check asked): not marked. (The partner site
-    // still asks; its tests cover a missing token there.)
-    expect((await order({ turnstileToken: undefined, phone: '+998 90 312 45 24', signals: { touch: 5, taps: 2, keys: 9 } }, { ip: '198.51.100.10' })).status).toBe(201);
+    // Inside the Instagram app the main page asks for no check, so no token from there is not marked.
+    const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
+    const signals = { touch: 5, taps: 2, keys: 9 };
+    expect((await order({ turnstileToken: undefined, phone: '+998 90 312 45 24', signals }, { ip: '198.51.100.10', userAgent: instagram })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
+    // A plain browser was asked, so no token from one is a failed check after all.
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    expect((await order({ turnstileToken: undefined, phone: '+998 90 312 45 26', signals }, { ip: '198.51.100.12', userAgent: chrome })).status).toBe(201);
+    expect(leadMessages().at(-1)!.text).toContain('«бот эмасман» текшируви ўтмади');
     // A passed check carries no such mark.
     await order({ phone: '+998 90 312 45 25' }, { ip: '198.51.100.11' });
     expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
+  });
+
+  it('accepts a check solved on the main page\'s own domain, whose orders arrive at the Worker\'s address', async () => {
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    const signals = { touch: 5, taps: 2, keys: 9 };
+    // Without MAIN_SITE_HOSTS it is someone else's site.
+    await order({ turnstileToken: 'own-domain', phone: '+998 90 312 45 31', signals }, { ip: '198.51.100.31', userAgent: chrome });
+    expect(leadMessages().at(-1)!.text).toContain('текшируви ўтмади');
+    await new Promise((r) => setTimeout(r, 200));
+    const before = telegram.messages.length;
+    await mf.dispose();
+    mf = start({ MAIN_SITE_HOSTS: 'zeynara.com.uz' });
+    await order({ turnstileToken: 'own-domain', phone: '+998 90 312 45 32', signals }, { ip: '198.51.100.32', userAgent: chrome });
+    expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
+    expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(telegram.messages.slice(before).some((m) => m.text.includes('Сайт созламасида хато'))).toBe(false);
   });
 
   it('warns the group once when the Turnstile secret is wrong', async () => {
@@ -1141,8 +1163,9 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await settled()).toHaveLength(1);
     });
 
-    it('the main page asks for no check: no token with browser signals is a clean order; no signals at all is a bot', async () => {
-      await order({ fullName: 'Инстаграм Мижоз', turnstileToken: undefined, signals: { touch: 5, taps: 6, keys: 14 } }, { ip: '203.0.113.81' });
+    it('the main page asks the Instagram app for no check: no token from there with browser signals is a clean order; no signals at all is a bot', async () => {
+      const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
+      await order({ fullName: 'Инстаграм Мижоз', turnstileToken: undefined, signals: { touch: 5, taps: 6, keys: 14 } }, { ip: '203.0.113.81', userAgent: instagram });
       await order({ fullName: 'Тўғри Пост', phone: '+998 90 312 45 82', turnstileToken: undefined }, { ip: '203.0.113.82' });
       for (let i = 0; i < 50 && sheets.rows.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));

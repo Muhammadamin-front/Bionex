@@ -39,7 +39,11 @@
     "LEADS_PER_LIST": "10",
     // The partner site's Pixel (apps/partner, docs/PARTNER-SITE.md). Public: it is in that
     // site's page anyway. Its Conversions API token is the secret META_T2_CAPI_TOKEN.
-    "META_T2_PIXEL_ID": "1783794022832394"
+    "META_T2_PIXEL_ID": "1783794022832394",
+    // The main page's own domain (apps/site, a Pages site that forwards each order here as a post to
+    // this Worker's address). Its «not a robot» checks are solved there, so they are accepted for it.
+    // The Turnstile widget's Hostnames list in Cloudflare must include it too.
+    "MAIN_SITE_HOSTS": "zeynara.com.uz"
   }
   // Secrets (never in this file): set once with `npx wrangler secret put NAME`
   //   TURNSTILE_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

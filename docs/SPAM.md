@@ -63,8 +63,8 @@ report names that number — «📣 Натижаси белгиланмаган:
 | `phone_pattern` | рақам сунъийга ўхшайди | e.g. 90 111 11 11 |
 | `honeypot` | яширин майдон тўлдирилган | one of two hidden decoy fields («fax», «website») was filled — only a script does that |
 | `bot_trap` | бот тузоғига тушди | the browser saw a made-up click (`isTrusted: false`), a touch screen nobody touched before sending (`taps: 0`), or says a program drives it (`webdriver`). Hidden from the panel and the partner sheet. Old cached pages send no count and are never caught |
-| `likely_bot` | Instagram/Facebook орқали эмас — бот эҳтимоли бор | a failed check outside the ads' in-app browser. Real customers were found among these (2026-10-24), so it is a warning only and stays visible |
-| `no_captcha` | «бот эмасман» текшируви ўтмади | common on old phones and in Instagram's in-app browser — **not** evidence of anything |
+| `likely_bot` | Instagram/Facebook орқали эмас — бот эҳтимоли бор | a failed check outside the ads' in-app browser, **including sending no token at all from a plain browser** (which is asked for one since 2026-10-31). Real customers were found among these (2026-10-24), so it is a warning only and stays visible — but on the main site it routes the order to the «Spam» tab and withholds the instant Meta Lead |
+| `no_captcha` | «бот эмасман» текшируви ўтмади | inside the Instagram / Facebook app, where the main site asks for no check, this cannot be set. Elsewhere it is a check that was asked for and not answered |
 
 ## The honest limits
 

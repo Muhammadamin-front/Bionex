@@ -305,9 +305,10 @@ user's Mac.
     at ~18:20 returned 201 and logged no Telegram/Sheets error. Worker/DO invocations did fall after
     16:00, so look at the ads (edits put an ad back into review) before the code.
 
-31. **No «not a robot» check on the main site** (2026-10-29, owner: their own phone, from the ad in
+31. **No «not a robot» check on the main site** — *narrowed to the Instagram / Facebook in-app
+    browser only on 2026-10-31; read #46 first* (2026-10-29, owner: their own phone, from the ad in
     Instagram, could not pass «Verify you are human»; on submit the form also waited up to 14 s
-    «Текширилмоқда…»). Vite defines `VITE_HUMAN_CHECK` = '0' except for `--mode t2`; `OrderForm`
+    «Текширилмоқда…»). Vite defined `VITE_HUMAN_CHECK` = '0' except for `--mode t2`; `OrderForm`
     then never loads Turnstile and sends at once. Worker, main site: no token is normal (no
     `no_captcha` / `likely_bot`); no token AND no browser `signals` (a direct API post) → `no_browser`,
     in `TRAP_FLAGS` and `LIKELY_BOT_FLAGS` (Spam tab, hidden from panel, never Meta). A token that
@@ -463,6 +464,40 @@ user's Mac.
     (incl. the gitignored `.env.production` / `.env.t2`) and ~1 000 .git objects to «dataless». Fixed with
     `find . -flags +dataless -print0 | xargs -0 brctl download`; the owner was advised to move
     ~/Desktop/Projects out of iCloud. If tools fail oddly, check `find . -flags +dataless` first.
+
+46. **The main site asks for the check again — everywhere but the Instagram / Facebook app**
+    (2026-10-31, owner: «25–28 sana orasida lidlar juda sifatli edi, 29-dan spam ko'payib ketdi»).
+    #31 turned the check off for everyone, which also made `no_captcha` / `likely_bot` unreachable
+    on the main site (`noCheckAsked` short-circuits them), so two of the five `MAIN_SPAM_SHEET_FLAGS`
+    went dead: the «Spam» tab's last row is **№206, 29.10 11:51** and nothing has been diverted
+    since, while the junk share inside «Lidlar» went 11% (№ ≤ 206) → 38% (№ > 206). With #32 sending
+    an instant CAPI `Lead` for every «clean» order, that junk was also being taught to Meta. The ads
+    open in the in-app browser, where the check is what cost orders on 29.10; the spam arrives from
+    plain browsers (`device.ts`: on 2026-10-21 every fake partner order was a plain Chrome that
+    failed the check). So `VITE_HUMAN_CHECK` = `'web'` on the main build, `'1'` for `--mode t2`, and
+    `OrderForm`'s `humanCheck()` loads Turnstile unless `fromSocialApp(navigator.userAgent)`. Worker:
+    `noCheckAsked` now also requires `fromSocialApp(user-agent)`, so a plain browser that sent no
+    token has failed the check (`no_captcha` + `likely_bot` → Spam tab, no instant Lead); `no_browser`
+    no longer depends on it (main + no token + no `signals` = a direct API post, whatever the UA).
+    Comparison that showed it: the partner's «Bionex Leads» (check on, `PARTNER_SHEET_HIDDEN_FLAGS`)
+    ran ~23% bad on $100–150/day against our ~38% on $45/day.
+    Same day, same owner message: the challenge spoke **English** («Verify you are a human») to
+    customers aged 40–60. `turnstileLanguage()` followed `navigator.language` and asked Cloudflare
+    for `auto` on any phone set to English — which says nothing about what its owner reads. It is
+    `TURNSTILE_LANGUAGE = 'ru'` always now (Cloudflare has no Uzbek), and an Uzbek line
+    («…қуйидаги катакчани белгиланг») is shown above the widget exactly while it is asking,
+    via Turnstile's `before-interactive-callback` / `after-interactive-callback`.
+    Same day, found before deploying: zeynara.com.uz (apps/site) forwards each order as a post to the
+    Worker's workers.dev address, so a token solved on the domain failed Turnstile's hostname check
+    (`hostname-mismatch`, a config error: «Spam» tab + an hourly group alert) — unseen while the page
+    sent no tokens. `verifyTurnstile` now takes `hostnames`; the main site also accepts
+    `MAIN_SITE_HOSTS` (wrangler.jsonc var, «zeynara.com.uz»). Do NOT use `SITE_HOST` for this (#40:
+    it turns on the redirect). The «Zeynara» widget's Hostnames list in Cloudflare must also contain
+    zeynara.com.uz, or the widget errors in the browser, sends no token, and every plain-browser
+    order there lands in «Spam». Order: hostname in Cloudflare → `deploy` (Worker) → `deploy:site`.
+    Not yet like the partner: the in-app exemption trusts the user agent («Instagram», «FBAN»), which
+    a script can fake. If «Lidlar» stays junky with in-app user agents, the next step is asking
+    everyone (the partner's rule) — the owner's call (#31).
 
 ## Open items
 

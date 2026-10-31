@@ -203,7 +203,9 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
           token: data.turnstileToken,
           ip,
           submissionId: data.submissionId,
-          hostname: url.hostname,
+          // zeynara.com.uz hands its orders over as posts to this Worker's own address (apps/site),
+          // so the page the check was solved on is one of MAIN_SITE_HOSTS, not `url`.
+          hostnames: [url.hostname, ...(site === 'main' ? siteHosts(env) : [])],
           verifyUrl: env.TURNSTILE_VERIFY_URL || undefined,
         });
       } catch (err) {
@@ -238,17 +240,20 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     // The number was filled in by autofill (Instagram's from the Meta account): often an old one.
     if (data.signals?.autofill) flags.push('phone_autofill');
-    // The main site's page no longer asks for the check (owner, 2026-10-29: in the Instagram app it
-    // would not pass, and people left). No token there is normal; a page that ran no script at all
-    // (no browser signals: a direct post to the API) is a program's. A token that was sent is still
-    // checked — an old page in a phone's cache still asks.
-    const noCheckAsked = site === 'main' && !data.turnstileToken;
-    if (noCheckAsked && !data.signals) flags.push('no_browser');
+    // The main site's page asks for the check everywhere but inside the Instagram / Facebook app
+    // (vite.config.ts, owner 2026-10-31: there it would not pass and people left). So no token is
+    // normal only from inside that app; a plain browser that sent none was asked and did not answer.
+    // From 2026-10-29 to 2026-10-31 no token at all was normal on the main site, and with it
+    // `no_captcha` / `likely_bot` became unreachable: the «Spam» tab took nothing and the junk the
+    // check used to hold back went into «Lidlar» (last diverted row №206, 29.10 11:51).
+    // A page that ran no script at all (no browser signals: a direct post to the API) is a program's.
+    const userAgent = request.headers.get('user-agent');
+    const noCheckAsked = site === 'main' && !data.turnstileToken && fromSocialApp(userAgent);
+    if (site === 'main' && !data.turnstileToken && !data.signals) flags.push('no_browser');
     if (!check.ok && !noCheckAsked) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
     // robot, but real customers turned up among them too (their Telegram name matched), so it
     // is a warning for the call and the order stays in the panel and the sheet.
-    const userAgent = request.headers.get('user-agent');
     if (!check.ok && !noCheckAsked && !fromSocialApp(userAgent)) flags.push('likely_bot');
     // The browser's own traps — a made-up click, a touch screen nobody touched, or a browser that
     // says a program drives it (device.ts): hidden as a program's. On the main site a made-up click
@@ -314,6 +319,9 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     return fail(503, 'unavailable', MESSAGES.unavailable);
   }
 }
+
+/** The main site's other addresses (wrangler.jsonc MAIN_SITE_HOSTS), e.g. ['zeynara.com.uz']. */
+const siteHosts = (env: Env) => (env.MAIN_SITE_HOSTS ?? '').split(',').map((h) => h.trim()).filter(Boolean);
 
 /**
  * The partner site's door (sites.ts): its Cloudflare Pages function forwards each order here

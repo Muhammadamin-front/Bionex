@@ -18,14 +18,14 @@ export class TurnstileUnavailable extends Error {}
 /**
  * Asks Cloudflare whether the token is genuine. The token alone proves nothing: it must be
  * fresh, unused, issued for our form action, for this exact order attempt (cData) and on
- * our own site (hostname).
+ * one of our own sites (hostnames).
  */
 export async function verifyTurnstile(opts: {
   secret: string;
   token: string;
   ip: string;
   submissionId: string;
-  hostname: string;
+  hostnames: string[];
   verifyUrl?: string;
 }): Promise<TurnstileResult> {
   if (opts.token === DUMMY_TOKEN && !TEST_SECRET.test(opts.secret)) {
@@ -54,6 +54,7 @@ export async function verifyTurnstile(opts: {
   const errors: string[] = [];
   if (data.action !== TURNSTILE_ACTION) errors.push('action-mismatch');
   if (data.cdata !== opts.submissionId) errors.push('cdata-mismatch');
-  if ((data.hostname ?? '').toLowerCase() !== opts.hostname.toLowerCase()) errors.push('hostname-mismatch');
+  const solvedOn = (data.hostname ?? '').toLowerCase();
+  if (!opts.hostnames.some((h) => h.toLowerCase() === solvedOn)) errors.push('hostname-mismatch');
   return { ok: errors.length === 0, errors };
 }
