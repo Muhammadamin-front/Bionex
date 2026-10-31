@@ -424,6 +424,9 @@ user's Mac.
     targetologist's «browser Leads ≫ server, dedup warning» is the 23–28 Oct rule (#27) still in
     Events Manager's window. `META_ORDER_VALUE` unset → no Purchase on «Sotildi» (owner asked if a
     price is required: yes for Purchase; not chosen).
+    2026-10-31: Events Manager showed ~22 QualifiedLead for 30–31 Oct against 13 marked rows — the
+    sheet script (11 «Kerakli») and the Worker (13) both sent each one, the same event_id, counted twice
+    and matched at 6.2/10. The owner emptied the script's `EVENT_MAP`; only the Worker sends it now.
 
 43. **Autofilled phone numbers** (2026-10-30, owner: Instagram's in-app browser puts in the Meta
     account's phone — sometimes 10 years old — and orders arrive with dead numbers). The owner's idea
