@@ -5,7 +5,8 @@
  *
  * 1) Sayt (Cloudflare Worker) buyurtmalarni yozadi: toza buyurtma «Lidlar»ga, shubhali «Spam»ga.
  * 2) Worker har 5 daqiqada «Lidlar»dagi «Holat»ni o'qiydi: «Sotildi»/«Kerakli» → Meta'ga Lead.
- * 3) «Holat» = «Kerakli» bo'lganda bu skript o'zi ham Meta'ga QualifiedLead yuboradi (M ustuni).
+ * 3) QualifiedLead'ni ham Worker yuboradi («Kerakli»/«Sotildi», to'liq ma'lumot bilan). 2026-10-31 gacha
+ *    bu skript ham yuborardi: har lid Meta'da ikki marta sanalardi, sifat 6.2/10 ga tushardi. EVENT_MAP bo'sh.
  *
  * Maxfiy kalitlar kodda emas: Loyiha sozlamalari (⚙) → Script Properties → META_TOKEN, LEAD_SECRET.
  */
@@ -20,7 +21,6 @@ const COL = { SANA: 2, ISM: 3, TEL: 4, HOLAT: 6, META: 13 };  // M = "Meta" hola
 
 // Qaysi Holat → qaysi Meta event
 const EVENT_MAP = {
-  'Kerakli': 'QualifiedLead'
   // 'Sotildi' va 'Kerakli' uchun Lead'ni sayt (Worker) yuboradi — shu yerda emas
 };
 
