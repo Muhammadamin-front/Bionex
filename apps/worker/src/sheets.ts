@@ -58,6 +58,8 @@ const FLAG_TEXT: Record<string, string> = {
   likely_bot: "Instagram/Facebook'dan emas — bot ehtimoli bor (odam ham bo'lishi mumkin)",
   spam_source: 'bu tarmoqdan avval spam belgilangan',
   spam_device: 'bu qurilmadan avval spam belgilangan',
+  spam_phone: 'bu raqam avval spam belgilangan',
+  link_copied: "reklama havolasi Instagram/Facebook ilovasidan tashqarida ochilgan (nusxa olingan yoki boshqa brauzerda ochilgan bo'lishi mumkin)",
   spam_lookalike: "avval spam bo'lgan qurilmaga o'xshaydi",
 };
 

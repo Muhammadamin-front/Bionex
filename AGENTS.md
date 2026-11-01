@@ -552,6 +552,17 @@ user's Mac.
     + workers.dev). The CAPI `event_source_url` is the order's Referer (the domain's Pages function
     keeps it), so workers.dev must stay listed while any ad points there.
 
+50. **A number marked spam goes to «Spam» when it orders again; a copied ad link is named**
+    (2026-11-01, owner's request). `spam_marks` gained `phone_hash` (filled for old marks on
+    migration from `leads` / `partner_leads` by `source`); 🚫, «Keraksiz»/«Spam» in either sheet store
+    it. `spamFlags` → `spam_phone` («bu raqam avval spam belgilangan»), in `MAIN_SPAM_SHEET_FLAGS`
+    («Spam» tab, no Lead). Within `DUPLICATE_WINDOW_HOURS` (24) the same number is a repeat, not a new
+    order, so this acts from the next day on, for 30 days. Partner: a warning only (#3 unchanged).
+    «Copied link»: a page cannot see a copy. `link_copied` (main site, information only, still «Lidlar»
+    and an instant Lead) = the ad's click id (fbclid / `_fbc`) and a user agent not from the
+    Instagram/Facebook app — copied out of the app, or «open in browser», a computer, Audience Network.
+    The same click id behind another number's order stays `reused_click` (#24).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

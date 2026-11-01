@@ -275,6 +275,11 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // The partner site keeps the old rule.
     if (site === 'main' ? programDriven(data.signals) : caughtByBotTrap(data.signals)) flags.push('bot_trap');
     else if (caughtByBotTrap(data.signals)) flags.push('synthetic_click');
+    // The ad's link (with Meta's click id) opened outside the Instagram / Facebook app it opens in:
+    // copied out into a browser or a message — or «open in browser», a computer, Audience Network.
+    // The copy itself cannot be seen from a page. Information only (owner, 2026-11-01); the same
+    // click behind another number's order is `reused_click` (registry.ts).
+    if (site === 'main' && (data.clickId || data.signals?.adClick) && !fromSocialApp(userAgent)) flags.push('link_copied');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the
     //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is

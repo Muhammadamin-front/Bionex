@@ -77,11 +77,12 @@ const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
  * The main site's orders that go to the «Spam» tab of its spreadsheet instead of «Lidlar»
  * (owner, 2026-10-28): bot traps, a failed "not a robot" check, a device marked spam before, or one
  * that looks like it (owner, 2026-10-31: «bot ehtimoli bo'lsa Spam listga tushsin»), or an order sent
- * within seconds (`rushed`, owner 2026-11-01: none of those was a real customer in the sheet). One
+ * within seconds (`rushed`, owner 2026-11-01: none of those was a real customer in the sheet), or a
+ * number marked spam before (`spam_phone`, owner 2026-11-01). One
  * place for each order, never both. «Holat» is read from «Lidlar» only, so nothing here reaches Meta
  * until a person copies the row into «Lidlar» (with its №) and sets «Sotildi» / «Kerakli».
  */
-const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device', 'spam_lookalike', 'rushed'];
+const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device', 'spam_lookalike', 'rushed', 'spam_phone'];
 /**
  * Main-site orders that get NO Lead the moment they arrive (owner, 2026-10-29: every other order is a
  * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
@@ -344,6 +345,14 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!leadColumns.includes('click_hash')) this.sql.exec('ALTER TABLE leads ADD COLUMN click_hash TEXT');
     const markColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(spam_marks)').toArray().map((c) => c.name);
     if (!markColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE spam_marks ADD COLUMN fp_hash TEXT');
+    // The marked order's number too (owner, 2026-11-01): the same number ordering again goes to «Spam».
+    if (!markColumns.includes('phone_hash')) {
+      this.sql.exec('ALTER TABLE spam_marks ADD COLUMN phone_hash TEXT');
+      this.sql.exec(
+        "UPDATE spam_marks SET phone_hash = (SELECT phone_hash FROM leads WHERE spam_marks.source IN ('lead:' || leads.id, 'sheet:' || leads.id)) WHERE source LIKE 'lead:%' OR source LIKE 'sheet:%'",
+      );
+      this.sql.exec("UPDATE spam_marks SET phone_hash = (SELECT phone_hash FROM partner_leads p WHERE spam_marks.source = p.site || ':' || p.seq) WHERE phone_hash IS NULL");
+    }
     const partnerColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(partner_leads)').toArray().map((c) => c.name);
     if (!partnerColumns.includes('device_hash')) this.sql.exec('ALTER TABLE partner_leads ADD COLUMN device_hash TEXT');
     if (!partnerColumns.includes('fp_hash')) this.sql.exec('ALTER TABLE partner_leads ADD COLUMN fp_hash TEXT');
@@ -449,7 +458,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (otherPhones >= NETWORK_PHONES_WARNING) input = { ...input, flags: [...input.flags, 'multi_phone_ip'] };
 
     // Operators marked an earlier order from this network or device as spam: say so on this one.
-    input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now)] };
+    input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, phoneHash, now)] };
     // Meta makes a new fbclid for every ad click, so the same one behind an earlier order from another
     // number means the link was copied from an address bar (a real customer forwarding it looks the
     // same): a warning, never a refusal.
@@ -591,7 +600,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const { limited, networkPhones } = this.numbersToday('partner_leads', site, ipHash, deviceHash, now);
     if (limited) return { status: 'ip_limited' };
 
-    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, now), ...(networkPhones >= NETWORK_PHONES_WARNING ? ['multi_phone_ip'] : [])];
+    const flags = [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, phoneHash, now), ...(networkPhones >= NETWORK_PHONES_WARNING ? ['multi_phone_ip'] : [])];
     const seq = this.nextSiteNumber(site);
     this.sql.exec(
       'INSERT INTO partner_leads (site, seq, phone_hash, ip_hash, device_hash, fp_hash, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -650,7 +659,7 @@ export class LeadRegistry extends DurableObject<Env> {
       }
       // OR IGNORE: a mark keeps the time it was first seen, so its 30 days do not restart on every read.
       this.sql.exec(
-        'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
+        'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, phone_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, phone_hash, ? FROM partner_leads WHERE site = ? AND seq = ?',
         source,
         input.now,
         input.site,
@@ -672,7 +681,7 @@ export class LeadRegistry extends DurableObject<Env> {
       if (!row.outcome) continue;
       if (row.outcome === 'spam') {
         this.sql.exec(
-          'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, ? FROM leads WHERE id = ?',
+          'INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, fp_hash, phone_hash, at) SELECT ?, ip_hash, device_hash, fp_hash, phone_hash, ? FROM leads WHERE id = ?',
           source,
           input.now,
           row.leadId,
@@ -683,18 +692,19 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /**
-   * An earlier order from this device, from a phone that looks like it, or from this network
-   * was marked as spam within 30 days. The look-alike is said only when the device itself is
+   * An earlier order from this device, from a phone that looks like it, from this network, or with
+   * this number was marked as spam within 30 days. The look-alike is said only when the device itself is
    * not recognised (its browser data was cleared, or a private window): a hint, never a refusal.
    */
-  private spamFlags(ipHash: string, deviceHash: string | null, fpHash: string | null, now: number): string[] {
+  private spamFlags(ipHash: string, deviceHash: string | null, fpHash: string | null, phoneHash: string, now: number): string[] {
     const since = now - 30 * DAY;
-    const seen = (column: 'device_hash' | 'fp_hash' | 'ip_hash', value: string) =>
+    const seen = (column: 'device_hash' | 'fp_hash' | 'ip_hash' | 'phone_hash', value: string) =>
       this.sql.exec(`SELECT 1 FROM spam_marks WHERE ${column} = ? AND at > ? LIMIT 1`, value, since).toArray().length > 0;
     const flags: string[] = [];
     if (deviceHash && seen('device_hash', deviceHash)) flags.push('spam_device');
     else if (fpHash && seen('fp_hash', fpHash)) flags.push('spam_lookalike');
     if (seen('ip_hash', ipHash)) flags.push('spam_source');
+    if (seen('phone_hash', phoneHash)) flags.push('spam_phone');
     return flags;
   }
 
@@ -994,7 +1004,7 @@ export class LeadRegistry extends DurableObject<Env> {
     this.sql.exec('DELETE FROM spam_marks WHERE source = ?', `lead:${input.leadId}`);
     if (input.action === 'spam') {
       this.sql.exec(
-        "INSERT INTO spam_marks (source, ip_hash, device_hash, fp_hash, at) SELECT 'lead:' || id, ip_hash, device_hash, fp_hash, ? FROM leads WHERE id = ?",
+        "INSERT INTO spam_marks (source, ip_hash, device_hash, fp_hash, phone_hash, at) SELECT 'lead:' || id, ip_hash, device_hash, fp_hash, phone_hash, ? FROM leads WHERE id = ?",
         input.now,
         input.leadId,
       );

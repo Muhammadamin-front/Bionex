@@ -1184,6 +1184,37 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await settled()).toHaveLength(1);
     });
 
+    it('a number marked «Keraksiz» goes to «Spam» when it orders again, from any phone or network', async () => {
+      await mf.dispose();
+      mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', DUPLICATE_WINDOW_HOURS: '0.00001' });
+      await order({ fullName: 'Бир Марта', phone: '+998 90 312 45 73' }, { ip: '203.0.113.73' });
+      await mark(1, 'Keraksiz');
+      await new Promise((r) => setTimeout(r, 60)); // past the repeat window: a new order, not a repeat
+      await order({ fullName: 'Яна Ўша', phone: '+998 90 312 45 73' }, { ip: '198.51.100.74' });
+      await order({ fullName: 'Бошқа Рақам', phone: '+998 90 312 45 75' }, { ip: '198.51.100.75' });
+      for (let i = 0; i < 50 && sheets.rows.length < 3; i++) await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(leadMessages()[1]!.text).toContain('бу рақам аввал спам белгиланган');
+      expect(leadMessages()[2]!.text).not.toContain('спам');
+      const tab = (name: string) => sheets.rows.filter((r) => r.sheet === name).map((r) => r.row[2]);
+      expect(tab('Spam')).toEqual(['Яна Ўша']);
+      expect(tab('Lidlar').sort()).toEqual(['Бир Марта', 'Бошқа Рақам']);
+    });
+
+    it('says when the ad link was opened outside the Instagram / Facebook app', async () => {
+      const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36';
+      const instagram = 'Mozilla/5.0 (Linux; Android 14; SM-A135F; wv) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36 Instagram 400.0';
+      await order({ phone: '+998 90 312 45 76', clickId: 'IwAR0copied123' }, { ip: '203.0.113.76', userAgent: chrome });
+      expect(leadMessages().at(-1)!.text).toContain('иловасидан ташқарида очилган');
+      await order({ phone: '+998 90 312 45 77', clickId: 'IwAR0inapp4567' }, { ip: '203.0.113.77', userAgent: instagram });
+      expect(leadMessages().at(-1)!.text).not.toContain('ташқарида');
+      // No ad click at all: nothing to say about a link.
+      await order({ phone: '+998 90 312 45 78' }, { ip: '203.0.113.78', userAgent: chrome });
+      expect(leadMessages().at(-1)!.text).not.toContain('ташқарида');
+      for (let i = 0; i < 50 && sheets.rows.length < 3; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(sheets.rows[0]!.row[7]).toContain('ilovasidan tashqarida ochilgan');
+    });
+
     it('the main page asks the Instagram app for no check: no token from there with browser signals is a clean order; no signals at all is a bot', async () => {
       const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
       await order({ fullName: 'Инстаграм Мижоз', turnstileToken: undefined, signals: { touch: 5, taps: 6, keys: 14 } }, { ip: '203.0.113.81', userAgent: instagram });
