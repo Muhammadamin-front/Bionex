@@ -52,6 +52,7 @@ const FLAG_TEXT: Record<string, string> = {
   decoy_filled: "yashirin maydon to'ldirilgan, lekin dastur belgisi yo'q (avto-to'ldirish bo'lishi mumkin, odam ham bo'lishi mumkin)",
   phone_autofill: "raqam avtomatik to'ldirilgan (Instagram/telefon) — eski, ishlamaydigan raqam bo'lishi mumkin",
   phone_pattern: "raqam soxtaga o'xshaydi",
+  rushed: "juda tez yuborilgan (saytda 20 soniyadan kam yoki forma 12 soniyadan tez to'ldirilgan)",
   reused_click: "shu reklama bosilishi avval boshqa raqamdan ishlatilgan (havola ko'chirilgan bo'lishi mumkin)",
   no_captcha: "«bot emasman» tekshiruvi o'tmadi",
   likely_bot: "Instagram/Facebook'dan emas — bot ehtimoli bor (odam ham bo'lishi mumkin)",

@@ -1351,6 +1351,22 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     expect(await quiet()).toHaveLength(0);
   });
 
+  it('waits for the sheet on an order sent too soon (under 20 s on the page or 12 s filling the form)', async () => {
+    const quick = sid();
+    await order({ submissionId: quick, signals: { touch: 5, taps: 3, keys: 9, pageMs: 9_000, fillMs: 6_000 } });
+    expect(leadMessages().at(-1)!.text).toContain('жуда тез юборилган');
+    await order({ phone: '+998 90 312 45 48', signals: { touch: 5, taps: 3, keys: 9, pageMs: 60_000, fillMs: 4_000 } }, { ip: '203.0.113.48' });
+    expect(leadMessages().at(-1)!.text).toContain('жуда тез юборилган');
+    expect(await quiet()).toHaveLength(0);
+    // Still a customer: «Kerakli» reports it.
+    await mark(1, 'Kerakli');
+    expect((await settled()).map((e) => [e.event_name, e.event_id])).toEqual([['Lead', quick]]);
+    // Taking its time is a clean order: a Lead at once.
+    await order({ phone: '+998 90 312 45 49', signals: { touch: 5, taps: 3, keys: 9, pageMs: 45_000, fillMs: 20_000 } }, { ip: '203.0.113.49' });
+    expect(leadMessages().at(-1)!.text).not.toContain('жуда тез');
+    expect(await settled(2)).toHaveLength(2);
+  });
+
   it('never invites the browser to report the order, so one order cannot become two events', async () => {
     expect(await (await order()).json()).not.toHaveProperty('track');
     // Not even without credentials: an unqualified Lead is worse for the ads than no Lead.
@@ -1727,6 +1743,13 @@ describe('the partner site (sites.ts t2)', () => {
     await press('s:1:sold');
     await new Promise((r) => setTimeout(r, 150));
     expect(meta.bodies).toHaveLength(2);
+  });
+
+  it('sends its Lead at once even for an order sent within seconds (the main site waits on those)', async () => {
+    const signals = { touch: 5, taps: 3, keys: 9, pageMs: 5_000, fillMs: 3_000 };
+    expect((await partnerOrder({ fullName: 'Тез Киши', phone: '+998 90 312 45 83', signals }, '203.0.113.83')).status).toBe(201);
+    await until(() => meta.bodies.length >= 1);
+    expect(meta.bodies[0]).toMatchObject({ access_token: 'EAA-partner', data: [{ event_name: 'Lead' }] });
   });
 
   it('reads «Keraksiz» from its sheet as spam: the device is flagged on the next order, on either site', async () => {

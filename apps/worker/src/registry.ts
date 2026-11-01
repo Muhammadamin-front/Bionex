@@ -86,7 +86,7 @@ const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_
  * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
  * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
  */
-const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
+const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click', 'rushed'];
 const PARTNER_SHEET_WRITE_ALERT =
   '⚠️ <b>2-сайт жадвали буюртмани қабул қилмади.</b> У буюртмаларни бошқа ҳеч ким кўрмайди. Жадвалнинг Apps Script’ини текширинг ёки дастурчига ёзинг.';
 const SHEET_WRITE_ALERT =

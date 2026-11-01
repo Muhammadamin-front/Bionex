@@ -525,6 +525,21 @@ user's Mac.
     билан буюртма») does not count, or every order would carry it. Deploy the Worker before (or with) any
     page that sends `offerTap`: the schema is strict, an old Worker would refuse such an order.
 
+49. **A main-site order sent within seconds waits for the sheet** (2026-11-01, the targetologist's
+    step 4, owner said «bajar»). Their reading of the main sheet 30.10–1.11: under 20 s on the page —
+    10 spam, 0 «Kerakli»/«Sotildi»; the form filled in under 12 s — ~8 spam, 0 good (a small sample,
+    and most of it from the days the check was off, #31 → #46). `index.ts` flags `rushed` when
+    `signals.pageMs` < `RUSHED_PAGE_MS` or `fillMs` < `RUSHED_FILL_MS` (0 = nothing typed counts),
+    main site only; it is in `NO_INSTANT_LEAD_FLAGS` and nothing else: «Lidlar», panel and group as
+    usual («juda tez yuborilgan …»), `meta_pending` with `lead_sent = 0`, so «Kerakli»/«Sotildi» still
+    sends the Lead. Partner unchanged (#3). Their step 5 («Spam» tab sends no Lead) was already true.
+    `fillMs` starts at the first `input` event, so an Instagram autofill sent at once is usually
+    `rushed` too. The owner says autofilled orders are many; offered, not built: a one-tap
+    «Бу рақам ҳозир ишлайдими?» confirmation in the form, only when the number came from autofill.
+    Same day the targetologist made the main Pixel's Traffic permissions allow list (zeynara.com.uz
+    + workers.dev). The CAPI `event_source_url` is the order's Referer (the domain's Pages function
+    keeps it), so workers.dev must stay listed while any ad points there.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

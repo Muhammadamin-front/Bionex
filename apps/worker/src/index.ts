@@ -37,6 +37,13 @@ const schema = makeLeadSubmissionSchema();
 /** The cron (wrangler.jsonc) that reads the partner sheet's «Holat» column. */
 const PARTNER_SHEET_CRON = '*/5 * * * *';
 const MAX_BODY = 8 * 1024;
+/**
+ * A main-site order sent this soon is `rushed` (no Lead at once; the sheet decides). From the
+ * targetologist's reading of the main sheet, 30.10–1.11.2026: under 20 s on the page — 10 spam, 0
+ * «Kerakli»/«Sotildi»; the form filled in under 12 s — ~8 spam, 0 good.
+ */
+const RUSHED_PAGE_MS = 20_000;
+const RUSHED_FILL_MS = 12_000;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -240,6 +247,13 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     // The number was filled in by autofill (Instagram's from the Meta account): often an old one.
     if (data.signals?.autofill) flags.push('phone_autofill');
+    // Sent within seconds of opening the page or of the first keystroke (0: nothing typed at all).
+    // A warning, not a refusal: the order goes to «Lidlar» and is rung as usual; only its Lead waits
+    // for «Kerakli» / «Sotildi» (registry.ts NO_INSTANT_LEAD_FLAGS). Old cached pages send no times.
+    const s = data.signals;
+    if (site === 'main' && s && ((s.pageMs !== undefined && s.pageMs < RUSHED_PAGE_MS) || (s.fillMs !== undefined && s.fillMs < RUSHED_FILL_MS))) {
+      flags.push('rushed');
+    }
     // The main site's page asks for the check everywhere but inside the Instagram / Facebook app
     // (vite.config.ts, owner 2026-10-31: there it would not pass and people left). So no token is
     // normal only from inside that app; a plain browser that sent none was asked and did not answer.
