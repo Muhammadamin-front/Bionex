@@ -8,6 +8,7 @@ import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
 import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
+import { ConfirmAutofillContext } from '../../components/landing/OrderForm';
 import { AskConcernContext } from '../../lib/concern';
 import { OfferContext, type Offer } from '../../lib/offer';
 import { AdHero } from './AdHero';
@@ -221,7 +222,10 @@ export function Landing() {
     <OfferContext.Provider value={OFFER}>
       {/* «Сизни нима безовта қилади?» after the order (owner, 2026-10-30). */}
       <AskConcernContext.Provider value={true}>
-        <Page hero={adHero} proof={<Proof />} barOverForms={false} />
+        {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
+        <ConfirmAutofillContext.Provider value={true}>
+          <Page hero={adHero} proof={<Proof />} barOverForms={false} />
+        </ConfirmAutofillContext.Provider>
       </AskConcernContext.Provider>
     </OfferContext.Provider>
   );

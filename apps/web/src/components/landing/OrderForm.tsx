@@ -1,7 +1,7 @@
 import { HONEYPOT_FIELD, TURNSTILE_ACTION } from '@bionex/shared/constants';
 import { caretAfterDigits, formatNationalAsTyped, formatUzPhone, nationalDigitsFromInput } from '@bionex/shared/phone';
 import type { Utm } from '@bionex/shared/utm';
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { site } from '../../config/product';
 import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
@@ -46,6 +46,13 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 /** Marks that password managers and autofill honour: never put a saved value into a decoy field. */
 const NO_AUTOFILL = { 'data-lpignore': 'true', 'data-1p-ignore': true, 'data-bwignore': 'true', 'data-form-type': 'other' } as const;
+
+/**
+ * Whether a number autofill put in must be confirmed with one tap before the order goes — the main
+ * site's choice (sites/classic; owner, 2026-11-01). Instagram fills in the Meta account's number,
+ * often years old and someone else's by now («I never left it»); the yellow hint alone was not read.
+ */
+export const ConfirmAutofillContext = createContext(false);
 
 export interface OrderResult {
   message: string;
@@ -110,6 +117,12 @@ export function OrderForm({
   const offer = useOffer();
   /** The number arrived all at once (autofill, often an old one): ask the visitor to check it. */
   const [phoneAutofilled, setPhoneAutofilled] = useState(false);
+  const confirmAutofill = useContext(ConfirmAutofillContext);
+  /** «Is this number in use?» is on screen in place of the submit button. */
+  const [askingNumber, setAskingNumber] = useState(false);
+  /** A ref, not state: the submit that follows «yes» runs in the same tick, before a re-render. */
+  const numberConfirmed = useRef(false);
+  const numberCheckRef = useRef<HTMLDivElement>(null);
   /** The built page shows the form before its script runs (prerender): typing then would be lost
    *  and «send» would reload the page, so the fields are read-only and the button a plain one
    *  (not `disabled`: that fades it) until React has taken the page over. A form opened later
@@ -266,7 +279,10 @@ export function OrderForm({
     // Instagram's (from the Meta account) or the keyboard's — and often a number no longer in use.
     const inputType = (e.nativeEvent as InputEvent).inputType;
     if (inputType === 'insertText' || inputType === 'deleteContentBackward' || inputType === 'insertFromPaste') setPhoneAutofilled(false);
-    else if (digits.length - prevDigits.length >= 5) setPhoneAutofilled(true);
+    else if (digits.length - prevDigits.length >= 5) {
+      setPhoneAutofilled(true);
+      numberConfirmed.current = false;
+    }
 
     const formatted = formatNationalAsTyped(digits);
     setPhone(formatted);
@@ -277,6 +293,27 @@ export function OrderForm({
     // often do not know how to close the keyboard, and the button sat hidden under it.
     if (digits.length === 9 && prevDigits.length < 9) requestAnimationFrame(() => window.setTimeout(showSubmitButton, 150));
   }
+
+  /** «Yes, this number works»: send the order now. */
+  function confirmNumber() {
+    numberConfirmed.current = true;
+    setAskingNumber(false);
+    const form = formRef.current;
+    if (form?.requestSubmit) form.requestSubmit();
+    else form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); // iOS < 16
+  }
+
+  /** «No, another number»: an empty field, the keyboard up. */
+  function retypeNumber() {
+    setAskingNumber(false);
+    setPhoneAutofilled(false);
+    setPhone('');
+    phoneRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (askingNumber) numberCheckRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [askingNumber]);
 
   /** Scrolls just enough for the submit button to sit above the keyboard (the visual viewport). */
   function showSubmitButton() {
@@ -326,6 +363,11 @@ export function OrderForm({
     if (nameError || phoneError) {
       setErrors({ fullName: nameError, phone: phoneError });
       (nameError ? nameRef : phoneRef).current?.focus();
+      return;
+    }
+    if (confirmAutofill && phoneAutofilled && !numberConfirmed.current) {
+      phoneRef.current?.blur(); // the keyboard would cover the question
+      setAskingNumber(true);
       return;
     }
 
@@ -554,7 +596,7 @@ export function OrderForm({
             <p id={errorId('phone')} className="mt-2 text-base font-semibold text-danger">
               {errors.phone}
             </p>
-          ) : phoneAutofilled ? (
+          ) : phoneAutofilled && !askingNumber ? (
             <p id={`${id}-phone-hint`} role="status" className="mt-2 rounded-xl bg-accent/30 px-3 py-2 text-base font-bold text-ink">
               Рақам автоматик ёзилди. Шу рақам ҳозир ишлайдими? Текшириб, керак бўлса тузатинг.
             </p>
@@ -595,20 +637,45 @@ export function OrderForm({
           </div>
         )}
 
-        <AntiMetalButton type={ready ? 'submit' : 'button'} busy={busy} disabled={busy} className="w-full sm:col-span-2">
-          {busy ? (
-            <>
-              <svg className="spinner h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="42 100" strokeLinecap="round" />
-              </svg>
-              {waitingForCheck ? 'Текширилмоқда…' : 'Юборилмоқда…'}
-            </>
-          ) : offer ? (
-            `−${offer.percent}% чегирма билан буюртма`
-          ) : (
-            'Батафсил маълумот олиш'
-          )}
-        </AntiMetalButton>
+        {askingNumber && phoneAutofilled ? (
+          <div
+            ref={numberCheckRef}
+            role="group"
+            aria-labelledby={`${id}-number-check`}
+            className="rounded-2xl border-2 border-accent-2 bg-accent/15 p-4 text-center sm:col-span-2"
+          >
+            <p id={`${id}-number-check`} className="text-lg font-bold text-ink">
+              Мутахассисимиз шу рақамга қўнғироқ қилади:
+            </p>
+            <p className="my-2 whitespace-nowrap font-display text-[1.45rem] font-extrabold tabular-nums">+998 {phone}</p>
+            <p className="mb-4 text-lg font-bold text-ink">Бу рақам ҳозир ишлайдими?</p>
+            <AntiMetalButton type="button" onClick={confirmNumber} className="w-full">
+              Ҳа, шу рақам ишлайди
+            </AntiMetalButton>
+            <button
+              type="button"
+              onClick={retypeNumber}
+              className="mt-3 flex min-h-14 w-full items-center justify-center rounded-2xl border-2 border-forest/25 px-4 py-2 font-display text-[1.05rem] font-bold text-forest transition-colors hover:border-forest/50 hover:bg-paper"
+            >
+              Йўқ, бошқа рақам ёзаман
+            </button>
+          </div>
+        ) : (
+          <AntiMetalButton type={ready ? 'submit' : 'button'} busy={busy} disabled={busy} className="w-full sm:col-span-2">
+            {busy ? (
+              <>
+                <svg className="spinner h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="42 100" strokeLinecap="round" />
+                </svg>
+                {waitingForCheck ? 'Текширилмоқда…' : 'Юборилмоқда…'}
+              </>
+            ) : offer ? (
+              `−${offer.percent}% чегирма билан буюртма`
+            ) : (
+              'Батафсил маълумот олиш'
+            )}
+          </AntiMetalButton>
+        )}
 
         <p className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
           Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.

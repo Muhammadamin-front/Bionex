@@ -534,8 +534,16 @@ user's Mac.
     usual («juda tez yuborilgan …»), `meta_pending` with `lead_sent = 0`, so «Kerakli»/«Sotildi» still
     sends the Lead. Partner unchanged (#3). Their step 5 («Spam» tab sends no Lead) was already true.
     `fillMs` starts at the first `input` event, so an Instagram autofill sent at once is usually
-    `rushed` too. The owner says autofilled orders are many; offered, not built: a one-tap
-    «Бу рақам ҳозир ишлайдими?» confirmation in the form, only when the number came from autofill.
+    `rushed` too. The owner says autofilled orders are many, so (same day, owner's yes) the main
+    site's form asks once when the number came from autofill (`phoneAutofilled`): the first «send»
+    shows «Мутахассисимиз шу рақамга қўнғироқ қилади: +998 … Бу рақам ҳозир ишлайдими?» with
+    [Ҳа, шу рақам ишлайди] (sends; `requestSubmit`) / [Йўқ, бошқа рақам ёзаман] (empties the field).
+    The owner's wording: «мутахассис», not «оператор». `ConfirmAutofillContext` (OrderForm.tsx),
+    provided only by sites/classic; partner unchanged. Typed or pasted numbers never see it. Ships
+    with the Worker deploy (workers.dev) and `deploy:site` (zeynara.com.uz).
+    Domain verification for zeynara.com.uz (Meta Business portfolio): advised the DNS TXT record
+    over the `<meta>` tag — no code, nothing in the public repo, and index.html is shared with the
+    partner build (#2).
     Same day the targetologist made the main Pixel's Traffic permissions allow list (zeynara.com.uz
     + workers.dev). The CAPI `event_source_url` is the order's Referer (the domain's Pages function
     keeps it), so workers.dev must stay listed while any ad points there.
