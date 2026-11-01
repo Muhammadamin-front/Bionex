@@ -533,6 +533,10 @@ user's Mac.
     main site only; it is in `NO_INSTANT_LEAD_FLAGS` and nothing else: «Lidlar», panel and group as
     usual («juda tez yuborilgan …»), `meta_pending` with `lead_sent = 0`, so «Kerakli»/«Sotildi» still
     sends the Lead. Partner unchanged (#3). Their step 5 («Spam» tab sends no Lead) was already true.
+    Later the same day (owner, re-pasting «sifatli lead 0 ta»): `rushed` moved into
+    `MAIN_SPAM_SHEET_FLAGS` — «Spam» tab, not «Lidlar»; still in the group and the panel, not refused
+    (a refused sender would only try again slower; the repo is public). A real customer sent fast
+    (autofill + «Ҳа») lands there too: worth a look at «juda tez» rows in «Spam» now and then.
     `fillMs` starts at the first `input` event, so an Instagram autofill sent at once is usually
     `rushed` too. The owner says autofilled orders are many, so (same day, owner's yes) the main
     site's form asks once when the number came from autofill (`phoneAutofilled`): the first «send»

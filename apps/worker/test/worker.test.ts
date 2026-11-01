@@ -1351,14 +1351,16 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     expect(await quiet()).toHaveLength(0);
   });
 
-  it('waits for the sheet on an order sent too soon (under 20 s on the page or 12 s filling the form)', async () => {
+  it('sends no Lead for an order sent too soon (under 20 s on the page or 12 s filling the form): it goes to «Spam»', async () => {
     const quick = sid();
     await order({ submissionId: quick, signals: { touch: 5, taps: 3, keys: 9, pageMs: 9_000, fillMs: 6_000 } });
     expect(leadMessages().at(-1)!.text).toContain('жуда тез юборилган');
     await order({ phone: '+998 90 312 45 48', signals: { touch: 5, taps: 3, keys: 9, pageMs: 60_000, fillMs: 4_000 } }, { ip: '203.0.113.48' });
     expect(leadMessages().at(-1)!.text).toContain('жуда тез юборилган');
     expect(await quiet()).toHaveLength(0);
-    // Still a customer: «Kerakli» reports it.
+    for (let i = 0; i < 50 && sheets.rows.length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+    expect(sheets.rows.map((r) => r.sheet)).toEqual(['Spam', 'Spam']);
+    // A row a person copies into «Lidlar» and marks «Kerakli» is still reported.
     await mark(1, 'Kerakli');
     expect((await settled()).map((e) => [e.event_name, e.event_id])).toEqual([['Lead', quick]]);
     // Taking its time is a clean order: a Lead at once.

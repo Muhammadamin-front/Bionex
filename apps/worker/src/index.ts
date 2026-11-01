@@ -38,7 +38,7 @@ const schema = makeLeadSubmissionSchema();
 const PARTNER_SHEET_CRON = '*/5 * * * *';
 const MAX_BODY = 8 * 1024;
 /**
- * A main-site order sent this soon is `rushed` (no Lead at once; the sheet decides). From the
+ * A main-site order sent this soon is `rushed` («Spam» tab, no Lead). From the
  * targetologist's reading of the main sheet, 30.10–1.11.2026: under 20 s on the page — 10 spam, 0
  * «Kerakli»/«Sotildi»; the form filled in under 12 s — ~8 spam, 0 good.
  */
@@ -248,8 +248,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // The number was filled in by autofill (Instagram's from the Meta account): often an old one.
     if (data.signals?.autofill) flags.push('phone_autofill');
     // Sent within seconds of opening the page or of the first keystroke (0: nothing typed at all).
-    // A warning, not a refusal: the order goes to «Lidlar» and is rung as usual; only its Lead waits
-    // for «Kerakli» / «Sotildi» (registry.ts NO_INSTANT_LEAD_FLAGS). Old cached pages send no times.
+    // Not refused (a refused one would just try again slower): it goes to the «Spam» tab and gets no
+    // Lead (registry.ts MAIN_SPAM_SHEET_FLAGS); the group still sees it. Old cached pages send no times.
     const s = data.signals;
     if (site === 'main' && s && ((s.pageMs !== undefined && s.pageMs < RUSHED_PAGE_MS) || (s.fillMs !== undefined && s.fillMs < RUSHED_FILL_MS))) {
       flags.push('rushed');
