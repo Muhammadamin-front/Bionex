@@ -770,6 +770,22 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!(await sent)) await this.alert('meta', META_ALERT, Date.now());
   }
 
+  /**
+   * Failed sheet reads in a row for `kind` (0 after a good read). An Apps Script now and then misses
+   * one 5-minute read and answers the next — nothing is lost, as every read takes the whole column —
+   * so the cron alerts only from the second failure in a row.
+   */
+  async sheetReadFailures(kind: string, failed: boolean): Promise<number> {
+    const key = `read_failures_${kind}`;
+    if (!failed) {
+      this.sql.exec('DELETE FROM meta WHERE k = ?', key);
+      return 0;
+    }
+    const next = Number(this.sql.exec<{ v: string }>('SELECT v FROM meta WHERE k = ?', key).toArray()[0]?.v ?? 0) + 1;
+    this.sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', key, String(next));
+    return next;
+  }
+
   /** A configuration problem that silently loses every order: tell the group, at most hourly. */
   async alert(kind: string, text: string, now: number): Promise<void> {
     const last = this.sql.exec<{ at: number }>('SELECT at FROM alerts WHERE kind = ?', kind).toArray()[0];

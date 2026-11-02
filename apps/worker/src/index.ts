@@ -364,10 +364,14 @@ async function syncPartnerSheet(env: Env, now: number): Promise<void> {
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
   const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const failures = await registry.sheetReadFailures('partner-sheet-read', !rows);
   if (rows) await registry.syncPartnerSpam({ site: 't2', rows, now });
   // Its sheet is the only place its orders go: the owner hears of a broken one privately, never the group.
-  else await registry.ownerAlert('partner-sheet-read', PARTNER_SHEET_READ_ALERT, now);
+  else if (failures >= SHEET_READ_FAILURES_TO_ALERT) await registry.ownerAlert('partner-sheet-read', PARTNER_SHEET_READ_ALERT, now);
 }
+
+/** Failed reads in a row before anyone is told: one miss is the Apps Script's, and the next read catches up. */
+const SHEET_READ_FAILURES_TO_ALERT = 2;
 
 const PARTNER_SHEET_READ_ALERT =
   '⚠️ <b>2-сайт жадвали ўқилмаяпти.</b> Унинг Apps Script’и ишламаяпти бўлиши мумкин — шунда янги буюртмалар ҳам жадвалга тушмайди. Текширинг ёки дастурчига ёзинг.';
@@ -383,13 +387,15 @@ async function syncMainSheet(env: Env, now: number): Promise<void> {
   const cfg = sheetsConfig(env, 'main');
   if (!cfg) return;
   const rows = await readSheetStatuses(cfg);
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  const failures = await registry.sheetReadFailures('sheet-read', !rows);
   if (!rows) {
     // While «Holat» cannot be read, no «Sotildi» / «Kerakli» reaches Meta: say so (hourly at most).
-    await env.REGISTRY.get(env.REGISTRY.idFromName('main')).alert('sheet-read', SHEET_READ_ALERT, now);
+    if (failures >= SHEET_READ_FAILURES_TO_ALERT) await registry.alert('sheet-read', SHEET_READ_ALERT, now);
     return;
   }
   const marked = rows.map((r) => ({ leadId: r.number, outcome: sheetOutcome(r.status) }));
-  await env.REGISTRY.get(env.REGISTRY.idFromName('main')).syncMainSheet({ rows: marked, now });
+  await registry.syncMainSheet({ rows: marked, now });
 }
 
 /**

@@ -362,6 +362,9 @@ user's Mac.
     the group (#2). Also: `buildUserData` makes `fbc` = `fb.1.<now>.<clickId>` when the `_fbc` cookie
     is not set yet (the Pixel loads only once the page is idle), so an early order still carries its
     ad click to Meta.
+    2026-11-02: an unreadable «Holat» alerts (group or owner) only from the **second failed read in a row**
+    (`sheetReadFailures`, `meta.read_failures_<kind>`, reset by a good read): an Apps Script misses a single
+    read now and then, and nothing is lost since every read takes the whole column.
 
 37. **The owner's private alerts** (2026-10-29): the partner's sheet is the only place its orders go,
     so a refused write (`acceptPartner` → `ownerAlert('partner-sheet-write')`) or an unreadable

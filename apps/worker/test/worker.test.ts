@@ -1238,11 +1238,20 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       await order({ signals: { touch: 5, taps: 3, keys: 9 } });
       await new Promise((r) => setTimeout(r, 150));
       expect(telegram.messages.some((m) => m.text.includes('Google жадвал буюртмани қабул қилмади'))).toBe(true);
-      // An unreadable «Holat» (the script answers with an error page) is said too.
+      // An unreadable «Holat» (the script answers with an error page) is said too — from the second
+      // failed read in a row: a single miss is the Apps Script's, and a good read starts the count over.
+      const unreadable = () => telegram.messages.some((m) => m.text.includes('Google жадвал ўқилмаяпти'));
+      sheets.statuses = 'broken' as unknown as Array<[unknown, unknown]>;
+      await readSheet();
+      sheets.statuses = [];
+      await readSheet();
       sheets.statuses = 'broken' as unknown as Array<[unknown, unknown]>;
       await readSheet();
       await new Promise((r) => setTimeout(r, 100));
-      expect(telegram.messages.some((m) => m.text.includes('Google жадвал ўқилмаяпти'))).toBe(true);
+      expect(unreadable()).toBe(false);
+      await readSheet();
+      await new Promise((r) => setTimeout(r, 100));
+      expect(unreadable()).toBe(true);
     });
 
     it('takes the thank-you screen\'s answer once: a reply under the order in Telegram and «Shikoyat» in its sheet row', async () => {
