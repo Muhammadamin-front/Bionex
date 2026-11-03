@@ -228,6 +228,18 @@ describe('a new order', () => {
   });
 });
 
+describe('the microphone test page', () => {
+  it('lets the page use the microphone and nothing else', async () => {
+    const res = await mf.dispatchFetch(`${SITE}/mic-test`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('permissions-policy')).toContain('microphone=(self)');
+    const html = await res.text();
+    expect(html).toContain('Mikrofon sinovi');
+    expect(html).not.toContain('{{NONCE}}');
+    expect(res.headers.get('content-security-policy')).toMatch(/script-src 'nonce-[0-9a-f]{32}'/);
+  });
+});
+
 describe('videos', () => {
   it('serves byte ranges, as an iPhone needs to play them', async () => {
     const get = (range?: string) => mf.dispatchFetch(`${SITE}/video/review-1.mp4`, range ? { headers: { range } } : {});

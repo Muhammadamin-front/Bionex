@@ -566,6 +566,21 @@ user's Mac.
     Instagram/Facebook app — copied out of the app, or «open in browser», a computer, Audience Network.
     The same click id behind another number's order stays `reused_click` (#24).
 
+51. **A call from the site — microphone test first** (2026-11-04, owner's idea): a 📞 button on the site,
+    enabled 9:00–19:00, that rings the operators' installed app (the panel PWA); **neither side sees a
+    phone number** (owner's requirement). Planned as our own WebRTC voice call: signalling over a Durable
+    Object WebSocket, STUN (+ Cloudflare TURN if needed), ringing in the panel, «Operatorlar band» → the
+    form after ~30 s, each call logged in the group with its ad. Advised to enable the button only while
+    an operator is online. Risks told: Instagram's in-app browser may not hand over the microphone (most
+    customers open the site there); a closed PWA cannot ring like a phone (a push notification at best,
+    weak on iPhone), so the panel must stay open; older customers vs the microphone prompt. Alternative
+    offered: a plain phone number 9–19 (the owner then asked that the number stay hidden).
+    Step 1 built: `GET /mic-test` on the Worker (`src/mic-test.ts` + `mic-test.html`, in
+    `run_worker_first`): microphone, a level meter, a WebRTC loop on the phone itself, a STUN check; the
+    owner screenshots the result from Instagram on Android and iPhone. Nothing is recorded or sent.
+    Note for the real button: the site's own pages send `Permissions-Policy: microphone=()` (apps/web
+    vite.config.ts `_headers`, also on zeynara.com.uz) — it must become `microphone=(self)` there.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

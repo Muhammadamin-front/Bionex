@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Mikrofon sinovi</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #f4f6f2; color: #14261c; font: 18px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 4px 0 12px; }
+  p { margin: 0 0 12px; }
+  .card { background: #fff; border-radius: 16px; padding: 16px; margin: 0 0 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  button { display: block; width: 100%; min-height: 56px; margin: 0 0 10px; border: 0; border-radius: 14px; background: #17784a; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  button.second { background: #fff; color: #17784a; border: 2px solid #17784a; }
+  button:disabled { opacity: .45; cursor: default; }
+  .meter { height: 18px; border-radius: 9px; background: #e3e8e1; overflow: hidden; margin: 6px 0 4px; }
+  .meter > div { height: 100%; width: 0; background: #17784a; transition: width 80ms linear; }
+  .hint { font-size: 16px; color: #4b5d52; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 6px 0; border-bottom: 1px solid #edf0eb; }
+  li:last-child { border-bottom: 0; }
+  .ua { font-size: 12px; color: #6b7a70; word-break: break-all; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎤 Mikrofon sinovi</h1>
+  <p class="hint">Saytdan qo'ng'iroq qilish shu telefonda va shu ilova ichida ishlaydimi — shuni tekshiramiz. Hech narsa yozib olinmaydi va hech qayerga yuborilmaydi.</p>
+
+  <div class="card">
+    <button id="mic">1. Mikrofonni yoqish</button>
+    <div class="meter" aria-hidden="true"><div id="level"></div></div>
+    <p class="hint" id="micText">Bosing, ruxsat so'ralsa «Разрешить» ni tanlang, keyin gapiring: yashil chiziq qimirlashi kerak.</p>
+  </div>
+
+  <div class="card">
+    <button id="echo" class="second" disabled>2. O'z ovozimni internet orqali eshitish</button>
+    <p class="hint" id="echoText">Telefonni qulog'ingizga tuting (yoki quloqchin taqing) va gapiring: bir lahzadan keyin o'z ovozingizni eshitishingiz kerak. 15 soniyada o'zi to'xtaydi.</p>
+    <audio id="out" autoplay playsinline></audio>
+  </div>
+
+  <div class="card">
+    <p><b>Natija</b> — shu ekranni rasmga olib (skrinshot), menga yuboring:</p>
+    <ul>
+      <li id="rBrowser"></li>
+      <li id="rMic">⏳ Mikrofon: hali sinalmadi</li>
+      <li id="rVoice">⏳ Ovoz eshitildi: hali sinalmadi</li>
+      <li id="rRtc">⏳ Internet orqali ovoz: hali sinalmadi</li>
+      <li id="rNet">⏳ Tarmoq: hali sinalmadi</li>
+    </ul>
+    <div class="ua" id="ua"></div>
+  </div>
+</main>
+<script nonce="{{NONCE}}">
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var ua = navigator.userAgent;
+  var app = /Instagram/.test(ua) ? 'Instagram ichida' : /FBAN|FBAV|FB_IAB|FB4A|FBIOS/.test(ua) ? 'Facebook ichida' : /Telegram/.test(ua) ? 'Telegram ichida' : 'oddiy brauzer';
+  var os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : 'kompyuter';
+  $('rBrowser').textContent = '📱 ' + os + ', ' + app;
+  $('ua').textContent = ua;
+
+  var stream = null;
+  var heard = false;
+  var set = function (id, ok, text) { $(id).textContent = (ok === null ? '⏳ ' : ok ? '✅ ' : '❌ ') + text; };
+
+  var WHY = {
+    NotAllowedError: "ruxsat berilmadi (yoki bu ilova mikrofonni bermaydi)",
+    SecurityError: "bu ilova mikrofonni bermaydi",
+    NotFoundError: 'telefonda mikrofon topilmadi',
+    NotReadableError: 'mikrofon boshqa ilovada band',
+    AbortError: "mikrofon ochilmadi"
+  };
+
+  $('mic').addEventListener('click', function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      set('rMic', false, "Mikrofon: bu brauzer mikrofonni umuman qo'llamaydi");
+      $('micText').textContent = "Bu ilova ichida mikrofon yo'q. Shu sahifani oddiy brauzerda ham ochib ko'ring.";
+      return;
+    }
+    $('mic').disabled = true;
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (s) {
+      stream = s;
+      set('rMic', true, 'Mikrofon: ishladi');
+      $('micText').textContent = 'Gapiring: yashil chiziq qimirlayaptimi?';
+      $('echo').disabled = typeof RTCPeerConnection === 'undefined';
+      if ($('echo').disabled) set('rRtc', false, "Internet orqali ovoz: bu brauzerda yo'q (WebRTC)");
+      meter(s);
+    }).catch(function (e) {
+      $('mic').disabled = false;
+      var name = (e && e.name) || 'Error';
+      set('rMic', false, 'Mikrofon: ' + (WHY[name] || name));
+      $('micText').textContent = 'Ishlamadi: ' + (WHY[name] || name) + '.';
+    });
+  });
+
+  function meter(s) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    var ctx = new Ctx();
+    if (ctx.resume) ctx.resume();
+    var analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    ctx.createMediaStreamSource(s).connect(analyser);
+    var data = new Uint8Array(analyser.fftSize);
+    (function tick() {
+      analyser.getByteTimeDomainData(data);
+      var peak = 0;
+      for (var i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i] - 128));
+      var pct = Math.min(100, Math.round(peak / 64 * 100));
+      $('level').style.width = pct + '%';
+      if (pct > 25 && !heard) { heard = true; set('rVoice', true, 'Ovoz eshitildi: ha'); }
+      requestAnimationFrame(tick);
+    })();
+  }
+
+  $('echo').addEventListener('click', function () {
+    if (!stream) return;
+    $('echo').disabled = true;
+    set('rRtc', null, 'Internet orqali ovoz: ulanmoqda…');
+    set('rNet', null, 'Tarmoq: tekshirilmoqda…');
+    var cfg = { iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }] };
+    var a = new RTCPeerConnection(cfg), b = new RTCPeerConnection(cfg);
+    var outside = false;
+    a.onicecandidate = function (e) {
+      if (!e.candidate) return;
+      if (/ typ srflx /.test(e.candidate.candidate)) outside = true;
+      b.addIceCandidate(e.candidate).catch(function () {});
+    };
+    b.onicecandidate = function (e) { if (e.candidate) a.addIceCandidate(e.candidate).catch(function () {}); };
+    b.ontrack = function (e) {
+      var out = $('out');
+      out.srcObject = e.streams[0];
+      var p = out.play();
+      if (p && p.catch) p.catch(function () {});
+    };
+    stream.getTracks().forEach(function (t) { a.addTrack(t, stream); });
+    a.createOffer()
+      .then(function (o) { return a.setLocalDescription(o); })
+      .then(function () { return b.setRemoteDescription(a.localDescription); })
+      .then(function () { return b.createAnswer(); })
+      .then(function (o) { return b.setLocalDescription(o); })
+      .then(function () { return a.setRemoteDescription(b.localDescription); })
+      .catch(function (e) { set('rRtc', false, 'Internet orqali ovoz: ' + ((e && e.name) || 'xato')); });
+
+    // After a few seconds: did audio actually travel, and could the phone see its address from outside?
+    setTimeout(function () {
+      b.getStats().then(function (stats) {
+        var bytes = 0;
+        stats.forEach(function (r) { if (r.type === 'inbound-rtp' && (r.kind === 'audio' || r.mediaType === 'audio')) bytes = r.bytesReceived || 0; });
+        set('rRtc', bytes > 0, 'Internet orqali ovoz: ' + (bytes > 0 ? 'ishladi' : "o'tmadi"));
+      }).catch(function () { set('rRtc', false, "Internet orqali ovoz: o'lchab bo'lmadi"); });
+      set('rNet', outside, 'Tarmoq: ' + (outside ? 'tashqi manzil olindi' : 'tashqi manzil olinmadi (ulanish uchun qo‘shimcha server kerak bo‘ladi)'));
+    }, 5000);
+
+    setTimeout(function () {
+      a.close();
+      b.close();
+      $('out').srcObject = null;
+      $('echoText').textContent = "To'xtatildi. Yana sinash uchun sahifani yangilang.";
+    }, 15000);
+  });
+})();
+</script>
+</body>
+</html>
