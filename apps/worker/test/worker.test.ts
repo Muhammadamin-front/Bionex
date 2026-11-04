@@ -849,6 +849,24 @@ describe("the operators' Mini App panel", () => {
     expect(names).toEqual(expect.arrayContaining(['Одам Бир', 'Одам Икки', 'Босган Одам']));
   });
 
+  it("remembers a bot trap's device: its next order, with any number, reaches neither the group nor the panel", async () => {
+    const BOT = '77777777-8888-4999-8aaa-bbbbbbbbbbbb';
+    await order({ fullName: 'Бот Бир', phone: '+998 90 312 46 01', deviceId: BOT, signals: { touch: 5, taps: 3, webdriver: true, keys: 12 } }, { ip: '203.0.113.101' });
+    expect(leadMessages()).toHaveLength(1);
+    // The same browser, now without the automation mark, another number and network: silent.
+    expect((await order({ fullName: 'Бот Икки', phone: '+998 90 312 46 02', deviceId: BOT, signals: { touch: 5, taps: 3, keys: 12 } }, { ip: '198.51.100.102' })).status).toBe(201);
+    // Its number again within the day is a repeat: no nudge in the group either.
+    await order({ fullName: 'Бот Икки', phone: '+998 90 312 46 02', deviceId: BOT, signals: { touch: 5, taps: 3, keys: 12 } }, { ip: '198.51.100.102' });
+    expect(telegram.messages.filter((m) => !m.text.startsWith('🆕')).map((m) => m.text).join('\n')).not.toContain('312 46 02');
+    expect(leadMessages()).toHaveLength(1);
+    // Its network is not held against anyone else (many customers share one mobile address).
+    await order({ fullName: 'Одам Уч', phone: '+998 90 312 46 03', signals: { touch: 5, taps: 3, keys: 12 } }, { ip: '203.0.113.101' });
+    expect(leadMessages()).toHaveLength(2);
+    expect(leadMessages()[1]!.text).not.toContain('спам');
+    const names = ((await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> }).leads.map((l) => l.name);
+    expect(names).toEqual(['Одам Уч']);
+  });
+
   it('keeps campaign, ad set (utm_term) and video (utm_content) per lead', async () => {
     await order(
       {
@@ -1206,10 +1224,13 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       await order({ fullName: 'Бошқа Рақам', phone: '+998 90 312 45 75' }, { ip: '198.51.100.75' });
       for (let i = 0; i < 50 && sheets.rows.length < 3; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));
-      expect(leadMessages()[1]!.text).toContain('бу рақам аввал спам белгиланган');
-      expect(leadMessages()[2]!.text).not.toContain('спам');
+      // The marked number's order reaches nobody but the «Spam» tab: not even the group.
+      expect(leadMessages().map((m) => m.text)).toEqual([expect.stringContaining('Бир Марта'), expect.stringContaining('Бошқа Рақам')]);
+      expect(leadMessages()[1]!.text).not.toContain('спам');
       const tab = (name: string) => sheets.rows.filter((r) => r.sheet === name).map((r) => r.row[2]);
       expect(tab('Spam')).toEqual(['Яна Ўша']);
+      const spamRow = sheets.rows.find((r) => r.sheet === 'Spam')!;
+      expect(spamRow.row[spamRow.headers.indexOf('Belgi')]).toContain('bu raqam avval spam belgilangan');
       expect(tab('Lidlar').sort()).toEqual(['Бир Марта', 'Бошқа Рақам']);
     });
 
@@ -1323,13 +1344,17 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await settled()).toHaveLength(1);
     });
 
-    it('remembers «Keraksiz» as spam, so the next order from that phone arrives marked', async () => {
+    it('remembers «Keraksiz» as spam, so the next order from that phone goes only to the «Spam» tab', async () => {
       const DEVICE = '11111111-2222-4333-8444-555555555555';
       await order({ deviceId: DEVICE }, { ip: '203.0.113.44' });
       sheets.statuses = [[1, 'Keraksiz']];
       await readSheet();
-      await order({ deviceId: DEVICE, phone: '+998 90 312 45 45' }, { ip: '198.51.100.45' });
-      expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+      expect((await order({ deviceId: DEVICE, phone: '+998 90 312 45 45' }, { ip: '198.51.100.45' })).status).toBe(201);
+      // Accepted, but the group never hears of it: only the first order is there.
+      expect(leadMessages()).toHaveLength(1);
+      for (let i = 0; i < 50 && !sheets.rows.some((r) => r.sheet === 'Spam'); i++) await new Promise((r) => setTimeout(r, 10));
+      const spamRow = sheets.rows.find((r) => r.sheet === 'Spam')!;
+      expect(spamRow.row[spamRow.headers.indexOf('Belgi')]).toContain('bu qurilmadan avval spam belgilangan');
       // Only the first (clean on arrival) order's Lead: the marked device gets none.
       expect(await quiet()).toHaveLength(1);
     });
@@ -1831,9 +1856,10 @@ describe('the partner site (sites.ts t2)', () => {
     await until(() => sheets.rows.length >= 2);
     expect(sheets.rows[1]!.row[7]).toContain('bu qurilmadan avval spam belgilangan');
     expect(meta.bodies).toHaveLength(1);
-    // The operators see it too, on the main site.
+    // The main site knows it too: its order is taken but kept out of the operators' group.
+    const shown = leadMessages().length;
     expect((await order({ phone: '+998 90 312 45 88', deviceId: DEVICE }, { ip: '192.0.2.88' })).status).toBe(201);
-    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
+    expect(leadMessages()).toHaveLength(shown);
 
     // Picked something else after all: forgotten at the next read, so the next order from that
     // device (no longer flagged) reaches the sheet again, clean.
@@ -1844,13 +1870,12 @@ describe('the partner site (sites.ts t2)', () => {
     expect(sheets.rows[2]!.row[7]).toBe('');
   });
 
-  it("an operator's 🚫 marks the device: its next order is flagged even from another network", async () => {
+  it("an operator's 🚫 marks the device: its next order, even from another network, never reaches the group again", async () => {
     const DEVICE = '66666666-7777-4888-9999-000000000000';
     expect((await order({ phone: '+998 90 312 45 90', deviceId: DEVICE }, { ip: '203.0.113.90' })).status).toBe(201);
     await press('s:1:spam');
     expect((await order({ phone: '+998 90 312 45 91', deviceId: DEVICE }, { ip: '198.51.100.91' })).status).toBe(201);
-    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
-    expect(leadMessages().at(-1)!.text).not.toContain('бу манбадан аввал спам');
+    expect(leadMessages()).toHaveLength(1);
     // Another phone on that first network: only the network warning.
     expect((await order({ phone: '+998 90 312 45 92', deviceId: '12345678-1234-4234-8234-123456789012' }, { ip: '203.0.113.90' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('бу манбадан аввал спам белгиланган');
@@ -1895,10 +1920,10 @@ describe('the partner site (sites.ts t2)', () => {
     expect((await order({ phone: '+998 90 312 45 94', deviceId: device(2), fingerprint: LOOKS }, { ip: '198.51.100.94' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('аввал спам бўлган қурилмага ўхшайди');
     expect(leadMessages().at(-1)!.text).not.toContain('бу қурилмадан');
-    // The same device still gets the stronger warning only.
+    // The same device itself: taken, but kept out of the group altogether.
+    const shown = leadMessages().length;
     expect((await order({ phone: '+998 90 312 45 95', deviceId: device(1), fingerprint: LOOKS }, { ip: '192.0.2.95' })).status).toBe(201);
-    expect(leadMessages().at(-1)!.text).toContain('бу қурилмадан аввал спам белгиланган');
-    expect(leadMessages().at(-1)!.text).not.toContain('ўхшайди');
+    expect(leadMessages()).toHaveLength(shown);
     // Another phone altogether: nothing.
     expect((await order({ phone: '+998 90 312 45 96', deviceId: device(3), fingerprint: 'cd'.repeat(32) }, { ip: '192.0.2.96' })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('спам');

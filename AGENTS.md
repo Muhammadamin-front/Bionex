@@ -581,6 +581,20 @@ user's Mac.
     Note for the real button: the site's own pages send `Permissions-Policy: microphone=()` (apps/web
     vite.config.ts `_headers`, also on zeynara.com.uz) — it must become `microphone=(self)` there.
 
+52. **Marked spam comes back silent** (2026-11-04, owner: «shu qurilmadan yoki nomerdan spam tushgan
+    bo'lsa, qaytib tushmasligi kerak»). Read of the main sheet that day: «Spam» tab 25–26 rows a day on
+    3–4 Nov, 42 of 51 one script (webdriver, ~70 s to fill, rotating flagship models, a copied ad link
+    with the same fbclid); repeats of marked numbers were already diverted since #50 (№288). The real
+    leak is first-time junk in «Lidlar»: 28 of 75 rows since 1 Nov marked «Spam» by operators, each a
+    new number and phone, mostly iPhones (= Instagram app, so no Turnstile under #46), each an instant
+    CAPI Lead (#32). Next lever, the owner's call: the check inside the app too (#46).
+    Built: `SILENT_FLAGS` (`spam_device`, `spam_phone`) — main-site order accepted, written to the «Spam»
+    tab only, never posted to the group (`list_items.hidden = 2`; repeats and the concern reply under it
+    are not posted either); `spam_phone` joined `LIKELY_BOT_FLAGS` (out of the panel). A bot trap's
+    device id is remembered (`spam_marks` source `trap:<id>`, `ip_hash` '', no phone/fingerprint: bots
+    type strangers' numbers and pose as common phones). `spam_lookalike` and `spam_source` unchanged
+    (guesses). Bot-trap orders themselves still reach the group (#13) — ask before changing that.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

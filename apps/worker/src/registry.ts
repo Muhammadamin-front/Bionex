@@ -58,7 +58,14 @@ const PANEL_LIMIT = 1000;
  * there with its warnings. A failed check is NOT here (likely_bot): real
  * customers turned up among those, so they stay visible with a warning.
  */
-const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'no_browser', 'spam_device', 'spam_lookalike'];
+const LIKELY_BOT_FLAGS = ['honeypot', 'bot_trap', 'no_browser', 'spam_device', 'spam_lookalike', 'spam_phone'];
+/**
+ * The device or the number itself was marked spam before (🚫, «Keraksiz»/«Spam» in a sheet, or a bot
+ * trap): such a main-site order reaches nobody — not the operators' group, not the panel, not «Lidlar»;
+ * only the «Spam» tab, where it can still be found (owner, 2026-11-04: «qaytib tushmasligi kerak»).
+ * `list_items.hidden` = 2. A look-alike phone is only a guess and still reaches the group.
+ */
+const SILENT_FLAGS = ['spam_device', 'spam_phone'];
 /**
  * What only a program does — the hidden fields (honeypot) and the browser's traps (bot_trap).
  * Such an order stays out of both Google Sheets and is never reported to Meta, on either site;
@@ -445,7 +452,7 @@ export class LeadRegistry extends DurableObject<Env> {
       // The same customer again (impatient, or pressed twice): one order, and a nudge to the operators.
       const repeats = earlier.repeats + 1;
       this.sql.exec('UPDATE leads SET repeats = ? WHERE id = ?', repeats, earlier.id);
-      if (repeats <= 5) this.enqueue(formatRepeat(input.phone, repeats, now), { replyToLead: earlier.id, now, thread: 'leads' });
+      if (repeats <= 5 && !this.silent(earlier.id)) this.enqueue(formatRepeat(input.phone, repeats, now), { replyToLead: earlier.id, now, thread: 'leads' });
       this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'duplicate', now);
       await this.flush();
       return { status: 'duplicate' };
@@ -501,10 +508,16 @@ export class LeadRegistry extends DurableObject<Env> {
         );
       }
     }
+    // A bot trap's device is remembered (never its number or look-alike: bots type strangers'
+    // numbers and pose as common phones), so the same browser comes back silent (SILENT_FLAGS).
+    if (deviceHash && input.flags.some((f) => TRAP_FLAGS.includes(f))) {
+      this.sql.exec("INSERT OR IGNORE INTO spam_marks (source, ip_hash, device_hash, at) VALUES (?, '', ?, ?)", `trap:${leadId}`, deviceHash, now);
+    }
     // Almost certainly a bot: still goes to the group (operators see it) and keeps its buttons,
-    // but is hidden from the panel and the lists so nobody calls it.
+    // but is hidden from the panel and the lists so nobody calls it. Marked spam before: not even the group.
+    const silent = input.flags.some((f) => SILENT_FLAGS.includes(f));
     const looksLikeBot = input.flags.some((f) => LIKELY_BOT_FLAGS.includes(f));
-    const list = this.addToList(leadId, input, now, looksLikeBot);
+    const list = this.addToList(leadId, input, now, silent ? 2 : looksLikeBot ? 1 : 0);
     const text = formatLead({
       number: leadId,
       fullName: input.fullName,
@@ -533,7 +546,7 @@ export class LeadRegistry extends DurableObject<Env> {
       leadId,
     );
     // The order first, then (if it completed one) the list under it.
-    this.enqueue(text, { leadId, now, thread: 'leads' });
+    if (!silent) this.enqueue(text, { leadId, now, thread: 'leads' });
     // A copy in the main site's own Google Sheet (when set): same row as the partner's sheet,
     // numbered like the Telegram order. A suspect order (MAIN_SPAM_SHEET_FLAGS) goes to its «Spam»
     // tab, every other one to «Lidlar» — never both.
@@ -753,7 +766,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!item || item.concern) return Boolean(item);
     const cyrl = input.concerns.map((c) => CONCERNS[c].cyrl).join(', ');
     this.sql.exec('UPDATE list_items SET concern = ? WHERE lead_id = ?', cyrl, leadId);
-    this.enqueue(`📝 Мижоз ўзи белгилади: <b>${cyrl}</b>`, { replyToLead: leadId, now: input.now, thread: 'leads' });
+    if (!this.silent(leadId)) this.enqueue(`📝 Мижоз ўзи белгилади: <b>${cyrl}</b>`, { replyToLead: leadId, now: input.now, thread: 'leads' });
     // Only once the sheet's script knows the `note` action (docs/main-sheet-script.js): an older one
     // would take it for an order and append an empty row. Switched on with the SHEETS_NOTES secret.
     const sheet = this.env.SHEETS_NOTES === '1' ? sheetsConfig(this.env, 'main') : null;
@@ -880,7 +893,13 @@ export class LeadRegistry extends DurableObject<Env> {
    * list, so operators can share out the calls. Each order is still sent the moment it
    * arrives; the list is only a summary. 0 turns the lists off.
    */
-  private addToList(leadId: number, input: OrderInput, now: number, hidden = false): { count: number; size: number; full: boolean } | null {
+  /** The order never went to the group (SILENT_FLAGS): nothing may be posted in reply to it. */
+  private silent(leadId: number): boolean {
+    return this.sql.exec<{ hidden: number }>('SELECT hidden FROM list_items WHERE lead_id = ?', leadId).toArray()[0]?.hidden === 2;
+  }
+
+  /** 1: kept out of the panel and lists (a likely bot); 2: also out of the group (SILENT_FLAGS). */
+  private addToList(leadId: number, input: OrderInput, now: number, hidden: 0 | 1 | 2 = 0): { count: number; size: number; full: boolean } | null {
     // Kept for /royxat even when the 10-order lists are turned off.
     this.sql.exec(
       'INSERT INTO list_items (lead_id, name, phone, at, flagged, hidden) VALUES (?, ?, ?, ?, ?, ?)',
@@ -889,7 +908,7 @@ export class LeadRegistry extends DurableObject<Env> {
       input.phone,
       now,
       input.flags.length > 0 ? 1 : 0,
-      hidden ? 1 : 0,
+      hidden,
     );
     // A hidden (bot) order never joins the lists and never triggers one.
     if (hidden) return null;
