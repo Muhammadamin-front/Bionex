@@ -21,6 +21,11 @@ changes nothing downstream** — no Meta Lead, no operator's afternoon.
 | Hide that a burst came from one place | every suspicious order shows `🔎 Манба #a1b2c3 (бугун 3 та рақам)` |
 | Change network to shake off a spam mark | the browser keeps a random id (`apps/web/src/lib/device.ts`) and 🚫 marks it too: his next order says «бу қурилмадан аввал спам белгиланган» on any network, until he clears the site's data or uses a private window |
 
+On the main site these limits count the network again since 2026-11-04 (the owner's call, comparing
+with 25–28.10); from 2026-10-29 they counted only the browser's own id, which a script can replace on
+every post. The partner site still counts the phone, with the network capped at 30. Every refusal shows
+in the 20:00 report: **watch that line**, because a customer behind a busy mobile address can be refused.
+
 **`IP_ORDERS_PER_HOUR` is 3 on purpose.** It is the only cap that costs him anything per
 attempt, so it is also the one that looks like a mistake when a real customer mistypes a number
 three times and is told "too many attempts". Do not raise it while this is going on. If
@@ -85,7 +90,7 @@ once, `shubhali` when it waits for a person. No code refuses an order.
 | `spam_qurilma` / `spam_raqam` / `spam_oxshash` | this phone / number / a look-alike was marked spam | «Spam» tab, no instant Lead |
 | `havola_takror` | this ad click was behind another number's order | no instant Lead |
 | `spam_tarmoq`, `kop_raqam`, `soxta_raqam`, `avto_raqam`, `havola_tashqarida`, `dastur_bosgan` | warnings | nothing |
-| `fbclid_yoq`, `ip_tez` | no ad click id; over 3 attempts from one network in 10 minutes | nothing |
+| `fbclid_yoq` | no ad click id | nothing |
 
 A repeat of a number within 24 h adds no row: it is noted in «Takror» on the order's own row.
 

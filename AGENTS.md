@@ -353,6 +353,7 @@ user's Mac.
     per-network limits. Every refusal goes to table `refusals` (7 days) and the daily /hisobot shows
     «🚧 Лимит сабабли қабул қилинмади: N та (…)» for the main site. Both sites (shared Worker).
     Before this, refusals were logged nowhere, so how many customers the old limits lost is unknown.
+    **The main site's part was undone on 2026-11-04: see #54.** The partner site still works this way.
 
 36. **Silent failures now reach the operators' group** (2026-10-29, own audit): a main-site order the
     sheet refuses (`SHEET_WRITE_ALERT`), an unreadable «Holat» on the 5-minute read
@@ -621,8 +622,7 @@ user's Mac.
     #46 stand: nobody in the app is asked or held, though an order with a token now also waits for
     siteverify (usually well under a second, 5 s at most). Purpose: two weeks of data on whether it tells spam from
     customers. **It says nothing yet**; only the owner decides whether it ever routes an order.
-    (d) `ip_tez` in «Sabab» only (over 3 attempts from one network in 10 minutes; #35: decides nothing),
-    `fbclid_yoq` likewise. (e) First decoy renamed `hp_x7k2` (the input only: the JSON key stays
+    (d) `fbclid_yoq` in «Sabab» only: it decides nothing. (e) First decoy renamed `hp_x7k2` (the input only: the JSON key stays
     `contactFax`, cached pages post it and the schema is strict; `website` stays as bait, #14).
     Verified locally with Turnstile's test keys and a faked Instagram user agent, the request intercepted:
     pass → token in 1.7 s, never on screen; forced challenge → removed, no token; blocked → no token; each
@@ -630,6 +630,19 @@ user's Mac.
     them: `honeypot_avto` in «Sabab» is how a filled decoy on a real phone will show. Known hole left open:
     the in-app exemption trusts the user agent, and the repo is public, so a script can claim Instagram.
     Deploy: `deploy` (Worker) first, then `deploy:site`; no `deploy:t2`.
+
+54. **Main site: the network limits are back** (2026-11-04, owner: «Bitta tarmoqdan soatiga 3 urinish, kuniga
+    3 ta raqam — buni qaytarish kerak», after comparing with 25–28.10, the days of good leads). `check` and
+    `numbersToday` hold the main site's network to `IP_ORDERS_PER_HOUR` and `LEADS_PER_IP_PER_DAY`, on top of
+    the per-device limits, which stay. From #35 until now they counted the browser's own id, which a script
+    replaces on every post. **Partner site unchanged** (#2, its network cap stays 30): say so if the owner
+    wants it too. Known cost, told to the owner: CGNAT (#35). A refused customer sees «try later», and with
+    `site.phone` null has no number to call, so it conflicts with the 2026-11-04 prompt's «no real customer
+    lost»; the owner chose knowing that. Watch «🚧 Лимит сабабли» in /hisobot. Worth knowing: this makes
+    `multi_phone_ip` unreachable on the main site (the limit stops the order first) and made #53's `ip_tez`
+    pointless, so it was removed. Checked before building, with empty posts refused by validation (nothing
+    recorded) and `wrangler tail`: an order through zeynara.com.uz reaches the Worker with the sender's real
+    `cf-connecting-ip`, so the domain's orders are not all counted as one network. Needs only `deploy`.
 
 ## Open items
 

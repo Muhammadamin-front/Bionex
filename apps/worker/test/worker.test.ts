@@ -276,7 +276,7 @@ describe('the site\'s own domain', () => {
   });
 });
 
-describe('limits count the phone, not the network (many customers share one mobile address)', () => {
+describe('the limits on a phone and on a network', () => {
   const dev = (n: number) => `aaaaaaaa-1111-4111-8111-00000000000${n}`;
   const report = async () => {
     const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
@@ -289,11 +289,27 @@ describe('limits count the phone, not the network (many customers share one mobi
     return telegram.messages.at(-1)!.text;
   };
 
-  it('takes many customers from one network, each from their own phone, and warns about the network', async () => {
+  it('main site: one network gets 3 attempts an hour, whatever device id each one claims, and the refusal is counted', async () => {
     const statuses = [];
-    for (let i = 1; i <= 6; i++) statuses.push((await order({ phone: `+998 90 312 46 0${i}`, deviceId: dev(i) }, { ip: '203.0.113.200' })).status);
-    expect(statuses).toEqual([201, 201, 201, 201, 201, 201]);
-    expect(leadMessages().at(-1)!.text).toContain('бу манбадан бугун бир нечта рақам юборилди');
+    for (let i = 1; i <= 4; i++) statuses.push((await order({ phone: `+998 90 312 46 0${i}`, deviceId: dev(i) }, { ip: '203.0.113.200' })).status);
+    expect(statuses).toEqual([201, 201, 201, 429]);
+    expect(leadMessages()).toHaveLength(3);
+    expect(await report()).toMatch(/Лимит сабабли қабул қилинмади: 1 та/);
+  });
+
+  it('main site: one network gets 3 numbers a day, even when the hourly limit leaves room', async () => {
+    await mf.dispose();
+    mf = start({ IP_ORDERS_PER_HOUR: '10' });
+    const statuses = [];
+    for (let i = 1; i <= 4; i++) statuses.push((await order({ phone: `+998 90 312 46 3${i}`, deviceId: dev(i) }, { ip: '203.0.113.202' })).status);
+    expect(statuses).toEqual([201, 201, 201, 429]);
+  });
+
+  it('main site: the same number sent again uses an attempt but no second number, and another network is not affected', async () => {
+    const statuses = [];
+    for (let i = 0; i < 2; i++) statuses.push((await order({ phone: '+998 90 312 46 41', deviceId: dev(1) }, { ip: '203.0.113.203' })).status);
+    statuses.push((await order({ phone: '+998 90 312 46 42', deviceId: dev(2) }, { ip: '203.0.113.204' })).status);
+    expect(statuses).toEqual([201, 200, 201]);
   });
 
   it('stops one phone trying many times or for many numbers, and counts it in the day report', async () => {
@@ -1351,17 +1367,6 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
         expect(await quiet()).toHaveLength(0);
       });
 
-      it('says when one network sends many at once, and decides nothing by it', async () => {
-        for (let i = 0; i < 4; i++) {
-          expect((await order({ fullName: `Тармоқ ${['А', 'Б', 'В', 'Г'][i]}`, phone: `+998 90 312 47 0${i}`, deviceId: sid(), signals: person }, { ip: '203.0.113.98', userAgent: instagram })).status).toBe(201);
-        }
-        expect(cell(await rowOf('Тармоқ В'), 'Sabab')).not.toContain('ip_tez');
-        const last = await rowOf('Тармоқ Г');
-        expect(cell(last, 'Sabab')).toContain('ip_tez');
-        expect(last.sheet).toBe('Lidlar');
-        expect(cell(last, 'Status')).toBe('ok');
-      });
-
       it('a repeat within 24 hours adds no row: a note on the order\'s own row', async () => {
         await mf.dispose();
         mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', SHEETS_NOTES: '1' });
@@ -1887,6 +1892,14 @@ describe('the partner site (sites.ts t2)', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(sheets.rows).toHaveLength(2);
     expect(meta.bodies).toHaveLength(leadsBefore);
+  });
+
+  it('keeps its own limits: many customers on one network, each from their own phone, all get through', async () => {
+    const statuses = [];
+    for (let i = 1; i <= 6; i++) {
+      statuses.push((await partnerOrder({ fullName: 'Шерик Мижоз', phone: `+998 90 312 48 0${i}`, deviceId: `aaaaaaaa-1111-4111-8111-00000000000${i}` }, '203.0.113.75')).status);
+    }
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 201]);
   });
 
   it("gets none of the main sheet's new columns: its row stays as it was", async () => {

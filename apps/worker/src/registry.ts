@@ -36,20 +36,17 @@ const DAY = 24 * HOUR;
 /** Order attempts per phone number per hour, on top of Turnstile and the per-IP limit. */
 const PHONE_REQUESTS_PER_HOUR = 5;
 /**
- * The network's own caps: only a flood stops here. Mobile operators in Uzbekistan put hundreds of
- * customers behind one address (CGNAT), so the everyday limits count the phone (its device id),
- * not the network (2026-10-29). A page with no device id falls back to the network's small limit.
+ * The partner site's network caps: only a flood stops there. Mobile operators in Uzbekistan put
+ * hundreds of customers behind one address (CGNAT), so its everyday limits count the phone (its
+ * device id), not the network (2026-10-29). The main site counts the network too, with the small
+ * limits (IP_ORDERS_PER_HOUR, LEADS_PER_IP_PER_DAY): the owner took them back on 2026-11-04, after
+ * comparing with 25–28.10, when junk was rare. A customer behind a busy address can be refused
+ * there; the 20:00 report counts every refusal.
  */
 const NETWORK_ATTEMPTS_PER_HOUR = 30;
 const NETWORK_PHONES_PER_DAY = 30;
 /** From this many different numbers a day, one network's orders carry «бу манбадан бугун бир нечта рақам». */
 const NETWORK_PHONES_WARNING = 3;
-/**
- * More attempts than this from one network in the time below: «ip_tez» in the sheet's «Sabab», nothing
- * else. Hundreds of customers can share one mobile address (CGNAT), so it decides nothing (AGENTS.md #35).
- */
-const IP_BURST_ATTEMPTS = 3;
-const IP_BURST_WINDOW = 10 * 60_000;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Meta's Conversions API refuses events older than this, so unmarked orders expire with it. */
@@ -395,7 +392,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (prior) return { kind: 'replay', status: prior.status };
     const ipKey = `ip:${await this.hash(input.ip)}`;
     const phoneKey = `phone:${await this.hash(input.phone)}`;
-    // The everyday limit is per phone (its device id); without one, per network as before.
+    // Per phone (its device id); without one, per network.
     const sourceKey = input.device ? `dev:${await this.hash(`device:${input.device}`)}` : ipKey;
     const count = (key: string, since: number) =>
       this.sql.exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', key, since).one().n;
@@ -403,10 +400,11 @@ export class LeadRegistry extends DurableObject<Env> {
     if (sourceKey !== ipKey) this.sql.exec('INSERT INTO hits (key, at) VALUES (?, ?)', sourceKey, input.now);
     // Every attempt counts, failed ones too: a competitor's script gets a few tries an hour, not hundreds.
     const since = input.now - HOUR;
+    const perHour = Number(this.env.IP_ORDERS_PER_HOUR || 3);
     const reason =
-      count(sourceKey, since) > Number(this.env.IP_ORDERS_PER_HOUR || 3)
+      count(sourceKey, since) > perHour
         ? (sourceKey === ipKey ? 'network' : 'device')
-        : count(ipKey, since) > NETWORK_ATTEMPTS_PER_HOUR
+        : count(ipKey, since) > ((input.site ?? 'main') === 'main' ? perHour : NETWORK_ATTEMPTS_PER_HOUR)
           ? 'network'
           : count(phoneKey, since) > PHONE_REQUESTS_PER_HOUR
             ? 'phone'
@@ -425,8 +423,8 @@ export class LeadRegistry extends DurableObject<Env> {
 
   /**
    * How many numbers this source ordered for today, and whether that is too many. The source is the
-   * phone (device id) when known, else the network; the network itself is capped only against floods
-   * and otherwise just warned about (`multi_phone_ip`).
+   * phone (device id) when known, else the network. The main site holds the network to the same small
+   * limit; the partner site caps it only against floods and otherwise just warns (`multi_phone_ip`).
    */
   private numbersToday(table: 'leads' | 'partner_leads', site: SiteId, ipHash: string, deviceHash: string | null, now: number): { limited: boolean; networkPhones: number } {
     const scope = table === 'partner_leads' ? ' AND site = ?' : '';
@@ -437,7 +435,9 @@ export class LeadRegistry extends DurableObject<Env> {
         .one().n;
     const networkPhones = distinct('ip_hash', ipHash);
     const perSource = deviceHash ? distinct('device_hash', deviceHash) : networkPhones;
-    const reason = perSource >= Number(this.env.LEADS_PER_IP_PER_DAY || 3) ? (deviceHash ? 'device_numbers' : 'network_numbers') : networkPhones >= NETWORK_PHONES_PER_DAY ? 'network_numbers' : null;
+    const perDay = Number(this.env.LEADS_PER_IP_PER_DAY || 3);
+    const networkCap = table === 'leads' ? perDay : NETWORK_PHONES_PER_DAY;
+    const reason = perSource >= perDay ? (deviceHash ? 'device_numbers' : 'network_numbers') : networkPhones >= networkCap ? 'network_numbers' : null;
     if (reason) this.refused(site, reason, now);
     return { limited: Boolean(reason), networkPhones };
   }
@@ -472,8 +472,7 @@ export class LeadRegistry extends DurableObject<Env> {
       return { status: 'duplicate' };
     }
 
-    // Someone typing strangers' numbers: one phone may order for only a few numbers a day. A busy
-    // network is only warned about — many customers share one mobile address.
+    // Someone typing strangers' numbers: one phone, and one network, may order for only a few numbers a day.
     const { limited, networkPhones: otherPhones } = this.numbersToday('leads', 'main', ipHash, deviceHash, now);
     if (limited) return { status: 'ip_limited' };
     if (otherPhones >= NETWORK_PHONES_WARNING) input = { ...input, flags: [...input.flags, 'multi_phone_ip'] };
@@ -567,9 +566,6 @@ export class LeadRegistry extends DurableObject<Env> {
     const sheet = sheetsConfig(this.env, 'main');
     if (sheet) {
       const suspect = input.flags.some((f) => MAIN_SPAM_SHEET_FLAGS.includes(f));
-      const attempts = this.sql
-        .exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', `ip:${ipHash}`, now - IP_BURST_WINDOW)
-        .one().n;
       const { info = [], ...logged } = input.log ?? {};
       const sent = sendSheetOrder(
         sheet,
@@ -588,7 +584,7 @@ export class LeadRegistry extends DurableObject<Env> {
             ? ({
                 ...logged,
                 status: input.flags.some((f) => NO_INSTANT_LEAD_FLAGS.includes(f)) ? 'shubhali' : 'ok',
-                reason: reasonCodes(input.flags, [...info, ...(attempts > IP_BURST_ATTEMPTS ? ['ip_tez'] : [])]),
+                reason: reasonCodes(input.flags, info),
               } as SheetLog)
             : undefined,
         },

@@ -26,12 +26,11 @@
   "triggers": { "crons": ["0 15 * * *", "*/5 * * * *"] },
 
   "vars": {
-    // Order attempts one PHONE (its device id; the network when it has none) may make per hour,
-    // failed ones too. Since 2026-10-29 it no longer counts the network: mobile operators put many
-    // customers behind one address. The network itself is capped only against floods (registry.ts
-    // NETWORK_ATTEMPTS_PER_HOUR). The names stay for compatibility.
+    // Order attempts per hour, failed ones too: per phone (device id) on both sites, and per network
+    // on the main site (back since 2026-11-04). The partner's network is capped only against floods
+    // (registry.ts NETWORK_ATTEMPTS_PER_HOUR).
     "IP_ORDERS_PER_HOUR": "3",
-    // How many different phone numbers one PHONE (device id; else the network) may order for per day.
+    // How many different phone numbers may be ordered for per day: the same split as above.
     "LEADS_PER_IP_PER_DAY": "3",
     // The same number again within this time is a repeat, not a new order.
     "DUPLICATE_WINDOW_HOURS": "24",
