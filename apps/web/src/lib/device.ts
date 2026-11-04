@@ -227,6 +227,12 @@ export async function deviceSignals(): Promise<DeviceSignals> {
   } catch {
     /* no cookies in this browser */
   }
+  let ref: string | undefined;
+  try {
+    ref = document.referrer ? new URL(document.referrer).hostname : undefined;
+  } catch {
+    /* an odd referrer: leave it out */
+  }
   return {
     gpu: gpuName(),
     touch: navigator.maxTouchPoints,
@@ -241,6 +247,7 @@ export async function deviceSignals(): Promise<DeviceSignals> {
     lang: navigator.language,
     adClick,
     chrome,
+    ref,
   };
 }
 

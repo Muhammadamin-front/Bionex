@@ -81,6 +81,10 @@ export interface DeviceSignals {
   /** The phone number appeared all at once, not typed or pasted: autofill (Instagram's from the
    *  Meta account, the keyboard's) — often an old number the person no longer uses. */
   autofill?: boolean;
+  /** The site the visitor came from (document.referrer's host only), for the sheet's «Referrer». */
+  ref?: string;
+  /** Inside the app, why the silent check gave no token: it wanted a person to act, or it failed to run. */
+  check?: 'interactive' | 'error';
 }
 
 const short = (v: unknown, max: number) => cleanDeviceModel(typeof v === 'string' ? v : undefined)?.slice(0, max);
@@ -106,6 +110,8 @@ export function cleanSignals(value: unknown): DeviceSignals | undefined {
     adClick: flag(v.adClick),
     chrome: typeof v.chrome === 'string' && /^\d{1,4}$/.test(v.chrome) ? v.chrome : undefined,
     autofill: flag(v.autofill),
+    ref: short(v.ref, 80),
+    check: v.check === 'interactive' || v.check === 'error' ? v.check : undefined,
   };
   for (const key of Object.keys(out) as Array<keyof DeviceSignals>) if (out[key] === undefined) delete out[key];
   return Object.keys(out).length ? out : undefined;

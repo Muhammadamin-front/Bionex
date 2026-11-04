@@ -4,7 +4,7 @@ import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
-import { sendSheetNote, sendSheetOrder, SPAM_SHEET, sheetsConfig } from './sheets';
+import { reasonCodes, REPEAT_COLUMN, sendSheetNote, sendSheetOrder, SPAM_SHEET, sheetsConfig, tashkentTime, type SheetLog } from './sheets';
 import { CONCERNS, type ConcernId } from '@bionex/shared/concerns';
 import type { SiteId } from './sites';
 import {
@@ -44,6 +44,12 @@ const NETWORK_ATTEMPTS_PER_HOUR = 30;
 const NETWORK_PHONES_PER_DAY = 30;
 /** From this many different numbers a day, one network's orders carry «бу манбадан бугун бир нечта рақам». */
 const NETWORK_PHONES_WARNING = 3;
+/**
+ * More attempts than this from one network in the time below: «ip_tez» in the sheet's «Sabab», nothing
+ * else. Hundreds of customers can share one mobile address (CGNAT), so it decides nothing (AGENTS.md #35).
+ */
+const IP_BURST_ATTEMPTS = 3;
+const IP_BURST_WINDOW = 10 * 60_000;
 /** Orders that Telegram never accepted are given up (and logged) after this long. */
 const GIVE_UP_AFTER = 7 * DAY;
 /** Meta's Conversions API refuses events older than this, so unmarked orders expire with it. */
@@ -213,6 +219,11 @@ export interface OrderInput {
   model?: string;
   /** The browser's signals in one line («Tafsilot»), in both scripts: the sheet's and the group's. */
   details?: { latn: string; cyrl: string };
+  /**
+   * For the main sheet's own columns (sheets.ts LOG_HEADERS); absent for bot orders. `info` are reasons
+   * for «Sabab» that decide nothing and show nowhere else, so they are not `flags`.
+   */
+  log?: Omit<SheetLog, 'status' | 'reason'> & { info: string[] };
 }
 
 /**
@@ -453,6 +464,9 @@ export class LeadRegistry extends DurableObject<Env> {
       const repeats = earlier.repeats + 1;
       this.sql.exec('UPDATE leads SET repeats = ? WHERE id = ?', repeats, earlier.id);
       if (repeats <= 5 && !this.silent(earlier.id)) this.enqueue(formatRepeat(input.phone, repeats, now), { replyToLead: earlier.id, now, thread: 'leads' });
+      // No new row: a note on the order's own row, in whichever tab it sits (the `note` action, see addConcern).
+      const noteSheet = this.env.SHEETS_NOTES === '1' ? sheetsConfig(this.env, 'main') : null;
+      if (noteSheet) this.ctx.waitUntil(sendSheetNote(noteSheet, { number: earlier.id, column: REPEAT_COLUMN, value: `${repeats}-marta, ${tashkentTime(now)}` }));
       this.sql.exec('INSERT INTO submissions (id, status, at) VALUES (?, ?, ?)', input.submissionId, 'duplicate', now);
       await this.flush();
       return { status: 'duplicate' };
@@ -553,6 +567,10 @@ export class LeadRegistry extends DurableObject<Env> {
     const sheet = sheetsConfig(this.env, 'main');
     if (sheet) {
       const suspect = input.flags.some((f) => MAIN_SPAM_SHEET_FLAGS.includes(f));
+      const attempts = this.sql
+        .exec<{ n: number }>('SELECT count(*) AS n FROM hits WHERE key = ? AND at > ?', `ip:${ipHash}`, now - IP_BURST_WINDOW)
+        .one().n;
+      const { info = [], ...logged } = input.log ?? {};
       const sent = sendSheetOrder(
         sheet,
         {
@@ -566,6 +584,13 @@ export class LeadRegistry extends DurableObject<Env> {
           flags: input.flags,
           model: input.model,
           details: input.details?.latn,
+          log: input.log
+            ? ({
+                ...logged,
+                status: input.flags.some((f) => NO_INSTANT_LEAD_FLAGS.includes(f)) ? 'shubhali' : 'ok',
+                reason: reasonCodes(input.flags, [...info, ...(attempts > IP_BURST_ATTEMPTS ? ['ip_tez'] : [])]),
+              } as SheetLog)
+            : undefined,
         },
         suspect ? SPAM_SHEET : undefined,
       );

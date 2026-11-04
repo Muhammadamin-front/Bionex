@@ -35,12 +35,60 @@ export interface SheetOrder {
   /** The phone's model as its browser names it. */
   model?: string;
   details?: string;
+  /** The main sheet's extra columns (LOG_HEADERS). Never for the partner's sheet: its row stays as it was. */
+  log?: SheetLog;
+}
+
+/** What is known about one main-site order for reading the spam later (AGENTS.md #53). */
+export interface SheetLog {
+  /** «ok»: it went to Meta as a Lead at once. «shubhali»: it waits for a person (registry.ts NO_INSTANT_LEAD_FLAGS). */
+  status: 'ok' | 'shubhali';
+  /** Short codes, comma-separated (REASON_CODE, and `info`): made to be filtered on. */
+  reason: string;
+  ip: string;
+  userAgent: string;
+  referrer: string;
+  source: string;
+  fbclid: string;
+  /** Seconds filling the form and on the page; empty when the browser sent none. */
+  fillSeconds: number | '';
+  pageSeconds: number | '';
 }
 
 const SHEET = 'Lidlar';
 /** The main spreadsheet's second tab: suspect orders (registry.ts MAIN_SPAM_SHEET_FLAGS) live here, never in «Lidlar». The script makes the tab on first use. */
 export const SPAM_SHEET = 'Spam';
 const HEADERS = ['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma', 'Tafsilot'];
+/**
+ * Written only where the tab's first row has the header (the script goes by header name), so an
+ * older sheet just ignores them. «Holat» stays the operators' own: it is what reaches Meta.
+ */
+const LOG_HEADERS = ['Status', 'Sabab', 'IP', 'User-Agent', 'Referrer', 'fbclid', 'utm_source', 'Forma (s)', 'Saytda (s)'];
+/** The column a repeat of an order within 24 h is noted in, on the order's own row. */
+export const REPEAT_COLUMN = 'Takror';
+
+/** The reasons as filterable codes, for «Sabab». «Belgi» has the same in words, but not in «Lidlar» (it is the owner's dropdown there). */
+const REASON_CODE: Record<string, string> = {
+  honeypot: 'honeypot',
+  decoy_filled: 'honeypot_avto',
+  bot_trap: 'bot_tuzoq',
+  no_browser: 'brauzersiz',
+  rushed: 'tez_yuborish',
+  no_captcha: 'captcha_fail',
+  likely_bot: 'instagramdan_emas',
+  spam_device: 'spam_qurilma',
+  spam_phone: 'spam_raqam',
+  spam_lookalike: 'spam_oxshash',
+  spam_source: 'spam_tarmoq',
+  multi_phone_ip: 'kop_raqam',
+  phone_pattern: 'soxta_raqam',
+  phone_autofill: 'avto_raqam',
+  reused_click: 'havola_takror',
+  link_copied: 'havola_tashqarida',
+  synthetic_click: 'dastur_bosgan',
+};
+
+export const reasonCodes = (flags: string[], info: string[] = []) => [...flags.map((f) => REASON_CODE[f] ?? f), ...info].join(', ');
 
 /** The same warnings the operators' group shows, for the people ringing from the sheet. */
 const FLAG_TEXT: Record<string, string> = {
@@ -91,7 +139,7 @@ export function sheetsConfig(env: Env, site: SiteId): SheetsConfig | null {
   return { url: env.SHEETS_T2_URL, secret: env.SHEETS_T2_SECRET };
 }
 
-const tashkentTime = (ms: number) =>
+export const tashkentTime = (ms: number) =>
   new Intl.DateTimeFormat('ru-RU', {
     timeZone: 'Asia/Tashkent',
     day: '2-digit',
@@ -172,13 +220,26 @@ export async function sendSheetOrder(cfg: SheetsConfig, order: SheetOrder, tab: 
     '',
     asText(order.model ?? ''),
     asText(order.details ?? ''),
+    ...(order.log
+      ? [
+          order.log.status,
+          asText(order.log.reason),
+          asText(order.log.ip),
+          asText(order.log.userAgent),
+          asText(order.log.referrer),
+          asText(order.log.fbclid),
+          asText(order.log.source),
+          order.log.fillSeconds,
+          order.log.pageSeconds,
+        ]
+      : []),
   ];
   try {
     // Apps Script answers a POST with a redirect to its output; following it is how "ok" is read.
     const res = await fetch(cfg.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ secret: cfg.secret, sheet: tab, headers: HEADERS, row }),
+      body: JSON.stringify({ secret: cfg.secret, sheet: tab, headers: order.log ? [...HEADERS, ...LOG_HEADERS] : HEADERS, row }),
       signal: AbortSignal.timeout(10_000),
     });
     const text = (await res.text()).trim();

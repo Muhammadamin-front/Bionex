@@ -66,6 +66,29 @@ report names that number — «📣 Натижаси белгиланмаган:
 | `likely_bot` | Instagram/Facebook орқали эмас — бот эҳтимоли бор | a failed check outside the ads' in-app browser, **including sending no token at all from a plain browser** (which is asked for one since 2026-10-31). Real customers were found among these (2026-10-24), so it is a warning only and stays visible — but on the main site it routes the order to the «Spam» tab and withholds the instant Meta Lead |
 | `no_captcha` | «бот эмасман» текшируви ўтмади | inside the Instagram / Facebook app, where the main site asks for no check, this cannot be set. Elsewhere it is a check that was asked for and not answered |
 
+## The main sheet's «Sabab» column
+
+Short codes for filtering, one row per order. Compare each code with what the operators marked in
+«Holat» before making any of them stricter. «Status» is `ok` when the order was reported as a Lead at
+once, `shubhali` when it waits for a person. No code refuses an order.
+
+| Code | Means | Decides anything? |
+|---|---|---|
+| `honeypot` / `bot_tuzoq` / `brauzersiz` | a decoy filled with a program's signs / a program's signs / a direct post with no page | «Spam» tab, never Meta |
+| `honeypot_avto` | a decoy filled with no program's signs: perhaps a person's autofill | warning |
+| `captcha_fail` + `instagramdan_emas` | a plain browser that did not pass the check | «Spam» tab, no instant Lead |
+| `captcha_savol_ilova` | inside the app, the silent check wanted a person to act. **This one says what asking there would cost** | **nothing yet: being measured** |
+| `captcha_fail_ilova` | inside the app, Cloudflare refused the token | **nothing yet: being measured** |
+| `captcha_yoq_ilova` | inside the app, no token and no reason: sent before it was ready, an old cached page (the first days after a deploy), or a script claiming to be the app | **nothing yet: being measured** |
+| `captcha_xato_ilova` | inside the app, the check itself failed to run | **nothing yet: being measured** |
+| `tez_yuborish` | under 20 s on the page or 12 s filling the form | «Spam» tab, no instant Lead |
+| `spam_qurilma` / `spam_raqam` / `spam_oxshash` | this phone / number / a look-alike was marked spam | «Spam» tab, no instant Lead |
+| `havola_takror` | this ad click was behind another number's order | no instant Lead |
+| `spam_tarmoq`, `kop_raqam`, `soxta_raqam`, `avto_raqam`, `havola_tashqarida`, `dastur_bosgan` | warnings | nothing |
+| `fbclid_yoq`, `ip_tez` | no ad click id; over 3 attempts from one network in 10 minutes | nothing |
+
+A repeat of a number within 24 h adds no row: it is noted in «Takror» on the order's own row.
+
 ## The honest limits
 
 Uzbek mobile networks put thousands of customers behind one address and move customers between

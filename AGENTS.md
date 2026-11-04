@@ -340,7 +340,7 @@ user's Mac.
     focus) fell with it. Cause: the `proof` section above the first form put the form ~3000 px (four phone
     screens) down, and `popup={false}` removed the dialog. `Landing` now renders `proof` right under
     `QuickOrder`, and the main site uses the default `popup`. Ask the owner before moving the form below
-    anything again. Also seen in Ads Manager that day: a campaign «Instant form test» (Instant Form leads
+    anything again. (The dialog went off again on 2026-11-04, the owner's explicit choice: see #53.) Also seen in Ads Manager that day: a campaign «Instant form test» (Instant Form leads
     stay in Meta, never reach the sheet/Telegram) and two ads with unpublished edits — the owner was told.
 
 35. **Limits count the phone, not the network** (2026-10-29, owner's choice after the targetologist
@@ -518,7 +518,7 @@ user's Mac.
     falls back to the old hero) and her words from the ad; ▶ opens her video in place, with sound.
     A compact red ticket, «Ҳозироқ буюртма беринг» (the ad's button), three promises. The phones' order
     bar steps aside while that button is in view (`[data-order-button]`, Landing.tsx). The arrival
-    dialog is unchanged: the owner was asked (now / after 20 s) and did not choose — ask before changing it.
+    dialog is unchanged: the owner was asked (now / after 20 s) and did not choose — ask before changing it. (They chose on 2026-11-04: no dialog on arrival, #53.)
 
 48. **A sticker by the name for a discount order** (2026-10-31, owner's request): pressing the discount
     (the first screen's red ticket or its button, or the bottom bar while it shows the offer) calls
@@ -594,6 +594,42 @@ user's Mac.
     device id is remembered (`spam_marks` source `trap:<id>`, `ip_hash` '', no phone/fingerprint: bots
     type strangers' numbers and pose as common phones). `spam_lookalike` and `spam_source` unchanged
     (guesses). Bot-trap orders themselves still reach the group (#13) — ask before changing that.
+
+53. **Spam audit: what the sheet can now say, and no dialog on arrival** (2026-11-04). The owner pasted a
+    generic 11-step anti-spam prompt («~90 % spam; the numbers are real, their owners say they left none»),
+    then said mid-way **«sms tasdiqlash shart emas»** (the prompt's step 9, OTP: not built, do not offer it
+    again unasked) and **«sayt ochilganida forma window pop-up bo'lmasin»**: `popup={false}` in
+    sites/classic (the dialog only ever opened on arrival, no button depends on it; the partner keeps
+    it). Watch orders after it: #34 is what happened the last time, though the form was far down then.
+    Most of the prompt already existed (sheet URL only in Worker secrets and never in the repo's history
+    or builds, `LEAD_SECRET`, validation, honeypot as a flag, `rushed`, Turnstile, 24-hour repeats). Added:
+    (a) **Main sheet columns** by header name (`LOG_HEADERS`): Status, Sabab, IP, User-Agent, Referrer,
+    fbclid, utm_source, Forma (s), Saytda (s). The script fills only headers already in the tab's first
+    row, so the owner types them in «Lidlar» and «Spam»; until then nothing changes. «Status» = `ok` when
+    the order got the instant Lead, else `shubhali` (`NO_INSTANT_LEAD_FLAGS`, no rule of its own). «Sabab» =
+    short codes (`REASON_CODE`, legend in docs/SPAM.md), because «Belgi» is not written in «Lidlar» (the
+    owner's dropdown). `SheetOrder.log` is main-only: the partner's row stays byte for byte (#2).
+    IP in the clear is the owner's explicit request and a change from docs/SECURITY.md; the targetologist
+    reads this sheet (#49), and leaving the «IP» header out keeps the column empty.
+    (b) **A repeat within 24 h** notes «Takror» on the order's own row (`sendSheetNote`, `SHEETS_NOTES`).
+    (c) **Silent check inside the Instagram / Facebook app** (`silentCheck` in OrderForm): Turnstile runs
+    off-screen, its token goes with the order if ready, it is dropped the moment it wants interaction, and
+    nothing awaits it (not even the script). The server only notes a failure in «Sabab» (`appCheckCode`:
+    `captcha_savol_ilova` it wanted a person, `captcha_fail_ilova` token refused, `captcha_xato_ilova` it
+    failed to run, `captcha_yoq_ilova` no token and no reason, which includes old cached pages for the
+    first days; `log.info`, not flags: same tab, same instant Lead, nothing in the group or panel). #31 and
+    #46 stand: nobody in the app is asked or held, though an order with a token now also waits for
+    siteverify (usually well under a second, 5 s at most). Purpose: two weeks of data on whether it tells spam from
+    customers. **It says nothing yet**; only the owner decides whether it ever routes an order.
+    (d) `ip_tez` in «Sabab» only (over 3 attempts from one network in 10 minutes; #35: decides nothing),
+    `fbclid_yoq` likewise. (e) First decoy renamed `hp_x7k2` (the input only: the JSON key stays
+    `contactFax`, cached pages post it and the schema is strict; `website` stays as bait, #14).
+    Verified locally with Turnstile's test keys and a faked Instagram user agent, the request intercepted:
+    pass → token in 1.7 s, never on screen; forced challenge → removed, no token; blocked → no token; each
+    sent within ~80 ms. **Not tested in the real Instagram app, Safari or Android Chrome**, nor autofill on
+    them: `honeypot_avto` in «Sabab» is how a filled decoy on a real phone will show. Known hole left open:
+    the in-app exemption trusts the user agent, and the repo is public, so a script can claim Instagram.
+    Deploy: `deploy` (Worker) first, then `deploy:site`; no `deploy:t2`.
 
 ## Open items
 

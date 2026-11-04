@@ -8,6 +8,9 @@
  * 3) QualifiedLead'ni ham Worker yuboradi («Kerakli»/«Sotildi», to'liq ma'lumot bilan). 2026-10-31 gacha
  *    bu skript ham yuborardi: har lid Meta'da ikki marta sanalardi, sifat 6.2/10 ga tushardi. EVENT_MAP bo'sh.
  *
+ * 4) Ustunlar nomi bo'yicha yoziladi: Status, Sabab, IP, User-Agent, Referrer, fbclid, utm_source, Forma (s),
+ *    Saytda (s) faqat 1-qatorda shu sarlavha bo'lsa to'ldiriladi («Lidlar» va «Spam»). Skriptni o'zgartirish shart emas.
+ *
  * Maxfiy kalitlar kodda emas: Loyiha sozlamalari (⚙) → Script Properties → META_TOKEN, LEAD_SECRET.
  */
 

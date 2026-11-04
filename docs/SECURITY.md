@@ -70,6 +70,9 @@
 ## Privacy
 - ✅ IPs and phone numbers are stored only as HMAC hashes (secret generated inside the
   Durable Object), for 30 days.
+- ⚠️ Exception, by the owner's request (2026-11-04): the main Google Sheet's «IP» and «User-Agent»
+  columns hold them in clear, for everyone the sheet is shared with. Leave the «IP» header out and
+  that column stays empty. The partner's sheet gets neither.
 - ✅ Name and number are stored in clear only while a message waits for Telegram, and for
   30 days for the operators' `/royxat` list and panel, archive included (then deleted).
 - ✅ The panel's browser link (`/panel?key=…`) is personal, signed with the bot token, valid

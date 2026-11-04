@@ -263,14 +263,17 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // `no_captcha` / `likely_bot` became unreachable: the «Spam» tab took nothing and the junk the
     // check used to hold back went into «Lidlar» (last diverted row №206, 29.10 11:51).
     // A page that ran no script at all (no browser signals: a direct post to the API) is a program's.
+    // Inside the app the page runs the check silently (OrderForm `silentCheck`): it never shows, never
+    // holds the order, and its result is only measured (`appCheckCode`, in the sheet's «Sabab»), until
+    // two weeks of it say whether it tells spam from customers (owner, 2026-11-04).
     const userAgent = request.headers.get('user-agent');
-    const noCheckAsked = site === 'main' && !data.turnstileToken && fromSocialApp(userAgent);
+    const inApp = site === 'main' && fromSocialApp(userAgent);
     if (site === 'main' && !data.turnstileToken && !data.signals) flags.push('no_browser');
-    if (!check.ok && !noCheckAsked) flags.push('no_captcha');
+    if (!check.ok && !inApp) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
     // robot, but real customers turned up among them too (their Telegram name matched), so it
     // is a warning for the call and the order stays in the panel and the sheet.
-    if (!check.ok && !noCheckAsked && !fromSocialApp(userAgent)) flags.push('likely_bot');
+    if (!check.ok && !inApp && !fromSocialApp(userAgent)) flags.push('likely_bot');
     // The browser's own traps — a made-up click, a touch screen nobody touched, or a browser that
     // says a program drives it (device.ts): hidden as a program's. On the main site a made-up click
     // alone is only a warning (`synthetic_click`): confirmed customers had it (owner, 2026-10-28).
@@ -325,6 +328,16 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       details: data.signals
         ? { latn: describeSignals(data.signals, userAgent, 'latn'), cyrl: describeSignals(data.signals, userAgent, 'cyrl') }
         : undefined,
+      log: {
+        ip,
+        userAgent: (userAgent ?? '').slice(0, 300),
+        referrer: s?.ref ?? '',
+        source: data.utm.source ?? '',
+        fbclid: data.clickId ?? '',
+        fillSeconds: s?.fillMs === undefined ? ('' as const) : Math.round(s.fillMs / 1000),
+        pageSeconds: s?.pageMs === undefined ? ('' as const) : Math.round(s.pageMs / 1000),
+        info: [...(data.clickId ? [] : ['fbclid_yoq']), ...(inApp && !check.ok ? [appCheckCode(data.turnstileToken, s?.check)] : [])],
+      },
     };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.
     const result = site === 'main' ? await registry.accept(order) : await registry.acceptPartner({ ...order, site });
@@ -341,6 +354,16 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     console.error('Order failed', (err as Error)?.message);
     return fail(503, 'unavailable', MESSAGES.unavailable);
   }
+}
+
+/**
+ * Why the silent check inside the app did not pass. Kept apart, because only «it wanted a person to
+ * act» says what asking there would cost: a token Cloudflare refused, the widget asking, the widget
+ * failing, or no token and no reason (sent before it was ready, an old cached page, or a script).
+ */
+function appCheckCode(token: string | undefined, reason: 'interactive' | 'error' | undefined): string {
+  if (token) return 'captcha_fail_ilova';
+  return reason === 'interactive' ? 'captcha_savol_ilova' : reason === 'error' ? 'captcha_xato_ilova' : 'captcha_yoq_ilova';
 }
 
 /** The main site's other addresses (wrangler.jsonc MAIN_SITE_HOSTS), e.g. ['zeynara.com.uz']. */

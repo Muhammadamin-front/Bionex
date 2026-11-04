@@ -1266,6 +1266,124 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect(await quiet()).toHaveLength(1);
     });
 
+    describe('the columns for reading the spam later', () => {
+      const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
+      const person = { touch: 5, taps: 6, keys: 14, fillMs: 15_400, pageMs: 41_200 };
+      const cell = (r: Record<string, any>, header: string) => r.row[r.headers.indexOf(header)];
+      /** The order's row, once it has reached the sheet (it is written just after the answer). */
+      const rowOf = async (name: string) => {
+        for (let i = 0; i < 100; i++) {
+          const found = sheets.rows.find((r) => r.row?.[2] === name);
+          if (found) return found;
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        throw new Error(`no row for ${name}`);
+      };
+
+      it('fills them for a clean order, and leaves the operators\' «Holat» alone', async () => {
+        await order(
+          { fullName: 'Тоза Мижоз', clickId: 'fbclid_abc12345', utm: { source: 'facebook', campaign: 'V1' }, signals: { ...person, ref: 'l.instagram.com' } },
+          { ip: '203.0.113.91', userAgent: instagram },
+        );
+        const r = await rowOf('Тоза Мижоз');
+        expect(r.sheet).toBe('Lidlar');
+        expect(cell(r, 'Status')).toBe('ok');
+        expect(cell(r, 'Sabab')).toBe('');
+        expect(cell(r, 'IP')).toBe('203.0.113.91');
+        expect(cell(r, 'User-Agent')).toBe(instagram);
+        expect(cell(r, 'Referrer')).toBe('l.instagram.com');
+        expect(cell(r, 'fbclid')).toBe('fbclid_abc12345');
+        expect(cell(r, 'utm_source')).toBe('facebook');
+        expect(cell(r, 'Forma (s)')).toBe(15);
+        expect(cell(r, 'Saytda (s)')).toBe(41);
+        expect(cell(r, 'Holat')).toBe('');
+      });
+
+      it('names the reasons of a suspect order, and keeps a formula in the user agent harmless', async () => {
+        await order({ fullName: 'Шубҳали Киши', turnstileToken: 'bad', signals: { ...person, pageMs: 5_000 } }, { ip: '203.0.113.92', userAgent: '=HYPERLINK("http://x")' });
+        const r = await rowOf('Шубҳали Киши');
+        expect(r.sheet).toBe('Spam');
+        expect(cell(r, 'Status')).toBe('shubhali');
+        expect(String(cell(r, 'Sabab')).split(', ').sort()).toEqual(['captcha_fail', 'fbclid_yoq', 'instagramdan_emas', 'tez_yuborish'].sort());
+        expect(cell(r, 'User-Agent')).toBe(`'=HYPERLINK("http://x")`);
+      });
+
+      it('a direct post with no page behind it is accepted, goes to the «Spam» tab and never reaches Meta', async () => {
+        const res = await order({ fullName: 'Тўғри Пост', turnstileToken: undefined }, { ip: '203.0.113.93', userAgent: 'curl/8.7.1' });
+        expect(res.status).toBe(201);
+        const r = await rowOf('Тўғри Пост');
+        expect(r.sheet).toBe('Spam');
+        expect(cell(r, 'Status')).toBe('shubhali');
+        expect(cell(r, 'Sabab')).toContain('brauzersiz');
+        expect(await quiet()).toHaveLength(0);
+        // The group still sees it (AGENTS.md #13); the panel and lists do not.
+        expect(leadMessages().at(-1)!.text).toContain('тўғридан-тўғри юборилган');
+      });
+
+      it('inside the Instagram app the silent check only measures: same tab, same Lead, nothing in the group', async () => {
+        await order({ fullName: 'Токенсиз Мижоз', phone: '+998 90 312 46 11', turnstileToken: undefined, signals: person }, { ip: '203.0.113.94', userAgent: instagram });
+        await order({ fullName: 'Ёмон Токен', phone: '+998 90 312 46 12', turnstileToken: 'bad', signals: person }, { ip: '203.0.113.95', userAgent: instagram });
+        await order({ fullName: 'Савол Берди', phone: '+998 90 312 46 14', turnstileToken: undefined, signals: { ...person, check: 'interactive' } }, { ip: '203.0.113.102', userAgent: instagram });
+        await order({ fullName: 'Хато Берди', phone: '+998 90 312 46 15', turnstileToken: undefined, signals: { ...person, check: 'error' } }, { ip: '203.0.113.103', userAgent: instagram });
+        await order({ fullName: 'Яхши Токен', phone: '+998 90 312 46 13', turnstileToken: 'good', signals: person }, { ip: '203.0.113.96', userAgent: instagram });
+        const expected: Record<string, string> = {
+          'Токенсиз Мижоз': 'captcha_yoq_ilova',
+          'Ёмон Токен': 'captcha_fail_ilova',
+          'Савол Берди': 'captcha_savol_ilova',
+          'Хато Берди': 'captcha_xato_ilova',
+        };
+        for (const [name, code] of Object.entries(expected)) {
+          const r = await rowOf(name);
+          expect(r.sheet).toBe('Lidlar');
+          expect(cell(r, 'Status')).toBe('ok');
+          expect(cell(r, 'Sabab')).toContain(code);
+          expect(cell(r, 'Belgi')).toBe('');
+        }
+        expect(cell(await rowOf('Яхши Токен'), 'Sabab')).not.toContain('captcha');
+        expect((await settled(5)).filter((e) => e.event_name === 'Lead')).toHaveLength(5);
+        for (const m of leadMessages()) expect(m.text).not.toContain('Текширинг');
+      });
+
+      it('claiming to be the Instagram app with no page behind it is still a program', async () => {
+        await order({ fullName: 'Сохта Инстаграм', turnstileToken: undefined }, { ip: '203.0.113.97', userAgent: instagram });
+        const r = await rowOf('Сохта Инстаграм');
+        expect(r.sheet).toBe('Spam');
+        expect(await quiet()).toHaveLength(0);
+      });
+
+      it('says when one network sends many at once, and decides nothing by it', async () => {
+        for (let i = 0; i < 4; i++) {
+          expect((await order({ fullName: `Тармоқ ${['А', 'Б', 'В', 'Г'][i]}`, phone: `+998 90 312 47 0${i}`, deviceId: sid(), signals: person }, { ip: '203.0.113.98', userAgent: instagram })).status).toBe(201);
+        }
+        expect(cell(await rowOf('Тармоқ В'), 'Sabab')).not.toContain('ip_tez');
+        const last = await rowOf('Тармоқ Г');
+        expect(cell(last, 'Sabab')).toContain('ip_tez');
+        expect(last.sheet).toBe('Lidlar');
+        expect(cell(last, 'Status')).toBe('ok');
+      });
+
+      it('a repeat within 24 hours adds no row: a note on the order\'s own row', async () => {
+        await mf.dispose();
+        mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', SHEETS_NOTES: '1' });
+        await order({ fullName: 'Шошилган Мижоз', signals: person }, { ip: '203.0.113.99', userAgent: instagram });
+        await rowOf('Шошилган Мижоз');
+        expect(((await (await order({ fullName: 'Шошилган Мижоз', signals: person }, { ip: '203.0.113.99', userAgent: instagram })).json()) as { status: string }).status).toBe('duplicate');
+        for (let i = 0; i < 100 && !sheets.rows.some((r) => r.action === 'note'); i++) await new Promise((r) => setTimeout(r, 10));
+        expect(sheets.rows.filter((r) => r.row)).toHaveLength(1);
+        const note = sheets.rows.find((r) => r.action === 'note')!;
+        expect(note).toMatchObject({ number: 1, column: 'Takror' });
+        expect(note.value).toMatch(/^2-marta, /);
+      });
+
+      it('a sheet without SHEETS_NOTES gets no note: its script may take one for an order', async () => {
+        await order({ fullName: 'Иккинчи Мижоз', signals: person }, { ip: '203.0.113.100', userAgent: instagram });
+        await rowOf('Иккинчи Мижоз');
+        await order({ fullName: 'Иккинчи Мижоз', signals: person }, { ip: '203.0.113.100', userAgent: instagram });
+        await new Promise((r) => setTimeout(r, 100));
+        expect(sheets.rows.some((r) => r.action === 'note')).toBe(false);
+      });
+    });
+
     it('tells the group when the sheet refuses an order or cannot be read', async () => {
       sheets.refuse = true;
       await order({ signals: { touch: 5, taps: 3, keys: 9 } });
@@ -1769,6 +1887,14 @@ describe('the partner site (sites.ts t2)', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(sheets.rows).toHaveLength(2);
     expect(meta.bodies).toHaveLength(leadsBefore);
+  });
+
+  it("gets none of the main sheet's new columns: its row stays as it was", async () => {
+    await partnerOrder({ fullName: 'Шерик Мижоз', phone: '+998 90 312 45 76', clickId: 'fbclid_abc12345', signals: { touch: 5, taps: 3, keys: 9 } }, '203.0.113.76');
+    await until(() => sheets.rows.length >= 1);
+    expect(sheets.rows[0]!.headers).toEqual(['№', 'Sana', 'Ism', 'Telefon', 'Kampaniya', 'Ad set', 'Video', 'Belgi', 'Holat', 'Izoh', 'Qurilma', 'Tafsilot']);
+    expect(sheets.rows[0]!.row).toHaveLength(12);
+    expect(JSON.stringify(sheets.rows[0])).not.toContain('203.0.113.76');
   });
 
   it('keeps its old rule: a made-up click alone is still a trap here', async () => {

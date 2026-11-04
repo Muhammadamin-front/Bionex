@@ -1,9 +1,9 @@
 // The main site: the original page (the one the partner site also shows) plus what makes it
 // believable — real customers' video messages and the product's state certificate, right under
 // the first form. Above it (2026-10-28) the form sat four phone screens down and orders all but
-// stopped while the partner page kept getting them; back under it, with the arrival dialog, on
-// 2026-10-29. The media live only on the Mac that deploys (.gitignore): the public repo never
-// carries customers' faces. A missing file just leaves its part out.
+// stopped while the partner page kept getting them; back under it on 2026-10-29. The media live
+// only on the Mac that deploys (.gitignore): the public repo never carries customers' faces. A
+// missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
 import { useEffect, useRef, useState } from 'react';
@@ -215,8 +215,6 @@ const adHero = ad.video && ad.poster && ad.face ? <AdHero video={ad.video} poste
 const OFFER: Offer = { percent: 25, pensioners: 35, until: '2026-11-08T23:59:59+05:00', untilText: '8 ноябргача' };
 
 export function Landing() {
-  // The order dialog on arrival is back (2026-10-29): without it and with the form under the
-  // videos, orders stopped. The videos now sit below the form, so it covers only the product.
   // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
   return (
     <OfferContext.Provider value={OFFER}>
@@ -224,7 +222,8 @@ export function Landing() {
       <AskConcernContext.Provider value={true}>
         {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
         <ConfirmAutofillContext.Provider value={true}>
-          <Page hero={adHero} proof={<Proof />} barOverForms={false} />
+          {/* No order dialog on arrival (owner, 2026-11-04). The first form stays right under the first screen. */}
+          <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
         </ConfirmAutofillContext.Provider>
       </AskConcernContext.Provider>
     </OfferContext.Provider>

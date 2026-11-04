@@ -27,6 +27,13 @@ const humanCheck = () => {
   if (mode !== 'web') return mode !== '0';
   return !fromSocialApp(typeof navigator === 'undefined' ? null : navigator.userAgent);
 };
+/**
+ * Inside the Instagram / Facebook app the main page does not ask, but it does measure (owner,
+ * 2026-11-04): the check runs out of sight and its token, if it is ready by then, goes with the
+ * order. Nothing is ever shown and nothing waits for it — the check is what cost orders there
+ * on 2026-10-29 — and the server only notes a failure in the sheet's «Sabab».
+ */
+const silentCheck = () => import.meta.env.VITE_HUMAN_CHECK === 'web' && !humanCheck();
 /** Validation schemas (Zod) are fetched with the form, not with the first paint. */
 const loadSchemas = () => import('@bionex/shared/lead');
 
@@ -135,6 +142,8 @@ export function OrderForm({
 
   const verification = useRef<Verification | null>(null);
   const turnstileToken = useRef<string | null>(null);
+  /** Why the silent check has no token, for the sheet's «Sabab». */
+  const silentOutcome = useRef<'interactive' | 'error' | undefined>(undefined);
   const widgetId = useRef<string | null>(null);
   const tokenWaiters = useRef<Array<(token: string | null) => void>>([]);
   const preparing = useRef<Promise<void> | null>(null);
@@ -148,11 +157,14 @@ export function OrderForm({
   };
 
   const renderWidget = useCallback(async (submissionId: string, gen: number) => {
-    if (!humanCheck()) return;
+    const silent = silentCheck();
+    if (!humanCheck() && !silent) return;
     const turnstile = await loadTurnstile();
     if (!widgetBox.current || gen !== generation.current) return;
     if (widgetId.current) turnstile.remove(widgetId.current);
     turnstileToken.current = null;
+    // Off-screen, like the decoys: whatever the widget wants to show, nobody can see it.
+    if (silent) widgetBox.current.classList.add('hp-field');
     widgetId.current = turnstile.render(widgetBox.current, {
       sitekey: SITE_KEY,
       action: TURNSTILE_ACTION,
@@ -168,7 +180,13 @@ export function OrderForm({
       'refresh-expired': 'auto',
       // The widget's own words are Russian at best, so the Uzbek line is shown exactly while it
       // is asking for something.
-      'before-interactive-callback': () => setChallenging(true),
+      'before-interactive-callback': () => {
+        if (!silent) return setChallenging(true);
+        // It wants a person to act: no asking in the app, so no token, and the reason goes with the order.
+        silentOutcome.current = 'interactive';
+        if (widgetId.current) turnstile.remove(widgetId.current);
+        widgetId.current = null;
+      },
       'after-interactive-callback': () => setChallenging(false),
       callback: (token) => {
         turnstileToken.current = token;
@@ -179,6 +197,7 @@ export function OrderForm({
         turnstileToken.current = null;
       },
       'error-callback': () => {
+        if (silent) silentOutcome.current = 'error';
         turnstileToken.current = null;
         resolveWaiters(null);
       },
@@ -189,9 +208,12 @@ export function OrderForm({
   const refreshVerification = useCallback(async () => {
     const gen = ++generation.current;
     turnstileToken.current = null;
+    silentOutcome.current = undefined;
     const submissionId = newSubmissionId();
     verification.current = { submissionId };
-    await renderWidget(submissionId, gen);
+    // The silent check holds nothing up, not even a slow or blocked Turnstile script.
+    if (silentCheck()) void renderWidget(submissionId, gen).catch(() => undefined);
+    else await renderWidget(submissionId, gen);
   }, [renderWidget]);
 
   const prepare = useCallback(() => {
@@ -388,7 +410,7 @@ export function OrderForm({
 
       const asksCheck = humanCheck();
       setWaitingForCheck(asksCheck && !turnstileToken.current);
-      const token = asksCheck ? await waitForTurnstile(8_000) : null;
+      const token = asksCheck ? await waitForTurnstile(8_000) : turnstileToken.current;
       setWaitingForCheck(false);
 
       const fullPhone = `+998${phone.replace(/\D/g, '')}`;
@@ -402,7 +424,7 @@ export function OrderForm({
         clickId: adClickId(),
         fingerprint,
         deviceModel: model,
-        signals: { ...signals, autofill: phoneAutofilled || undefined },
+        signals: { ...signals, autofill: phoneAutofilled || undefined, check: silentOutcome.current },
         turnstileToken: token ?? undefined,
         offerTap: offer && offerTapped() ? offer.percent : undefined,
         // Either decoy filled is the same trap.
@@ -612,8 +634,9 @@ export function OrderForm({
             Dashlane) to leave the decoys alone: they sit off-screen, not display:none, and a
             person whose autofill filled one would be taken for a bot. */}
         <div className="hp-field" aria-hidden="true">
-          <label htmlFor={`${id}-fax`}>Бу майдонни бўш қолдиринг</label>
-          <input ref={honeypotRef} id={`${id}-fax`} name="contact_fax" type="text" tabIndex={-1} autoComplete="off" {...NO_AUTOFILL} />
+          <label htmlFor={`${id}-x7k2`}>Бу майдонни бўш қолдиринг</label>
+          {/* A name that means nothing: autofill goes by the name, and has nothing to recognise here. */}
+          <input ref={honeypotRef} id={`${id}-x7k2`} name="hp_x7k2" type="text" tabIndex={-1} autoComplete="off" {...NO_AUTOFILL} />
         </div>
         {/* A second decoy with the name form-filling scripts like most. */}
         <div className="hp-field" aria-hidden="true">
