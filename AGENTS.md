@@ -644,6 +644,13 @@ user's Mac.
     recorded) and `wrangler tail`: an order through zeynara.com.uz reaches the Worker with the sender's real
     `cf-connecting-ip`, so the domain's orders are not all counted as one network. Needs only `deploy`.
 
+55. **The page opens at its top** (2026-11-05, owner: zeynara.com.uz opened at the very bottom). A fresh
+    open was already at the top on all five set-ups tried (WebKit and Chromium builds with phone and
+    Instagram user agents, desktop). Reloaded or reopened, the browser returned to the last place, and since
+    the prerender (#39) it can do so at once. `openAtTop` in `main.tsx`: `history.scrollRestoration =
+    'manual'`, back to the top unless the visitor has touched the page; a `#section` link stays App.tsx's.
+    Shared code: the partner site gets it only with `deploy:t2`. Live on zeynara.com.uz the same day; the owner confirmed it on their phone. workers.dev gets it with the next `deploy`.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
