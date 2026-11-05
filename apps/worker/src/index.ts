@@ -1,6 +1,6 @@
 import { HONEYPOT_FIELD, makeLeadSubmissionSchema, type ApiError, type ApiErrorCode, type LeadSubmitResponse } from '@bionex/shared/lead';
 import { phoneLooksSynthetic } from '@bionex/shared/phone';
-import { concernAnswerSchema } from '@bionex/shared/concerns';
+import { concernAnswerSchema, regionAnswerSchema } from '@bionex/shared/concerns';
 import { site } from '../../web/src/config/product';
 import { buildUserData, metaConfig } from './meta';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -109,7 +109,7 @@ export default {
         waitingForTelegram: queued,
       });
     }
-    if (url.pathname === '/api/leads/concern' && request.method === 'POST') return takeConcern(request, env, url);
+    if ((url.pathname === '/api/leads/concern' || url.pathname === '/api/leads/region') && request.method === 'POST') return takeAnswer(request, env, url);
     if (url.pathname !== '/api/leads') return fail(404, 'not_found', MESSAGES.notFound);
     if (request.method !== 'POST') return fail(405, 'not_found', MESSAGES.notFound);
     return takeOrder(request, env, ctx, url, 'main');
@@ -132,11 +132,11 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 /**
- * The thank-you screen's optional «Сизни нима безовта қилади?» (main site): the answer joins the order
- * it follows — a reply under its Telegram message and the sheet row's «Shikoyat». Only for an order this
- * browser has just placed (its submission id), once.
+ * The thank-you screen's optional questions (main site), «Қайси вилоятдансиз?» and «Сизни нима безовта
+ * қилади?»: the answer joins the order it follows — a reply under its Telegram message and the sheet
+ * row's «Viloyat» / «Shikoyat». Only for an order this browser has just placed (its submission id), once.
  */
-async function takeConcern(request: Request, env: Env, url: URL): Promise<Response> {
+async function takeAnswer(request: Request, env: Env, url: URL): Promise<Response> {
   const origin = request.headers.get('origin');
   if (origin && origin !== url.origin) return fail(403, 'forbidden', MESSAGES.forbidden);
   const raw = await request.text();
@@ -147,9 +147,17 @@ async function takeConcern(request: Request, env: Env, url: URL): Promise<Respon
   } catch {
     return fail(400, 'validation_failed', MESSAGES.validation);
   }
-  const parsed = concernAnswerSchema.safeParse(body);
-  if (!parsed.success) return fail(400, 'validation_failed', MESSAGES.validation);
-  const done = await env.REGISTRY.get(env.REGISTRY.idFromName('main')).addConcern({ ...parsed.data, now: Date.now() });
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
+  let done: boolean;
+  if (url.pathname === '/api/leads/region') {
+    const parsed = regionAnswerSchema.safeParse(body);
+    if (!parsed.success) return fail(400, 'validation_failed', MESSAGES.validation);
+    done = await registry.addRegion({ ...parsed.data, now: Date.now() });
+  } else {
+    const parsed = concernAnswerSchema.safeParse(body);
+    if (!parsed.success) return fail(400, 'validation_failed', MESSAGES.validation);
+    done = await registry.addConcern({ ...parsed.data, now: Date.now() });
+  }
   return done ? json(200, { ok: true }) : fail(404, 'not_found', MESSAGES.notFound);
 }
 

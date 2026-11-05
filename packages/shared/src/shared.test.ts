@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { REGION_IDS, REGIONS, regionAnswerSchema } from './concerns';
 import {
   caretAfterDigits,
   cleanDeviceModel,
@@ -213,5 +214,24 @@ describe('modelFromUserAgent', () => {
     expect(cleanDeviceModel('<b>=HYPERLINK("x")</b> Redmi Note 12')).toBe('bHYPERLINK(x)/b Redmi Note 12');
     expect(cleanDeviceModel('x'.repeat(300))).toHaveLength(80);
     expect(cleanDeviceModel('   ')).toBeUndefined();
+  });
+});
+
+describe('the thank-you screen\'s region', () => {
+  const submissionId = '3f2c1d4e-5b6a-4c7d-8e9f-000000000001';
+
+  it('offers the 12 regions, Tashkent city and Karakalpakstan, each in both scripts', () => {
+    expect(REGION_IDS).toHaveLength(14);
+    for (const id of REGION_IDS) {
+      expect(REGIONS[id].cyrl).toMatch(/^[\u0400-\u04FF ]+$/);
+      expect(REGIONS[id].latn).toMatch(/^[A-Za-z' ]+$/);
+    }
+  });
+
+  it('takes only a known region and nothing else', () => {
+    expect(regionAnswerSchema.safeParse({ submissionId, region: 'fergana' }).success).toBe(true);
+    expect(regionAnswerSchema.safeParse({ submissionId, region: 'moscow' }).success).toBe(false);
+    expect(regionAnswerSchema.safeParse({ submissionId, region: 'fergana', extra: 1 }).success).toBe(false);
+    expect(regionAnswerSchema.safeParse({ region: 'fergana' }).success).toBe(false);
   });
 });

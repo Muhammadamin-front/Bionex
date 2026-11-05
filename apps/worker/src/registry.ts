@@ -5,7 +5,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
 import { reasonCodes, REPEAT_COLUMN, sendSheetNote, sendSheetOrder, SPAM_SHEET, sheetsConfig, tashkentTime, type SheetLog } from './sheets';
-import { CONCERNS, type ConcernId } from '@bionex/shared/concerns';
+import { CONCERNS, REGIONS, type ConcernId, type RegionId } from '@bionex/shared/concerns';
 import type { SiteId } from './sites';
 import {
   callTelegram,
@@ -326,6 +326,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('hidden')) this.sql.exec('ALTER TABLE list_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
     // «Сизни нима безовта қилади?», answered on the thank-you screen.
     if (!listColumns.includes('concern')) this.sql.exec('ALTER TABLE list_items ADD COLUMN concern TEXT');
+    // «Қайси вилоятдансиз?», answered on the same screen.
+    if (!listColumns.includes('region')) this.sql.exec('ALTER TABLE list_items ADD COLUMN region TEXT');
     // Orders already written to the «Spam» tab (live or by «/spam N»), so none is written twice.
     this.sql.exec('CREATE TABLE IF NOT EXISTS spam_exported (lead_id INTEGER PRIMARY KEY)');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
@@ -779,12 +781,9 @@ export class LeadRegistry extends DurableObject<Env> {
    * the operators under its Telegram message and written to its sheet row («Shikoyat»). Once per order.
    */
   async addConcern(input: { submissionId: string; concerns: ConcernId[]; now: number }): Promise<boolean> {
-    const leadId = this.sql
-      .exec<{ lead_id: number | null }>("SELECT lead_id FROM submissions WHERE id = ? AND status = 'accepted'", input.submissionId)
-      .toArray()[0]?.lead_id;
-    if (!leadId) return false;
-    const item = this.sql.exec<{ concern: string | null }>('SELECT concern FROM list_items WHERE lead_id = ?', leadId).toArray()[0];
-    if (!item || item.concern) return Boolean(item);
+    const order = this.orderOfSubmission(input.submissionId);
+    if (!order || order.concern) return Boolean(order);
+    const { leadId } = order;
     const cyrl = input.concerns.map((c) => CONCERNS[c].cyrl).join(', ');
     this.sql.exec('UPDATE list_items SET concern = ? WHERE lead_id = ?', cyrl, leadId);
     if (!this.silent(leadId)) this.enqueue(`📝 Мижоз ўзи белгилади: <b>${cyrl}</b>`, { replyToLead: leadId, now: input.now, thread: 'leads' });
@@ -797,6 +796,30 @@ export class LeadRegistry extends DurableObject<Env> {
     }
     await this.flush();
     return true;
+  }
+
+  /** The thank-you screen's region, handled like addConcern: its Telegram reply and the row's «Viloyat». Once per order. */
+  async addRegion(input: { submissionId: string; region: RegionId; now: number }): Promise<boolean> {
+    const order = this.orderOfSubmission(input.submissionId);
+    if (!order || order.region) return Boolean(order);
+    const { leadId } = order;
+    const { cyrl, latn } = REGIONS[input.region];
+    this.sql.exec('UPDATE list_items SET region = ? WHERE lead_id = ?', cyrl, leadId);
+    if (!this.silent(leadId)) this.enqueue(`📍 Вилояти: <b>${cyrl}</b>`, { replyToLead: leadId, now: input.now, thread: 'leads' });
+    const sheet = this.env.SHEETS_NOTES === '1' ? sheetsConfig(this.env, 'main') : null;
+    if (sheet) this.ctx.waitUntil(sendSheetNote(sheet, { number: leadId, column: 'Viloyat', value: latn }));
+    await this.flush();
+    return true;
+  }
+
+  /** The accepted order a submission became, with its thank-you answers so far. */
+  private orderOfSubmission(submissionId: string): { leadId: number; concern: string | null; region: string | null } | null {
+    const leadId = this.sql
+      .exec<{ lead_id: number | null }>("SELECT lead_id FROM submissions WHERE id = ? AND status = 'accepted'", submissionId)
+      .toArray()[0]?.lead_id;
+    if (!leadId) return null;
+    const item = this.sql.exec<{ concern: string | null; region: string | null }>('SELECT concern, region FROM list_items WHERE lead_id = ?', leadId).toArray()[0];
+    return item ? { leadId, ...item } : null;
   }
 
   /** The main dataset refused or never got an event: Leads are being lost, so the group hears of it (hourly at most). */

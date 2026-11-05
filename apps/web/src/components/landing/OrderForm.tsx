@@ -10,7 +10,7 @@ import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } fr
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
-import { ConcernQuestion } from '../../lib/concern';
+import { AfterOrderQuestions } from '../../lib/concern';
 import { OfferBanner, offerTapped, useOffer } from '../../lib/offer';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
@@ -512,7 +512,7 @@ export function OrderForm({
           ))}
         </ol>
         {/* Only in the form the order was sent from: the other one shows the same confirmation. */}
-        {completed.submissionId && submittedHere.current && <ConcernQuestion submissionId={completed.submissionId} />}
+        {completed.submissionId && submittedHere.current && <AfterOrderQuestions submissionId={completed.submissionId} />}
         {callButton && <div className="mx-auto mt-6 max-w-sm">{callButton}</div>}
       </div>
     );

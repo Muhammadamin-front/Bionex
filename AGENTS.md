@@ -650,7 +650,18 @@ user's Mac.
     Instagram user agents, desktop). Reloaded or reopened, the browser returned to the last place, and since
     the prerender (#39) it can do so at once. `openAtTop` in `main.tsx`: `history.scrollRestoration =
     'manual'`, back to the top unless the visitor has touched the page; a `#section` link stays App.tsx's.
-    Shared code: the partner site gets it only with `deploy:t2`. Live on zeynara.com.uz the same day; the owner confirmed it on their phone. workers.dev gets it with the next `deploy`.
+    Shared code: the partner site gets it only with `deploy:t2`. Live on both addresses the same day; the owner confirmed it on their phone.
+
+56. **«Қайси вилоятдансиз?» on the thank-you screen** (2026-11-05, owner's choice over a third form field:
+    asked after the order, so it costs none, as with #44). Main site only (`AskConcernContext`). `AfterOrderQuestions`
+    (lib/concern.tsx) asks one thing at a time: the region (14 buttons from `REGIONS`, one tap sends it, «Ўтказиб
+    юбориш» skips), then the concern question. POST `/api/leads/region` (also forwarded by apps/site) → `addRegion`:
+    once per order (`list_items.region`), reply under the order in Telegram «📍 Вилояти: …», and the sheet script's
+    `note` writes «Viloyat» on the order's row (`SHEETS_NOTES`; the script makes the header itself, per tab, no script
+    change). Not sent to Meta, not in the panel. Deploy `deploy` (Worker) before `deploy:site`: an older Worker
+    answers 404 and the region is lost (nothing else is: the order is already in).
+    Live on both addresses 2026-11-05, walked through on the live page with the API mocked; a real order's
+    Telegram reply and «Viloyat» cell had not been seen yet when this was written.
 
 ## Open items
 

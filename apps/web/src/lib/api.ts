@@ -64,6 +64,11 @@ export function sendConcern(body: { submissionId: string; concerns: string[] }):
   return apiFetch<{ ok: true }>('/api/leads/concern', { method: 'POST', body: JSON.stringify(body) });
 }
 
+/** The thank-you screen's region (lib/concern.tsx). `keepalive`: it goes even if the page is closed right after the tap. */
+export function sendRegion(body: { submissionId: string; region: string }): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>('/api/leads/region', { method: 'POST', body: JSON.stringify(body), keepalive: true });
+}
+
 /**
  * A random id for one order attempt (UUID v4). `crypto.randomUUID` only exists since
  * iOS 15.4 / Chrome 92, so older phones build it from `getRandomValues` (available everywhere).

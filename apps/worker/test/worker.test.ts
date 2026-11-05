@@ -1450,6 +1450,29 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect((await answer({ submissionId, concerns: ['cancer'] })).status).toBe(400);
     });
 
+    it('takes the thank-you screen\'s region once: a reply under the order in Telegram and «Viloyat» in its sheet row', async () => {
+      await mf.dispose();
+      mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', SHEETS_NOTES: '1' });
+      const submissionId = sid();
+      expect((await order({ submissionId, signals: { touch: 5, taps: 3, keys: 9 } })).status).toBe(201);
+      const answer = (body: unknown) =>
+        mf.dispatchFetch(`${SITE}/api/leads/region`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      expect((await answer({ submissionId, region: 'fergana' })).status).toBe(200);
+      await new Promise((r) => setTimeout(r, 150));
+      expect(telegram.messages.at(-1)!.text).toContain('Вилояти: <b>Фарғона</b>');
+      expect(sheets.rows.find((r) => r.action === 'note')).toMatchObject({ number: 1, column: 'Viloyat', value: "Farg'ona" });
+      // Once only; an unknown order or region is refused; the other question still has its own answer.
+      const before = telegram.messages.length;
+      expect((await answer({ submissionId, region: 'samarkand' })).status).toBe(200);
+      expect(telegram.messages).toHaveLength(before);
+      expect((await answer({ submissionId: sid(), region: 'samarkand' })).status).toBe(404);
+      expect((await answer({ submissionId, region: 'moscow' })).status).toBe(400);
+      const concern = await mf.dispatchFetch(`${SITE}/api/leads/concern`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ submissionId, concerns: ['heart'] }) });
+      expect(concern.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 150));
+      expect(telegram.messages.at(-1)!.text).toContain('Мижоз ўзи белгилади: <b>Юрак</b>');
+    });
+
     it('«/spam N» copies earlier suspect orders into the «Spam» tab once, and says so in the group', async () => {
       // The sheet is down when they arrive: nothing is written, so «/spam» has something to copy.
       sheets.refuse = true;
