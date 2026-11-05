@@ -485,7 +485,8 @@ user's Mac.
     `OrderForm`'s `humanCheck()` loads Turnstile unless `fromSocialApp(navigator.userAgent)`. Worker:
     `noCheckAsked` now also requires `fromSocialApp(user-agent)`, so a plain browser that sent no
     token has failed the check (`no_captcha` + `likely_bot` → Spam tab, no instant Lead); `no_browser`
-    no longer depends on it (main + no token + no `signals` = a direct API post, whatever the UA).
+    no longer depends on it (main + no token + no `signals` = a direct API post, whatever the UA;
+    since 2026-11-04 any token Cloudflare did not accept counts as no token here, so a made-up one hides nothing).
     Comparison that showed it: the partner's «Bionex Leads» (check on, `PARTNER_SHEET_HIDDEN_FLAGS`)
     ran ~23% bad on $100–150/day against our ~38% on $45/day.
     Same day, same owner message: the challenge spoke **English** («Verify you are a human») to

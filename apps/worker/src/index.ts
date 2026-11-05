@@ -262,13 +262,14 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // From 2026-10-29 to 2026-10-31 no token at all was normal on the main site, and with it
     // `no_captcha` / `likely_bot` became unreachable: the «Spam» tab took nothing and the junk the
     // check used to hold back went into «Lidlar» (last diverted row №206, 29.10 11:51).
-    // A page that ran no script at all (no browser signals: a direct post to the API) is a program's.
+    // A page that ran no script at all (no browser signals: a direct post to the API) is a program's,
+    // and a made-up token does not change that: only a token Cloudflare accepted does.
     // Inside the app the page runs the check silently (OrderForm `silentCheck`): it never shows, never
     // holds the order, and its result is only measured (`appCheckCode`, in the sheet's «Sabab»), until
     // two weeks of it say whether it tells spam from customers (owner, 2026-11-04).
     const userAgent = request.headers.get('user-agent');
     const inApp = site === 'main' && fromSocialApp(userAgent);
-    if (site === 'main' && !data.turnstileToken && !data.signals) flags.push('no_browser');
+    if (site === 'main' && !check.ok && !data.signals) flags.push('no_browser');
     if (!check.ok && !inApp) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
     // robot, but real customers turned up among them too (their Telegram name matched), so it

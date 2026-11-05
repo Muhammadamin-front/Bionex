@@ -125,6 +125,9 @@ function start(bindings: Record<string, string> = {}) {
 let ids = 0;
 const sid = () => `3f2c1d4e-5b6a-4c7d-8e9f-${String(++ids).padStart(12, '0')}`;
 
+/** What a real page always sends. A failed check with no signals at all is a direct post (`no_browser`). */
+const inBrowser = { touch: 5, taps: 6, keys: 14 };
+
 function order(body: Record<string, unknown> = {}, opts: { ip?: string; origin?: string | null; cookie?: string; userAgent?: string } = {}) {
   const headers: Record<string, string> = { 'content-type': 'application/json', 'cf-connecting-ip': opts.ip ?? '198.51.100.7' };
   if (opts.origin !== null) headers.origin = opts.origin ?? SITE;
@@ -835,7 +838,7 @@ describe("the operators' Mini App panel", () => {
     expect(ok.leads.some((l) => l.name === 'Оддий Киши')).toBe(true);
     // A failed check from outside Instagram (likely_bot) is only a warning: real people fail it too.
     const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
-    await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 69', turnstileToken: 'bad' }, { ip: '203.0.113.69', userAgent: chrome });
+    await order({ fullName: 'Шубҳали Киши', phone: '+998 90 312 45 69', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.69', userAgent: chrome });
     expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли бор');
     const warned = (await (await panel('/api/panel/data?days=1', { auth: await initData(ali) })).json()) as { leads: Array<{ name: string }> };
     expect(warned.leads.some((l) => l.name === 'Шубҳали Киши')).toBe(true);
@@ -997,7 +1000,7 @@ describe('spam protection', () => {
 
   it('allows one IP at most 3 attempts an hour, failed ones included', async () => {
     const statuses = [];
-    for (let i = 0; i < 5; i++) statuses.push((await order({ turnstileToken: 'bad', phone: `+998 90 312 45 ${10 + i}` })).status);
+    for (let i = 0; i < 5; i++) statuses.push((await order({ turnstileToken: 'bad', signals: inBrowser, phone: `+998 90 312 45 ${10 + i}` })).status);
     expect(statuses).toEqual([201, 201, 201, 429, 429]); // unchecked orders still count toward the limit
     // A real customer on another network is unaffected.
     expect((await order({}, { ip: '203.0.113.50' })).status).toBe(201);
@@ -1160,10 +1163,10 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     it('reports a suspect order («Sotildi», «Kerakli») as a Lead, once, and waits on the others', async () => {
       // A failed check: no Lead on arrival, so the sheet decides (a clean order's Lead went already).
       const first = sid();
-      await order({ submissionId: first, turnstileToken: 'bad' }, { ip: '203.0.113.41' });
+      await order({ submissionId: first, turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.41' });
       const second = sid();
-      await order({ submissionId: second, phone: '+998 90 312 45 42', turnstileToken: 'bad' }, { ip: '203.0.113.42' });
-      await order({ phone: '+998 90 312 45 43', turnstileToken: 'bad' }, { ip: '203.0.113.43' });
+      await order({ submissionId: second, phone: '+998 90 312 45 42', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.42' });
+      await order({ phone: '+998 90 312 45 43', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.43' });
       // Waiting statuses send nothing.
       sheets.statuses = [[1, "Ko'tarmadi"], [2, "Qaytib qo'ng'iroq"], [3, '']];
       await readSheet();
@@ -1183,7 +1186,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
     it('puts bot traps and failed checks in the «Spam» tab, and only clean orders in «Lidlar»', async () => {
       await order({ fullName: 'Тоза Киши', phone: '+998 90 312 45 44' }, { ip: '203.0.113.44' });
       await order({ fullName: 'Тузоқ Киши', signals: { touch: 5, taps: 0, keys: 9 } }, { ip: '203.0.113.46' });
-      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad' }, { ip: '203.0.113.47' });
+      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 47', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.47' });
       for (let i = 0; i < 50 && sheets.rows.length < 3; i++) await new Promise((r) => setTimeout(r, 10));
       await new Promise((r) => setTimeout(r, 100));
       const inTab = (tab: string) => sheets.rows.filter((r) => r.sheet === tab).map((r) => r.row[2]);
@@ -1367,6 +1370,24 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
         expect(await quiet()).toHaveLength(0);
       });
 
+      it('a made-up token does not turn a direct post into a page: still a program, from the app or not', async () => {
+        await order({ fullName: 'Сохта Токен', phone: '+998 90 312 46 21', turnstileToken: 'bad' }, { ip: '203.0.113.104', userAgent: instagram });
+        await order({ fullName: 'Сохта Токен Курл', phone: '+998 90 312 46 22', turnstileToken: 'bad' }, { ip: '203.0.113.105', userAgent: 'curl/8.7.1' });
+        for (const name of ['Сохта Токен', 'Сохта Токен Курл']) {
+          const r = await rowOf(name);
+          expect(r.sheet).toBe('Spam');
+          expect(cell(r, 'Sabab')).toContain('brauzersiz');
+        }
+        expect(await quiet()).toHaveLength(0);
+      });
+
+      it('a token Cloudflare accepts is not a direct post, even with no browser signals', async () => {
+        await order({ fullName: 'Яхши Токен Сигналсиз', phone: '+998 90 312 46 23', turnstileToken: 'good' }, { ip: '203.0.113.106', userAgent: instagram });
+        const r = await rowOf('Яхши Токен Сигналсиз');
+        expect(r.sheet).toBe('Lidlar');
+        expect(cell(r, 'Sabab')).not.toContain('brauzersiz');
+      });
+
       it('a repeat within 24 hours adds no row: a note on the order\'s own row', async () => {
         await mf.dispose();
         mf = withMeta({ SHEETS_URL: 'https://sheets.mock/exec', SHEETS_SECRET: 'sheet-secret', SHEETS_NOTES: '1' });
@@ -1433,7 +1454,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       // The sheet is down when they arrive: nothing is written, so «/spam» has something to copy.
       sheets.refuse = true;
       await order({ fullName: 'Тузоқ Киши', contactFax: 'x' }, { ip: '203.0.113.61' });
-      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 62', turnstileToken: 'bad' }, { ip: '203.0.113.62' });
+      await order({ fullName: 'Текширув Киши', phone: '+998 90 312 45 62', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.62' });
       await order({ fullName: 'Тоза Киши', phone: '+998 90 312 45 63' }, { ip: '203.0.113.63' });
       await new Promise((r) => setTimeout(r, 100));
       expect(sheets.rows).toHaveLength(0);
@@ -1484,7 +1505,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('reports nothing to Meta for any Telegram button: the group is for information only', async () => {
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     for (const action of ['sold', 'rejected', 'noanswer', 'callback']) await press(`s:1:${action}`);
     expect(await quiet()).toHaveLength(0);
     // The sheet is still the way in: the order stayed pending, so «Sotildi» there reports it.
@@ -1493,7 +1514,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('a Telegram 🚫 withholds the order, so a later «Sotildi» in the sheet cannot report it', async () => {
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     await press('s:1:spam');
     await mark(1, 'Sotildi');
     expect(await quiet()).toHaveLength(0);
@@ -1545,7 +1566,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('sends no Lead on arrival for a suspect order: it waits for a person', async () => {
-    await order({ turnstileToken: 'bad' }); // failed check
+    await order({ turnstileToken: 'bad', signals: inBrowser }); // failed check
     await order({ phone: '+998 90 312 45 46', signals: { webdriver: true, touch: 5, taps: 3 } }, { ip: '203.0.113.46' }); // bot
     await order({ phone: '+998 90 312 45 47', turnstileToken: undefined }, { ip: '203.0.113.47' }); // no browser
     expect(await quiet()).toHaveLength(0);
@@ -1616,13 +1637,13 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('never reports an order marked spam — that is the whole point', async () => {
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     await mark(1, 'Keraksiz');
     expect(await quiet()).toHaveLength(0);
   });
 
   it('keeps an unanswered order waiting, and reports it when the call finally connects', async () => {
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     await mark(1, "Ko'tarmadi");
     expect(await quiet()).toHaveLength(0);
     await mark(1, 'Sotildi');
@@ -1630,7 +1651,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   });
 
   it('keeps a "ring me later" order waiting: the customer answered but has not decided', async () => {
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     await mark(1, "Qaytib qo'ng'iroq");
     expect(await quiet()).toHaveLength(0);
     await mark(1, 'Sotildi');
@@ -1678,7 +1699,7 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   it('reports an order whose security check never finished, once an operator vouches for it', async () => {
     // Turnstile not finishing is normal on old phones and in in-app browsers; the operator
     // who spoke to the customer is a better judge of a real person than the widget.
-    await order({ turnstileToken: 'bad' });
+    await order({ turnstileToken: 'bad', signals: inBrowser });
     expect(leadMessages()[0]!.text).toContain('«бот эмасман» текшируви ўтмади');
     await mark(1, 'Sotildi');
     expect(await settled()).toHaveLength(1);
@@ -1687,10 +1708,10 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
   it('a failed check from outside the Instagram / Facebook app is flagged as a likely robot', async () => {
     const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
     const instagram = 'Mozilla/5.0 (Linux; Android 16; SM-A175F Build/BP2A; wv) AppleWebKit/537.36 Chrome/155.0 Mobile Safari/537.36 Instagram 450.0.0.50.77 Android';
-    expect((await order({ phone: '+998 90 312 45 71', turnstileToken: 'bad' }, { ip: '203.0.113.71', userAgent: chrome })).status).toBe(201);
+    expect((await order({ phone: '+998 90 312 45 71', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.71', userAgent: chrome })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).toContain('бот эҳтимоли бор');
     // In the app the ads open in, a failed check alone is not enough.
-    expect((await order({ phone: '+998 90 312 45 72', turnstileToken: 'bad' }, { ip: '203.0.113.72', userAgent: instagram })).status).toBe(201);
+    expect((await order({ phone: '+998 90 312 45 72', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.72', userAgent: instagram })).status).toBe(201);
     expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
     // A passed check is never flagged, wherever it was opened.
     expect((await order({ phone: '+998 90 312 45 73' }, { ip: '203.0.113.73', userAgent: chrome })).status).toBe(201);

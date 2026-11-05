@@ -79,7 +79,7 @@ once, `shubhali` when it waits for a person. No code refuses an order.
 
 | Code | Means | Decides anything? |
 |---|---|---|
-| `honeypot` / `bot_tuzoq` / `brauzersiz` | a decoy filled with a program's signs / a program's signs / a direct post with no page | «Spam» tab, never Meta |
+| `honeypot` / `bot_tuzoq` / `brauzersiz` | a decoy filled with a program's signs / a program's signs / a direct post with no page (no browser signals and no token Cloudflare accepted: a made-up token does not hide it) | «Spam» tab, never Meta |
 | `honeypot_avto` | a decoy filled with no program's signs: perhaps a person's autofill | warning |
 | `captcha_fail` + `instagramdan_emas` | a plain browser that did not pass the check | «Spam» tab, no instant Lead |
 | `captcha_savol_ilova` | inside the app, the silent check wanted a person to act. **This one says what asking there would cost** | **nothing yet: being measured** |
