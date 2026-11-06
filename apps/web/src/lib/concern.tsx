@@ -1,46 +1,46 @@
-import { CONCERN_IDS, CONCERNS, REGION_IDS, REGIONS, type ConcernId, type RegionId } from '@bionex/shared/concerns';
+import { CONCERN_IDS, CONCERNS, type ConcernId } from '@bionex/shared/concerns';
 import { createContext, useContext, useState } from 'react';
-import { sendConcern, sendRegion } from './api';
+import { sendConcern } from './api';
 import { cn } from './cn';
 
-/** Whether the thank-you screen asks its questions (region, then «Сизни нима безовта қилади?»): the main site's choice (sites/classic). */
+/** Whether the thank-you screen asks «Сизни нима безовта қилади?»: the main site's choice (sites/classic). */
 export const AskConcernContext = createContext(false);
 
-/** The optional questions after an order is in, one at a time: the one-tap region first. */
+/** The Telegram channel the phone moves on to after the questions: the main site's choice (sites/classic). */
+export const TelegramChannelContext = createContext<string | null>(null);
+
+/**
+ * The optional question after an order is in. Its last tap (answered or skipped) opens the Telegram
+ * channel. Only after it: going there at once would leave the question unanswered. If a phone does
+ * not hand over to Telegram, a real link stays on screen.
+ */
 export function AfterOrderQuestions({ submissionId }: { submissionId: string }) {
   const ask = useContext(AskConcernContext);
-  const [regionDone, setRegionDone] = useState(false);
+  const channel = useContext(TelegramChannelContext);
+  const [done, setDone] = useState(false);
+  const [answered, setAnswered] = useState(false);
   if (!ask) return null;
-  if (!regionDone) return <RegionQuestion submissionId={submissionId} onDone={() => setRegionDone(true)} />;
-  return <ConcernQuestion submissionId={submissionId} />;
-}
-
-/** One tap sends it and moves on. Best effort: a lost answer only means the operator asks on the call. */
-function RegionQuestion({ submissionId, onDone }: { submissionId: string; onDone: () => void }) {
-  const pick = (region: RegionId) => {
-    void sendRegion({ submissionId, region }).catch(() => undefined);
-    onDone();
-  };
+  if (!done) {
+    return (
+      <ConcernQuestion
+        submissionId={submissionId}
+        onDone={(gaveAnswer) => {
+          setAnswered(gaveAnswer);
+          setDone(true);
+          // Still within the tap, which phones ask for before opening another app; the moment lets the answer leave.
+          if (channel) window.setTimeout(() => window.location.assign(channel), 350);
+        }}
+      />
+    );
+  }
   return (
-    <div className="mx-auto mt-6 max-w-sm border-t border-line pt-5 text-left">
-      <p className="font-display text-xl font-extrabold leading-snug">Қайси вилоятдансиз?</p>
-      <p className="mt-1 text-base text-muted">Биттасини босинг, мутахассисларимиз билиб туради.</p>
-      {/* First and last across the full width: «Қорақалпоғистон» does not fit half a phone screen in one word. */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {REGION_IDS.map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => pick(r)}
-            className="min-h-14 rounded-2xl border-2 border-line bg-paper px-1 text-center text-base font-bold leading-tight text-ink first:col-span-2 last:col-span-2 max-[350px]:text-[0.8rem]"
-          >
-            {REGIONS[r].cyrl}
-          </button>
-        ))}
-      </div>
-      <button type="button" onClick={onDone} className="mt-2 min-h-12 w-full text-base font-semibold text-muted underline">
-        Ўтказиб юбориш
-      </button>
+    <div className="mx-auto mt-6 max-w-sm" role="status">
+      {answered && <p className="rounded-2xl bg-paper px-4 py-3 text-lg font-bold text-brand-2">Раҳмат! Мутахассисларимизга етказилди.</p>}
+      {channel && (
+        <a href={channel} target="_blank" rel="noopener" className="mt-3 flex min-h-14 items-center justify-center rounded-2xl bg-forest px-4 text-center font-display text-lg font-bold text-white">
+          Телеграм каналимизга ўтиш
+        </a>
+      )}
     </div>
   );
 }
@@ -49,18 +49,13 @@ function RegionQuestion({ submissionId, onDone }: { submissionId: string; onDone
  * The optional question after an order is in: it costs no orders, and the operator opens the call
  * knowing the customer's worry. Several answers may be picked; the answer goes once.
  */
-function ConcernQuestion({ submissionId }: { submissionId: string }) {
+function ConcernQuestion({ submissionId, onDone }: { submissionId: string; onDone: (answered: boolean) => void }) {
   const [picked, setPicked] = useState<ConcernId[]>([]);
-  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
-  if (state === 'sent') {
-    return <p className="mx-auto mt-6 max-w-sm rounded-2xl bg-paper px-4 py-3 text-lg font-bold text-brand-2" role="status">Раҳмат! Мутахассисларимизга етказилди.</p>;
-  }
   const toggle = (c: ConcernId) => setPicked((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]));
-  const send = async () => {
-    setState('sending');
+  const send = () => {
     // Best effort: the order is already in; a lost answer only means the operator asks on the call.
-    await sendConcern({ submissionId, concerns: picked }).catch(() => undefined);
-    setState('sent');
+    void sendConcern({ submissionId, concerns: picked }).catch(() => undefined);
+    onDone(true);
   };
   return (
     <div className="mx-auto mt-6 max-w-sm border-t border-line pt-5 text-left">
@@ -90,11 +85,14 @@ function ConcernQuestion({ submissionId }: { submissionId: string }) {
       </div>
       <button
         type="button"
-        onClick={() => void send()}
-        disabled={!picked.length || state === 'sending'}
+        onClick={send}
+        disabled={!picked.length}
         className="mt-4 min-h-14 w-full rounded-2xl bg-forest px-4 font-display text-lg font-bold text-white disabled:opacity-40"
       >
-        {state === 'sending' ? 'Юборилмоқда…' : 'Мутахассисга юбориш'}
+        Мутахассисга юбориш
+      </button>
+      <button type="button" onClick={() => onDone(false)} className="mt-2 min-h-12 w-full text-base font-semibold text-muted underline">
+        Ўтказиб юбориш
       </button>
     </div>
   );

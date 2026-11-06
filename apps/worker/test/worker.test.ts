@@ -66,7 +66,7 @@ async function outbound(request: Request): Promise<Response> {
       success: true,
       action: 'lead-submit',
       cdata: token === 'other-form' ? 'something-else' : cdata,
-      hostname: token === 'other-site' ? 'evil.example' : token === 'partner' ? 'zeynaraa-uz.example' : token === 'own-domain' ? 'zeynara.com.uz' : 'zeynara.example',
+      hostname: token === 'other-site' ? 'evil.example' : token === 'partner' ? 'zeynaraa-uz.example' : token === 'own-domain' ? 'zeynara.com.uz' : token === 'www-domain' ? 'www.zeynara.com.uz' : 'zeynara.example',
     });
   }
   if (url.hostname === 'telegram.mock') {
@@ -1051,6 +1051,25 @@ describe('spam protection', () => {
     await order({ turnstileToken: 'own-domain', phone: '+998 90 312 45 32', signals }, { ip: '198.51.100.32', userAgent: chrome });
     expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
     expect(leadMessages().at(-1)!.text).not.toContain('бот эҳтимоли');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(telegram.messages.slice(before).some((m) => m.text.includes('Сайт созламасида хато'))).toBe(false);
+  });
+
+  it('accepts a check solved on www. of the main page\'s domain, which the same site serves', async () => {
+    const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+    const signals = { touch: 5, taps: 2, keys: 9 };
+    // Only the bare domain listed: what raised the group's alert on 2026-11-05.
+    await mf.dispose();
+    mf = start({ MAIN_SITE_HOSTS: 'zeynara.com.uz' });
+    await order({ turnstileToken: 'www-domain', phone: '+998 90 312 45 33', signals }, { ip: '198.51.100.33', userAgent: chrome });
+    expect(leadMessages().at(-1)!.text).toContain('текшируви ўтмади');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(telegram.messages.some((m) => m.text.includes('Сайт созламасида хато'))).toBe(true);
+    const before = telegram.messages.length;
+    await mf.dispose();
+    mf = start({ MAIN_SITE_HOSTS: 'zeynara.com.uz,www.zeynara.com.uz' });
+    await order({ turnstileToken: 'www-domain', phone: '+998 90 312 45 34', signals }, { ip: '198.51.100.34', userAgent: chrome });
+    expect(leadMessages().at(-1)!.text).not.toContain('текшируви ўтмади');
     await new Promise((r) => setTimeout(r, 200));
     expect(telegram.messages.slice(before).some((m) => m.text.includes('Сайт созламасида хато'))).toBe(false);
   });

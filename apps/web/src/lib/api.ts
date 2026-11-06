@@ -59,14 +59,12 @@ export function submitLead(body: unknown): Promise<LeadSubmitResponse> {
   return apiFetch<LeadSubmitResponse>('/api/leads', { method: 'POST', body: JSON.stringify(body) });
 }
 
-/** The thank-you screen's optional answer (lib/concern.tsx), for the order just placed. */
+/**
+ * The thank-you screen's answer (lib/concern.tsx), for the order just placed. `keepalive`: it goes
+ * even if the page is closed right after the tap, or the phone moves on to Telegram.
+ */
 export function sendConcern(body: { submissionId: string; concerns: string[] }): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>('/api/leads/concern', { method: 'POST', body: JSON.stringify(body) });
-}
-
-/** The thank-you screen's region (lib/concern.tsx). `keepalive`: it goes even if the page is closed right after the tap. */
-export function sendRegion(body: { submissionId: string; region: string }): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>('/api/leads/region', { method: 'POST', body: JSON.stringify(body), keepalive: true });
+  return apiFetch<{ ok: true }>('/api/leads/concern', { method: 'POST', body: JSON.stringify(body), keepalive: true });
 }
 
 /**
