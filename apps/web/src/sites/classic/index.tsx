@@ -6,14 +6,14 @@
 // missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 import { ConfirmAutofillContext } from '../../components/landing/OrderForm';
-import { AskConcernContext } from '../../lib/concern';
-import { OfferContext, type Offer } from '../../lib/offer';
+import { AskConcernContext, TelegramChannelContext } from '../../lib/concern';
+import { ProductPhotoContext, type ProductPhoto } from '../../components/ui/ProductPack';
 import { AdHero } from './AdHero';
 
-const media = import.meta.glob<string>('./media/*.{mp4,jpg}', { eager: true, query: '?url', import: 'default' });
+const media = import.meta.glob<string>('./media/*.{mp4,jpg,webp}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
 
 /**
@@ -34,12 +34,60 @@ const videos = [
 const certificate = { full: file('certificate.jpg'), small: file('certificate-small.jpg') };
 
 /**
+ * The owner's own photos of the box (2026-11-06; the sharp ones of ten, cropped and shrunk to WebP without
+ * their metadata, see AGENTS.md #63). `name-<width>.webp` for each width; a missing file leaves the photo out.
+ */
+function photoSet(name: string, widths: number[]) {
+  const files = widths.map((w) => file(`${name}-${w}.webp`));
+  if (files.some((f) => !f)) return undefined;
+  return {
+    src: files[Math.min(1, files.length - 1)]!,
+    srcSet: files.map((f, i) => `${f} ${widths[i]}w`).join(', '),
+    full: files[files.length - 1]!,
+  };
+}
+const front = photoSet('pack-front', [360, 540, 720]);
+/** In place of the drawn pack in «Маҳсулот ҳақида» (its small print had spelling mistakes). */
+const packPhoto: ProductPhoto | null = front
+  ? { ...front, width: 720, height: 960, alt: 'Зейнара сиропи қадоғи, 330 мл', heroHiddenMedia: '(max-width: 1023px)' }
+  : null;
+const packPhotos = [
+  { name: 'pack-angle', widths: [400, 600, 800], width: 800, height: 1067, alt: 'Зейнара қутиси ён томондан', caption: 'Зейнара сиропи, 330 мл', top: false },
+  { name: 'pack-latin', widths: [400, 600, 800], width: 800, height: 1067, alt: 'Зейнара қутисининг лотин ёзувли тури', caption: 'Лотин ёзувли қадоғи', top: false },
+  // Ingredients and how to take it: cut above the maker's address and phone.
+  { name: 'pack-back', widths: [600, 1000], width: 1000, height: 1479, alt: 'Қути орқасидаги таркиб ва ичиш тартиби', caption: 'Таркиби ва ичиш тартиби (қути орқасида)', top: true },
+]
+  .map((p) => ({ ...p, set: photoSet(p.name, p.widths) }))
+  .filter((p): p is typeof p & { set: NonNullable<typeof p.set> } => Boolean(p.set));
+
+/**
  * The videos play by themselves once the row is on screen, one after another (owner, 2026-10-28):
  * with sound once the visitor has touched the page — browsers
  * allow sound only after that — else muted, with «Овозни ёқиш» to turn it on for the rest; after the last one it stops. Swiping to another video plays that one
  * and pauses the one before. Off the screen it pauses. Never on a data saver or for someone who
  * asked the phone for less motion.
  */
+/**
+ * True once the element comes within a screen or so of the visible part of the page; never before the page
+ * is taken over (the prerendered HTML has no picture to fetch). Measured 2026-11-06 on a throttled phone:
+ * the video covers and the certificate (~400 KB, all far down the page) downloaded at once beside the
+ * script that makes the form work, so on slow 3G the form could be typed into only after 14.7 s
+ * (the partner page: 4.4 s). `loading="lazy"` did not help: on slow networks Chrome fetches 2500 px ahead.
+ */
+function useNear<T extends Element>(): [RefObject<T | null>, boolean] {
+  const ref = useRef<T>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || near) return;
+    if (typeof IntersectionObserver === 'undefined') return setNear(true);
+    const io = new IntersectionObserver(([e]) => e?.isIntersecting && setNear(true), { rootMargin: '800px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
+  return [ref, near];
+}
+
 /** The page has had a tap or a key press, so a browser lets a video play with its sound. */
 const touchedPage = () => {
   try {
@@ -50,7 +98,7 @@ const touchedPage = () => {
 };
 
 function VideoRow() {
-  const rowRef = useRef<HTMLDivElement>(null);
+  const [rowRef, near] = useNear<HTMLDivElement>();
   const refs = useRef<Array<HTMLVideoElement | null>>([]);
   const [current, setCurrent] = useState(0);
   const [sound, setSound] = useState(false);
@@ -142,7 +190,7 @@ function VideoRow() {
             }}
             className={`block aspect-[3/4] w-full bg-ink ${v.fit}`}
             src={v.src}
-            poster={v.poster}
+            poster={near ? v.poster : undefined}
             controls
             playsInline
             muted
@@ -168,8 +216,41 @@ function VideoRow() {
   );
 }
 
+/** The real box, under the videos: fetched only near the screen, like everything else down here. */
+function PackPhotos() {
+  const [rowRef, near] = useNear<HTMLDivElement>();
+  if (!packPhotos.length) return null;
+  return (
+    <div className="mt-12">
+      <h3 className="font-display text-[1.5rem] font-extrabold leading-tight sm:text-[1.9rem]">Маҳсулотнинг ҳақиқий суратлари</h3>
+      <p className="mt-2 max-w-2xl text-lg text-ink-2">Зейнара сизга шу қадоқда етказиб берилади.</p>
+      <div ref={rowRef} className="-mx-4 mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0">
+        {packPhotos.map((p) => (
+          <figure key={p.name} className="w-[70%] flex-none snap-center overflow-hidden rounded-3xl bg-card shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:w-auto">
+            <a href={p.set.full} target="_blank" rel="noopener" className="block">
+              <img
+                src={near ? p.set.src : undefined}
+                srcSet={near ? p.set.srcSet : undefined}
+                sizes="(min-width: 640px) 33vw, 70vw"
+                width={p.width}
+                height={p.height}
+                alt={p.alt}
+                decoding="async"
+                className={`block aspect-[3/4] h-auto w-full bg-paper-2 object-cover ${p.top ? 'object-top' : ''}`}
+              />
+            </a>
+            <figcaption className="px-5 py-3 text-[0.95rem] text-muted">{p.caption}</figcaption>
+          </figure>
+        ))}
+      </div>
+      {packPhotos.length > 1 && <p className="mt-2 text-[0.95rem] text-muted sm:hidden">← Бошқа суратларни кўриш учун суринг →</p>}
+    </div>
+  );
+}
+
 function Proof() {
-  if (!videos.length && !certificate.full) return null;
+  const [certRef, certNear] = useNear<HTMLAnchorElement>();
+  if (!videos.length && !certificate.full && !packPhotos.length) return null;
   return (
     <section aria-labelledby="ishonch-title" className="bg-paper-2">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
@@ -185,10 +266,19 @@ function Proof() {
           </>
         )}
 
+        <PackPhotos />
+
         {certificate.full && (
-          <figure className={`grid grid-cols-1 items-center gap-6 rounded-3xl bg-card p-6 shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:grid-cols-[12rem_1fr] sm:p-8 ${videos.length ? 'mt-10' : ''}`}>
-            <a href={certificate.full} target="_blank" rel="noopener" className="mx-auto block w-40 sm:w-48">
-              <img src={certificate.small ?? certificate.full} alt="Санитария-эпидемиологик хулоса № 482583" loading="lazy" className="w-full rounded-xl border border-line" />
+          <figure className={`grid grid-cols-1 items-center gap-6 rounded-3xl bg-card p-6 shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:grid-cols-[12rem_1fr] sm:p-8 ${videos.length || packPhotos.length ? 'mt-10' : ''}`}>
+            <a ref={certRef} href={certificate.full} target="_blank" rel="noopener" className="mx-auto block w-40 sm:w-48">
+              {/* width/height keep its place on the page before the picture is fetched. */}
+              <img
+                src={certNear ? (certificate.small ?? certificate.full) : undefined}
+                width={480}
+                height={643}
+                alt="Санитария-эпидемиологик хулоса № 482583"
+                className="h-auto w-full rounded-xl border border-line bg-paper-2"
+              />
             </a>
             <figcaption>
               <h3 className="font-display text-xl font-extrabold sm:text-2xl">Давлат текширувидан ўтган</h3>
@@ -211,21 +301,30 @@ function Proof() {
 const ad = { video: file('story-0.mp4'), poster: file('story-0.jpg'), face: file('story-0-face.jpg') };
 const adHero = ad.video && ad.poster && ad.face ? <AdHero video={ad.video} poster={ad.poster} face={ad.face} /> : undefined;
 
-/** The discount the ad video announces (owner, 2026-10-30): shown until the end of 8 November, Tashkent time. */
-const OFFER: Offer = { percent: 25, pensioners: 35, until: '2026-11-08T23:59:59+05:00', untilText: '8 ноябргача' };
-
+/*
+ * No discount on the page any more (owner, 2026-11-06: «chegirma degan yozuvlarni butunlay olib tashlash kerak»).
+ * It ran from 2026-10-30 as an OfferContext provider here (lib/offer.tsx: −25 %, pensioners −35 %, until 8 November);
+ * without the provider every ticket, discount line and «… чегирма билан буюртма» button falls back to the plain text.
+ */
 export function Landing() {
   // The bottom bar hides over a form: it covered the submit button once the keyboard closed (2026-10-28).
   return (
-    <OfferContext.Provider value={OFFER}>
+    <>
       {/* «Сизни нима безовта қилади?» after the order (owner, 2026-10-30). */}
       <AskConcernContext.Provider value={true}>
-        {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
-        <ConfirmAutofillContext.Provider value={true}>
-          {/* No order dialog on arrival (owner, 2026-11-04). The first form stays right under the first screen. */}
-          <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
-        </ConfirmAutofillContext.Provider>
+        {/* After those questions the phone moves on to the Telegram channel (owner, 2026-11-05). */}
+        <TelegramChannelContext.Provider value="https://t.me/zeynare">
+          {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
+          <ConfirmAutofillContext.Provider value={true}>
+            {/* The order dialog opens 2 s after arrival (owner, 2026-11-06; it was off from 11-04). The first
+                form stays right under the first screen. */}
+            {/* The owner's photo of the box in place of the drawn pack (2026-11-06). */}
+            <ProductPhotoContext.Provider value={packPhoto}>
+              <Page hero={adHero} proof={<Proof />} popupAfterMs={2000} barOverForms={false} />
+            </ProductPhotoContext.Provider>
+          </ConfirmAutofillContext.Provider>
+        </TelegramChannelContext.Provider>
       </AskConcernContext.Provider>
-    </OfferContext.Provider>
+    </>
   );
 }

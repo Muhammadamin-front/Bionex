@@ -1,5 +1,6 @@
 import { modelFromUserAgent, type DeviceSignals } from '@bionex/shared/device';
 import { newSubmissionId } from './api';
+import { earlyActions } from './early';
 
 const KEY = 'bx_device';
 
@@ -194,6 +195,18 @@ if (typeof document !== 'undefined') {
   document.addEventListener(typeof PointerEvent === 'function' ? 'pointerdown' : 'touchstart', tap, true);
   // Clicks only: some autofill extensions type with made-up input events, but none click.
   document.addEventListener('click', (e) => e.isTrusted || touches.synthetic++, true);
+}
+
+// What was typed and tapped on the drawn page before this script arrived (scripts/early.js, main site):
+// counted from here on by the listeners above, so early.js stops.
+const early = earlyActions();
+if (early && !early.done) {
+  typing.first = early.first;
+  typing.keys = early.keys;
+  typing.pasted = early.pasted;
+  touches.taps = early.taps;
+  touches.synthetic = early.synthetic;
+  early.done = true;
 }
 
 /**

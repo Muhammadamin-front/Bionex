@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "montserrat fallback",
+        "createdAt": "2026-11-06T07:39:51.943Z",
+        "reason": "Claude: a metric-matched local fallback face (Arial/Roboto) for the page's Montserrat, so headings do not jump while the web font loads; not a new typeface"
+      }
+    ]
+  }
+}

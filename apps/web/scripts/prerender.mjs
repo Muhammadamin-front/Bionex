@@ -3,6 +3,7 @@
  * pictures as soon as the page arrives, instead of a blank screen until the script has loaded
  * and run. src/main.tsx then takes the drawn page over (hydrateRoot).
  */
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,6 +25,19 @@ page = page.replace(/<link rel="stylesheet"[^>]*href="(\/assets\/[^"]+\.css)"[^>
   if (css.includes('</style')) throw new Error(`${href} cannot be inlined`);
   return `<style>${css}</style>`;
 });
+
+// The form takes typing before the page's script arrives (scripts/early.js, src/lib/early.ts): inline in the
+// <head>, so it runs before the form is even parsed (at the end of the page it ran seconds after the form
+// showed on slow 3G); allowed by its hash in this build's content security policy (no 'unsafe-inline').
+const early = readFileSync(join(web, 'scripts/early.js'), 'utf8');
+if (early.includes('</script')) throw new Error('scripts/early.js cannot be inlined');
+if (!page.includes('</head>')) throw new Error(`${dist}/index.html has no </head>`);
+page = page.replace('</head>', `<script>${early}</script></head>`);
+const headersFile = join(dist, '_headers');
+const headers = readFileSync(headersFile, 'utf8');
+const hash = `'sha256-${createHash('sha256').update(early).digest('base64')}'`;
+if (!/script-src 'self'/.test(headers)) throw new Error(`${headersFile} has no script-src 'self' to add the hash to`);
+writeFileSync(headersFile, headers.replace(/script-src 'self'(?: 'sha256-[^']+')?/, `script-src 'self' ${hash}`));
 
 // Every local file the drawn page asks for must exist, or the page would show broken pictures.
 const missing = [...page.matchAll(/(?:src|href|poster)="(\/[^"#?]*)"|(\/[^\s",]+\.(?:webp|jpg|png|svg|mp4))\s+\d+w/g)]

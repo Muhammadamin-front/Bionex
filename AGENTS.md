@@ -427,7 +427,10 @@ user's Mac.
     Also checked that day: the main Pixel config has no estRules (no browser Lead); the
     targetologist's «browser Leads ≫ server, dedup warning» is the 23–28 Oct rule (#27) still in
     Events Manager's window. `META_ORDER_VALUE` unset → no Purchase on «Sotildi» (owner asked if a
-    price is required: yes for Purchase; not chosen).
+    price is required: yes for Purchase; not chosen). 2026-11-06: set, the owner's average takings per
+    sale: `META_ORDER_VALUE` = 12, `META_CURRENCY` = USD (the ad account spends in dollars). «Sotildi»
+    now adds a Purchase of $12 (main site only; nothing optimises on it yet; a refused Purchase raises
+    no group alert, so look in Events Manager after the first one).
     2026-10-31: Events Manager showed ~22 QualifiedLead for 30–31 Oct against 13 marked rows — the
     sheet script (11 «Kerakli») and the Worker (13) both sent each one, the same event_id, counted twice
     and matched at 6.2/10. The owner emptied the script's `EVENT_MAP`; only the Worker sends it now.
@@ -652,16 +655,160 @@ user's Mac.
     'manual'`, back to the top unless the visitor has touched the page; a `#section` link stays App.tsx's.
     Shared code: the partner site gets it only with `deploy:t2`. Live on both addresses the same day; the owner confirmed it on their phone.
 
-56. **«Қайси вилоятдансиз?» on the thank-you screen** (2026-11-05, owner's choice over a third form field:
-    asked after the order, so it costs none, as with #44). Main site only (`AskConcernContext`). `AfterOrderQuestions`
-    (lib/concern.tsx) asks one thing at a time: the region (14 buttons from `REGIONS`, one tap sends it, «Ўтказиб
-    юбориш» skips), then the concern question. POST `/api/leads/region` (also forwarded by apps/site) → `addRegion`:
-    once per order (`list_items.region`), reply under the order in Telegram «📍 Вилояти: …», and the sheet script's
-    `note` writes «Viloyat» on the order's row (`SHEETS_NOTES`; the script makes the header itself, per tab, no script
-    change). Not sent to Meta, not in the panel. Deploy `deploy` (Worker) before `deploy:site`: an older Worker
-    answers 404 and the region is lost (nothing else is: the order is already in).
-    Live on both addresses 2026-11-05, walked through on the live page with the API mocked; a real order's
-    Telegram reply and «Viloyat» cell had not been seen yet when this was written.
+56. **«Қайси вилоятдансиз?» on the thank-you screen: built and removed the same day** (2026-11-05, owner, after
+    trying it: «keraksiz ekan»). The page no longer asks. `POST /api/leads/region`, `regionAnswerSchema`, `REGIONS`,
+    `addRegion` and `list_items.region` stay, so a page still in a browser's cache loses nothing; a «Viloyat» column
+    may exist in the sheet's tabs from that day (delete it by hand if unwanted). Ask before bringing the question back.
+
+57. **The phone moves on to the Telegram channel after the thank-you questions** (2026-11-05, owner, after a
+    rival's site did so; the rival's front page had no form, so its method was not seen). `AfterOrderQuestions`
+    (`TelegramChannelContext`, main site only, set in sites/classic; the partner build has no trace of it): the
+    last tap, answered or skipped, runs `location.assign('https://t.me/zeynare')` 350 ms later, and «Телеграм
+    каналимизга ўтиш» stays as a real link. Not on arrival of the order: that would leave #44's question
+    unanswered (ask the owner before moving it). Whoever ignores the questions stays on the page: no timer. A repeat of a number within 24 h gets no
+    questions (no `submissionId`), so no move and no link either: test with a number not used that day.
+    Its answer uses `keepalive`, or the move would cancel it. @zeynare is a channel, not a group: customers
+    cannot write there, and subscribing is their own tap. It had 1 subscriber and almost no posts that day; the
+    owner was told. Real-phone behaviour varies (Instagram's browser may show the t.me page in place, with its
+    own button), tested in engines. The owner's words after trying it on a phone: «guruh ochildi». Live on both addresses.
+    The owner also wrote that @bionexecobot was added to «guruh» (read as this channel; whether it is an admin
+    there is unknown) and asked it to greet every customer and push for an order. Nothing built yet. What Telegram
+    allows (Bot API docs, checked 2026-11-05): a bot can write only to someone who pressed Start, so never to a site
+    visitor; a channel post goes to every subscriber, so no personal greeting there. `chat_join_request` comes only
+    if the bot has `can_invite_users`; its `user_chat_id` works for 5 minutes, until the request is processed. That
+    needs an invite link with `creates_join_request` in place of t.me/zeynare (the plain @username joins with no
+    request), the bot approving each request, and the update in `allowed_updates` with a `WEBHOOK_VERSION` bump,
+    which drops pending updates (#40). Today the bot ignores the channel: no `channel_post` in `allowed_updates`,
+    and `telegramCommand` drops chats other than `TELEGRAM_CHAT_ID`. Whatever is built: someone arriving from the
+    thank-you page has already ordered, so confirm and never ask again; at most one greeting and one reminder,
+    because this same bot carries every order to the operators and spam reports could get it restricted.
+
+58. **Main sheet: tab «V2 30-65+» merged back into «Lidlar»** (2026-11-05, owner: «birlashtir», without resetting Meta). The
+    live Apps Script had gained `ADSET_SHEETS` on 2026-11-04 (version 7; not in docs/main-sheet-script.js, written by no
+    session of this project): orders of ad set «V2 | UZ 30-65+» went to their own tab, and `statuses` / `note_` read it too.
+    Version 8 (same deployment, same URL) has the map empty: those orders go to «Lidlar» again and only «Lidlar» is read for
+    «Holat». The helper functions stay in the live script, doing nothing. №398, №401, №402 were moved with their numbers, by
+    header name (a one-off function, removed again; plain copy would shift the columns, as «Lidlar» has «Viloyat» and the tab
+    did not). The tab is empty and nothing reads it, so the owner may delete it; a filter on «Ad set» in «Lidlar» shows V2's
+    orders. To split again: one line in `ADSET_SHEETS` and a new version. Worker, ads and Meta untouched.
+    Seen the same morning: №403 (webdriver, correct in «Spam») was also pasted into «Lidlar» by a person at 09:58, one column
+    off, because «Spam» kept its columns in another order. The same day (owner's yes) the columns of «Spam» were moved so its
+    first 15 match «Lidlar» (№ … Meta; the empty «Yosh» is last, kept), and a row copied by hand (#26) now lands right. The
+    script writes by header name, so the order is free: keep the two tabs alike. №403's row in «Lidlar» was left as pasted.
+    №399 is in no tab; the script log has a clean write at 07:57 that may be it. Ask, don't assume.
+
+59. **www.zeynara.com.uz is in `MAIN_SITE_HOSTS`** (2026-11-05, the group's alert «сайт манзили … Hostnames рўйхатида йўқ»). The
+    Pages site serves www too. Cloudflare's widget lets subdomains through and issued a token there (seen in Chrome), but the
+    Worker compares the solved host exactly, so it answered `hostname-mismatch`. The alert's wording blames Cloudflare's list; here
+    it was ours, and nothing in Cloudflare needed changing. Since #53 the in-app silent check sends tokens too, which is probably why
+    it surfaced now. Harm: a plain browser on www went to «Spam»; only one failed-check row since 31.10 has no other sign (11-04
+    13:34, iPhone), and whether it came from www is unknown. Needs only a Worker deploy, not `deploy:site`.
+    Same day, the owner's question why the partner has less spam. Read of both sheets, in «Lidlar» shares (good = Kerakli + Sotildi,
+    bad = Spam + Keraksiz; partner vs main): 25–28.10 70/20 vs 74/13; 29–31.10 83/9 vs 38/38; 1–2.11 65/19 vs 43/43; 3–5.11 24/61 vs
+    32/39. The main site's slide starts on 29.10, when the check left the in-app browser (#31) and the instant Lead began (#32), so
+    the two cannot be told apart. iPhones on the main site: 2 of 31 until 28.10, then 40 of 140 (3 good, 26 bad); partner 22 of 444
+    (13 good, 6 bad). iPhone + «dastur bosgan» on main since 29.10: 16 rows, 0 good, 12 bad (#29 keeps it a warning). The partner's 2–4.11
+    spike does not count: the owner says its Instagram was off those days (#60). Main: 52 of 85 rows on 1–5.11 have no «Ad set». The main
+    sheet has no «Sabab» / «User-Agent» headers, so #53's measurement is not being kept. Nothing was changed on this; all the owner's call.
+
+60. **«Copy the partner's site?» — read of 2026-11-05, nothing changed yet** (owner: $100 budget, 7–8 leads; partner $150, 30+, and the
+    partner's 2–4.11 spam came from its Instagram being off, so those days don't count). A first read that counted them said quality was
+    equal, junk 77 % vs 78 %, and the 30-50 ad set cleanest: all withdrawn. Good / bad % of marked rows, without 2–4.11: 25–28.10 partner
+    70/20 vs main 74/13; 29.10–1.11 + 5.11 partner 77/12 (158 rows) vs main 39/43 (80 rows; with 2–4.11 still 38/40). In that second span:
+    Android not rushed, partner 76/13 (139) vs main 58/26 (50), while on 25–28.10 it was 69/19 vs 76/14; iPhone, partner 10 rows 8 good 2 bad
+    vs main 21 rows 2 good 15 bad; rushed Android, partner 9 rows 7/0 vs main 9 rows 1/5. Partner ad sets: 30-50 72 %, 30-65 67 %, A- 68 %
+    good, no difference. So the split starts 29.10, when the check left the in-app browser (#31). Also new then: the instant Lead (#32, the
+    partner has one too) and V1 (began 30.10), so not proven. A failed check on the partner since 29.10: 6 of 158 rows, 2 good 0 bad, and they
+    still reach its sheet. A good lead cost about the same: main 30.10–2.11 $174 / 32 = $5.5; partner 30.10–1.11 67 on the owner's stated
+    $100–150/day = $4.5–6.7 (its real spend is unknown here; its sheet has no «Sotildi», so «Kerakli» may be looser). Our filters on the
+    partner's 287 rows take 23, 12 of them good; `rushed` takes 16 with 12 good, so it acts as a stand-in for the check. No row carries «bir
+    nechta raqam», but refused orders reach no sheet: the check is «🚧 Лимит сабабли» in the 20:00 report. A 7-minute `wrangler tail` proved nothing.
+    Advised: copy the check, not the whole page (the page would lose the discount the ad promises, the videos, the certificate). The owner's
+    call (#46). If yes, a 3-day test: in-app check on, a failed check into «Lidlar» with «!» as on the partner, `rushed` off; judge by good
+    share and cost per good lead. «Lidlar» rows may fall as junk leaves it: say so.
+    Today is too early to read: by 11:13 «Lidlar» had 7 rows against 7, 4, 8, 12 on 1–4.11. LPV → «Lidlar» row: 2.11 15 %, 3.11 13 % (V1 $20.63),
+    4.11 19 % (V1 $58.97), 5.11 by 11:20 5 % (V1 $22.04 and V2 $15.48, 146 LPV, 7 rows; a morning against whole days). V2 began on 5.11 on
+    QualifiedLead, $50 of the day's $100, still learning. The dialog was turned off on the evening of 4.11 (#53); that it matters is a guess:
+    raise it only if V1's full-day rate for 5.11 stays near 5 %. Ads Manager's «Проверить и опубликовать (17)» would also publish pending
+    edits on V1's running ads, which can restart learning.
+    The owner then: «umumiy leadlar soni juda kam». Count follows spend: main 30.10–2.11 ~$44/day, ~20 rows/day, ~$2.2 a row; partner 30.10–1.11 stated
+    $100–150/day, ~30 rows/day, $3.4–5 a row. Today half of $100 is on V2 (QualifiedLead, 3 rows on $15.48), while the account makes ~44 good rows a week
+    in all, under the ~50 one ad set needs (docs/TARGETING.md). Advised, not done: V2 off, drafts Z-A and Z-B (Lead, $30 each, not yet opened) on, publishing
+    only those; the check test (above) after count recovers, since it does not raise count.
+
+61. **«Leads fell after yesterday's change»: the site checked, the dialog back after 2 s** (2026-11-06). Checked live: all three
+    addresses serve the same bundle; a phone run (Playwright, Instagram iOS/Android and plain Android Chrome user agents, the
+    order post caught, Meta blocked) sends the order 0.1 s after the tap in the app and shows «Раҳмат!»; `wrangler tail` saw a
+    real 201 at 12:24; the Facebook app on Android (`FB_IAB/FB4A`) is exempt from the check like Instagram and sends at once too.
+    **No limit refusals** since #54 went live: zone analytics for zeynara.com.uz show POST /api/leads 429 ×4 on
+    4.11, none on 5–6.11. **All of this is the domain only**: workers.dev is no zone, so its orders and refusals are not in it.
+    The fall is in conversion, not in delivery: Uzbek phone page opens on the domain (`httpRequestsAdaptiveGroups`,
+    country UZ, device mobile, GET / 200) vs 201 orders (bots included): 2.11 286 / 20 (7 %), 5.11 839 / 35 (4.2 %), 6.11 to 12:45
+    212 / 5 (2.4 %). The fall began at 00:00 on 5.11, when opens tripled (an ad set's start time; V2 began that day): 00–07h 140 / 5
+    (3.6 %), before the day's first deploy at 07:03; the 11–12h bump (83 / 12) was a blip. Facebook-app webviews came with it
+    (ChromeMobileWebview 158 on 5.11 vs 10 in 2–4.11). US desktop «Unknown» opens come in bursts (4.11 22h 397, 5.11 22h 1 182,
+    6.11 07h 537): Meta's robots checking the page, as when ads are published or edited. Read: the ads, not the site. The wrangler OAuth token reads zone
+    GraphQL (path, method, status, country, device, browser) but not query, referrer or ASN. The domain's Cloudflare Web Analytics
+    beacon is blocked by our CSP (harmless, so no RUM there).
+    The owner asked for the order dialog back, «2 sekunddan keyin» (it was off since #53): `Landing` `popupAfterMs`, `OrderModal`
+    `openAfterMs` = 2000 counted from navigation start (`performance.now()`), never sooner than 600 ms after hydration, and
+    skipped if a form field has focus or a video plays with sound by then (#28: it once covered the videos). Partner unchanged (no prop: 600 ms after ready). Tested on the built page: opens at
+    ~2.1 s; with the name field tapped at 1.2 s it does not open. Needs `deploy` (workers.dev) and `deploy:site` (the domain).
+    Same day the owner asked to make the site «like the partner's»: advised as in #60 (the check, not the page).
+
+62. **No discount; the form takes typing the moment the page is drawn** (2026-11-06). (a) Owner: «chegirma degan yozuvlarni
+    butunlay olib tashlash kerak» — sites/classic no longer provides `OfferContext` (#41/#48 code stays in lib/offer.tsx): every
+    ticket, «… чегирма билан буюртма» and «чегирмали нарх» falls back to the plain text, no `offerTap` is sent. Gulchehra opa's
+    video (story-0) still says the discount at its end, and so does the ad itself: the owner's call.
+    (b) Owner: «sherik saytida videolar yo'q … bizdagi sekin ochilsa kerak», then «juda sekin internetda ham forma 2-3 sekundda tayyor
+    bo'lsin». Measured live (Playwright, Instagram Android UA, 4× CPU, Meta blocked; form ready = the name field takes typing):
+    DevTools «Slow 3G» (0.4 Mbit/s, 400 ms) main 14.7 s vs partner 4.4 s; 1.6 Mbit/s main 3.2 s vs partner 1.5 s. The main page was
+    drawn at once (1.2 s) but read-only until hydrated, and its script (122 KB) shared the line with ~400 KB of pictures far down the
+    page: the seven video posters and the certificate (`loading="lazy"` does not help: Chrome fetches 2500 px ahead on slow
+    networks). Now: `useNear` (sites/classic) gives the posters and the certificate their address only after hydration and within
+    800 px of the screen (certificate keeps its box with width/height). `scripts/early.js` is inlined by prerender.mjs into the
+    main page's <head> (its sha256 added to that build's `_headers` script-src; no 'unsafe-inline'; the partner build has neither).
+    The fields still render `readOnly={!ready}`; early.js lifts it as each field is parsed (MutationObserver, then readystatechange;
+    DOMContentLoaded would wait for the module script) and on touch/focus — so if early.js ever fails to run, the form only waits
+    as before (a field open without early.js would send taps 0 / fillMs 0 → `bot_trap`/`rushed`, «Spam»). Until React takes over it
+    records typing/paste/taps/made-up clicks (handed to lib/device.ts's counters, so `fillMs`/`keys`/`taps` read as before), a
+    number put in by autofill (→ `phoneAutofilled`, the confirm question) and a press of the button / Enter on the number (the
+    button pulses, `data-wait`; Enter on the name moves to the number). OrderForm's take-over effect copies the typed text into
+    state (React 19 leaves a typed value on screen when hydrating, but its state is empty and the next re-render would wipe it)
+    and sends a pressed order at once. `trackInitiateCheckout` called before `initPixel` (child effects run first) now waits for it.
+    At the end of the body (first deploy) the script ran seconds after the form showed on the domain's slow-3G stream and a first
+    letter was lost («лишер»): hence the <head>.
+    Live, same throttling (Instagram Android UA, 4× CPU, Meta blocked, the order post caught): Slow 3G the form takes typing at
+    1.3 s (partner 4.2 s); 1.6 Mbit/s 1.5 s (partner 1.4 s). Typed and «sent» at ~2.5 s on Slow 3G, the order left at ~7 s, when the
+    script arrived, with the right name, number and signals (keys 15, fillMs ~5.3 s, taps 3), on zeynara.com.uz, www and
+    workers.dev; an autofilled number got the confirm question; with early.js removed the fields stayed read-only until the script
+    and the order still went. The 2-s dialog stays shut while a form field has text or an order is in (it covered the confirm
+    question before that guard). Deployed by the agent on the owner's word («o'zing deploy qil ruxsat»), Worker version f983417d
+    and Pages 519f87c8; not committed (the working tree also holds other sessions' uncommitted, already-live changes).
+    The same day: domain-only numbers since it opened (UZ phones, GET / vs 201): 30.10–2.11 969 opens / 73 orders (7.5 %), 3–4.11
+    bot-inflated, 5.11 839 / 35, 6.11 to 13:00 219 / 6. Opens are not people (repeats, Meta's prefetch). workers.dev, where the
+    videos went live on 28.10, cannot be counted with this token (no path in Workers analytics; Workers Logs query: Forbidden).
+    The partner is untouched (no deploy:t2).
+    The owner confirmed today's domain orders against the sheet (00:46, 01:12, 06:33, 07:36 repeat, 08:18; 12:03 was their test):
+    orders through zeynara.com.uz do arrive.
+    Later the same day the owner: only ad set «V3» is on; V1 and V2 are off. V3's optimisation event, link and start time not yet known.
+
+63. **The owner's own photos of the box replace the drawn pack** (2026-11-06, owner: «zeynara rasmlarini joyladim … hajmini reduce
+    qilgin, saytga joylagin tiniq chiqqanlarini»). Ten iPhone HEICs (IMG_1270–1279, repo root, untracked: never commit them; they
+    carry EXIF incl. orientation). Sharp at 100 %: 1270 (front, Cyrillic), 1271 (back, Russian), 1272 (front, Latin), 1273 (back, Uzbek),
+    1274, 1275 (angled); soft: 1276, 1278, 1279; 1277 is a top-down angle. The drawn pack (public/images/zeynara/zeynara*.webp) is a
+    render whose small print is misspelt («АРТЕРИАНОГО», «ОРТАНИЗМА»). Made with sips (HEIC → JPEG) and sharp (auto-rotate, crop,
+    sharpen 0.5, WebP q60 / q70 for the back; sharp writes no metadata, GPS included) into `src/sites/classic/media/` (gitignored, like
+    the videos): `pack-front-{360,540,720}` (1270), `pack-angle-{400,600,800}` (1275), `pack-latin-{400,600,800}` (1272),
+    `pack-back-{600,1000}` (1273 cut above «ISHLAB CHIQARUVCHI»: both backs print the maker's address and phone,
+    kept off the page so customers do not ring the maker instead of ordering). 22–98 KB each (151 KB for the 1000-px back).
+    `ProductPhotoContext` (components/ui/ProductPack.tsx): when provided (sites/classic only), `ProductPack` shows the photo (rounded,
+    no beating-heart overlay, which is aligned to the drawing) instead of the drawing, in AdHero's ProductStage (desktop only: the
+    first screen hides it below 1024 px, so `heroHiddenMedia` puts a 1-px data: GIF `<source>` there and phones download nothing —
+    before, they downloaded the 31 KB drawing they never saw) and in About («Маҳсулот ҳақида»), fetched near the screen only.
+    `PackPhotos` in Proof, under the videos: «Маҳсулотнинг ҳақиқий суратлари», three cards (angle, Latin front, back), swipeable on
+    phones, `useNear`, each a link to its largest file. The partner build has none of it (no provider, no files). Deployed the same
+    day (Worker be1ed8ce, Pages 558bdb6c); slow-3G form still takes typing at ~1 s.
 
 ## Open items
 

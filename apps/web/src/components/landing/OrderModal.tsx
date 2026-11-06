@@ -26,18 +26,28 @@ const CLOSE_AFTER_SUCCESS_MS = 2000;
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
 
+/**
+ * `openAfterMs`: when to open, counted from the moment the page started to load (main site: 2 s,
+ * owner 2026-11-06), never sooner than OPEN_DELAY_MS after the page is ready. Unset (the partner
+ * site): OPEN_DELAY_MS after the page is ready, as always.
+ */
 export function OrderModal({
   utm,
   order,
   onOrdered,
+  openAfterMs,
 }: {
   utm: Utm;
   order: OrderResult | null;
   onOrdered: (r: OrderResult) => void;
+  openAfterMs?: number;
 }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
+  /** The order as of now, for the opening timer (its effect runs once). */
+  const orderNow = useRef(order);
+  orderNow.current = order;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -58,7 +68,20 @@ export function OrderModal({
       seen = false;
     }
     if (seen) return;
-    const timer = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS);
+    const wait = openAfterMs === undefined ? OPEN_DELAY_MS : Math.max(OPEN_DELAY_MS, openAfterMs - performance.now());
+    const timer = window.setTimeout(() => {
+      // Someone who has ordered, or is filling in a form on the page (perhaps before the script arrived, or
+      // answering «is this number in use?»), is ordering already; someone watching a video with sound (the
+      // first screen's ▶) is listening: the dialog would only get in the way.
+      if (orderNow.current) return;
+      if (openAfterMs !== undefined) {
+        if (document.activeElement?.matches('input, textarea')) return;
+        const filling = [...document.querySelectorAll<HTMLInputElement>('input[name="zn-customer"], input[name="zn-number"]')].some((i) => i.value.trim());
+        if (filling) return;
+        if ([...document.querySelectorAll('video')].some((v) => !v.paused && !v.muted)) return;
+      }
+      setOpen(true);
+    }, wait);
     return () => window.clearTimeout(timer);
     // Deliberately runs once: a later order must not re-trigger the opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps

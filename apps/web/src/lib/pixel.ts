@@ -46,6 +46,10 @@ export function initPixel(): void {
   if (import.meta.env.VITE_META_BROWSER_LEAD !== '1') fbq('set', 'autoConfig', false, PIXEL_ID);
   fbq('init', PIXEL_ID);
   fbq('track', 'PageView');
+  if (checkoutWaiting) {
+    checkoutWaiting = false;
+    trackInitiateCheckout();
+  }
 
   const load = () => {
     const script = document.createElement('script');
@@ -63,12 +67,18 @@ export function initPixel(): void {
 }
 
 let checkoutTracked = false;
+/** Asked for before the Pixel was set up (a form typed into before the page was taken over): sent by initPixel. */
+let checkoutWaiting = false;
 
 /** First interaction with the order form. */
 export function trackInitiateCheckout(): void {
   if (checkoutTracked) return;
+  if (!window.fbq) {
+    checkoutWaiting = true;
+    return;
+  }
   checkoutTracked = true;
-  window.fbq?.('track', 'InitiateCheckout', { content_name: 'Zeynara' });
+  window.fbq('track', 'InitiateCheckout', { content_name: 'Zeynara' });
 }
 
 /**

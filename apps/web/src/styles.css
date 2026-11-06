@@ -446,3 +446,14 @@ input::placeholder {
   height: 1px !important;
   overflow: hidden !important;
 }
+
+/* «Send» pressed before the page's script arrived (scripts/early.js): the button shows it has the order
+   and is waiting; OrderForm sends it and clears the mark as soon as the page is taken over. */
+[data-wait] {
+  animation: wait-pulse 1.1s ease-in-out infinite;
+}
+@keyframes wait-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}

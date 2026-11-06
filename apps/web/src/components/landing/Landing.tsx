@@ -22,7 +22,8 @@ import {
 /**
  * `hero`: the main site's own first screen (sites/classic AdHero); without it, the original one.
  * `proof`: what the main site adds right under the first form (real customers' videos, the certificate).
- * `popup: false`: no order dialog on arrival.
+ * `popup: false`: no order dialog on arrival. `popupAfterMs`: when it opens, from the start of loading
+ * (main site 2000); unset, it opens as soon as the page is ready (partner site).
  * `barOverForms` (default false, both sites since 2026-10-29): false = the bottom order bar steps aside
  * while a form is on screen, so it can never cover the form's own button.
  * The partner site passes nothing, so its page stays exactly as it was.
@@ -31,8 +32,9 @@ export function Landing({
   hero,
   proof,
   popup = true,
+  popupAfterMs,
   barOverForms = false,
-}: { hero?: ReactNode; proof?: ReactNode; popup?: boolean; barOverForms?: boolean } = {}) {
+}: { hero?: ReactNode; proof?: ReactNode; popup?: boolean; popupAfterMs?: number; barOverForms?: boolean } = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
@@ -123,7 +125,7 @@ export function Landing({
       {/* Always on screen (except while typing), as the owner asked. */}
       <StickyCta visible={!typing && !formOnScreen && !heroButtonVisible} quickFormOnScreen={quickVisible && !order} />
       {/* Over everything: the form meets the visitor instead of waiting to be scrolled to. */}
-      {popup && <OrderModal utm={utm} order={order} onOrdered={setOrder} />}
+      {popup && <OrderModal utm={utm} order={order} onOrdered={setOrder} openAfterMs={popupAfterMs} />}
     </>
   );
 }

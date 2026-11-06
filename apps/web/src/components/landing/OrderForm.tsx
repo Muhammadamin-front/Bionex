@@ -7,6 +7,7 @@ import { ApiRequestError, newSubmissionId, submitLead } from '../../lib/api';
 import { cn } from '../../lib/cn';
 import { caughtByBotTrap, fromSocialApp } from '@bionex/shared/device';
 import { adClickId, deviceFingerprint, deviceId, deviceModel, deviceSignals } from '../../lib/device';
+import { earlyActions } from '../../lib/early';
 import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
@@ -130,15 +131,41 @@ export function OrderForm({
   /** A ref, not state: the submit that follows «yes» runs in the same tick, before a re-render. */
   const numberConfirmed = useRef(false);
   const numberCheckRef = useRef<HTMLDivElement>(null);
-  /** The built page shows the form before its script runs (prerender): typing then would be lost
-   *  and «send» would reload the page, so the fields are read-only and the button a plain one
-   *  (not `disabled`: that fades it) until React has taken the page over. A form opened later
-   *  (the pop-up) is ready at once. */
+  /** The built page shows the form before its script runs (prerender). Its fields are read-only until React
+   *  has taken the page over, but scripts/early.js (inlined into the main page) lifts that at once and records
+   *  the typing, so they take typing as soon as they are drawn (2026-11-06: on slow 3G the script came 6–15 s
+   *  after the page); should early.js not run, the form simply waits as before. The button stays a plain one
+   *  (not `disabled`: that fades it) so «send» cannot reload the page; early.js remembers the press. A form
+   *  opened later (the pop-up) is ready at once. */
   const [ready, setReady] = useState(() => pageTakenOver);
+  /** «Send» was pressed before the page was taken over: sent as soon as it is. */
+  const [sendWhenReady, setSendWhenReady] = useState(false);
   useEffect(() => {
+    const wasTakenOver = pageTakenOver;
     pageTakenOver = true;
     setReady(true);
+    if (wasTakenOver) return;
+    // Typed before React took the page over: the text is on screen (React leaves it there), not yet in state.
+    const early = earlyActions();
+    const nameEl = nameRef.current;
+    const phoneEl = phoneRef.current;
+    if (nameEl?.value) setFullName(nameEl.value);
+    if (phoneEl?.value) {
+      setPhone(formatNationalAsTyped(nationalDigitsFromInput(phoneEl.value).digits));
+      if (early?.autofill.includes(phoneEl)) setPhoneAutofilled(true);
+    }
+    if (nameEl?.value || phoneEl?.value) trackInitiateCheckout();
+    formRef.current?.querySelector('[data-wait]')?.removeAttribute('data-wait');
+    if (early && early.submit && early.submit === formRef.current) setSendWhenReady(true);
+    if (early) early.ready = true;
   }, []);
+  useEffect(() => {
+    if (!ready || !sendWhenReady) return;
+    setSendWhenReady(false);
+    const form = formRef.current;
+    if (form?.requestSubmit) form.requestSubmit();
+    else form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); // iOS < 16
+  }, [ready, sendWhenReady]);
 
   const verification = useRef<Verification | null>(null);
   const turnstileToken = useRef<string | null>(null);
