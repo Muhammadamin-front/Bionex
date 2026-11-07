@@ -810,6 +810,32 @@ user's Mac.
     phones, `useNear`, each a link to its largest file. The partner build has none of it (no provider, no files). Deployed the same
     day (Worker be1ed8ce, Pages 558bdb6c); slow-3G form still takes typing at ~1 s.
 
+64. **workers.dev is the owner's one-ad test: the partner site's rules on the plain page** (2026-11-07). History: Worker version
+    893f44f2 (2026-11-06 13:43 Tashkent, same login, not from this folder; its Worker code was byte-identical to this folder's, only
+    its assets had no `sites/classic/media/`) left workers.dev showing the main page with every media part missing — what the partner
+    page looks like. The owner wanted to test that with one ad, then «sherik sayti bilan bir xil qil», then «videolarni qo'shma, ui ni
+    o'zgartirma, faqat sertifikatni qo'shsang bo'ladi». V3 (the only ad set on) points at zeynara.com.uz, so workers.dev is free.
+    Built: **`npm run deploy` now builds `MAIN_PAGE=plain`** → `src/sites/classic/plain.tsx`: the original page + the certificate only
+    (`certificate.tsx`, shared with index.tsx; its glob matches `certificate*.jpg` only, so no video or photo is even built), no
+    concern question, no Telegram redirect, no autofilled-number question, the dialog 0.6 s after ready (`popupAfterMs={0}`, which keeps
+    the «someone is filling in a form» guard: this page takes typing before hydration, the partner's does not). `VITE_HUMAN_CHECK` '1'
+    (Turnstile for everyone, Instagram too, no silent check) and `VITE_ORDER_RULES` 'partner' → OrderForm sends `rules: 'partner'`
+    (shared schema, `z.literal('partner').optional()`). **`deploy:full`** builds the full page for workers.dev, `deploy:site` is
+    unchanged (zeynara.com.uz keeps the full page and the main rules; checked: its visible text equals live).
+    Worker, `partnerRules` = main site + that marker: no in-app exemption (a failed check inside the app is `no_captcha`, «!» in
+    «Lidlar»; outside also `likely_bot`); no `rushed`; a filled decoy is `honeypot` (no `decoy_filled`); the partner's network limits
+    (`check` 30 an hour, `numbersToday` cap 30, per-device 3 kept); «Spam» tab = `PARTNER_SHEET_HIDDEN_FLAGS` + `SILENT_FLAGS`;
+    instant CAPI Lead for everything but `TRAP_FLAGS` + `SILENT_FLAGS` — so, like the partner, a `likely_bot` order gets a Lead
+    though it sits in «Spam». Kept from the main site on purpose: `bot_trap` = `programDriven` (#29), no browser Lead on our Pixel
+    (principle #1, the server Lead does it), the group/panel behaviour, `meta_pending` (QualifiedLead / Purchase on the sheet's marks).
+    `/spam N` re-exports by the main rules (a test-page in-app «!» order could be copied to «Spam» by it). Nothing marks a test-page
+    order in Telegram: tell them apart by the ad set's name in «Ad set» (URL parameters on the test ad). Every test-page Lead goes to the
+    same Bionex Eco dataset V3 learns from. Tests: 4 new (135). Checked with Turnstile test keys (pass: token, sent at once; forced
+    challenge: the Uzbek hint, then sent without a token after ~8 s, as on the partner) and live on workers.dev (Worker 5c7e9d98), the
+    order post caught. On slow 3G a «send» pressed before hydration now also waits for Turnstile (~15 s in the throttled test).
+    To end the test: `deploy:full` (or decide what workers.dev should be) — and a deploy from another folder without media would
+    again strip workers.dev's certificate.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

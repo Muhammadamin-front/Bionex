@@ -90,6 +90,12 @@ export function makeLeadSubmissionSchema(opts: { phonePrefixes?: readonly string
     turnstileToken: z.string().max(2048).optional(),
     /** The visitor pressed the main site's discount (its percent) before ordering: a sticker by the name for the operators. */
     offerTap: z.number().int().min(1).max(90).optional(),
+    /**
+     * Sent only by the main Worker's own page while it runs the partner site's rules (MAIN_PAGE=plain,
+     * owner 2026-11-07): the check asked of everyone, a Lead for every order that is not a trap, no
+     * «sent too fast» rule. Absent, an order gets the main site's rules as before.
+     */
+    rules: z.literal('partner').optional(),
     [HONEYPOT_FIELD]: z.string().max(500).optional(),
     utm: utmInputSchema,
   });

@@ -197,13 +197,18 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
 
   const ip = request.headers.get('cf-connecting-ip') ?? '0.0.0.0';
   const now = Date.now();
+  // The workers.dev test page (apps/web MAIN_PAGE=plain, owner 2026-11-07) asks for the partner site's
+  // rules: the check counts for everyone, no «sent too fast» rule, a decoy is a trap, a Lead for every
+  // order that is not a trap, the partner's network limits. Still a main-site order: our group, sheet,
+  // Pixel. zeynara.com.uz and old cached pages send nothing here and keep the main site's rules.
+  const partnerRules = site === 'main' && data.rules === 'partner';
   const registry = env.REGISTRY.get(env.REGISTRY.idFromName('main'));
   // Set up to report orders from here (step 4)? Then the browser's pixel stays quiet.
   const meta = metaConfig(env, site);
 
   try {
     // 1. Already answered (the customer's phone lost our reply and retried)? Same answer again.
-    const pre = await registry.check({ submissionId: data.submissionId, ip, phone: data.phone, device: data.deviceId, site, now });
+    const pre = await registry.check({ submissionId: data.submissionId, ip, phone: data.phone, device: data.deviceId, site, now, partnerRules });
     if (pre.kind === 'replay') return answer(pre.status);
     if (pre.kind === 'limited') return fail(429, 'rate_limited', MESSAGES.rateLimited);
 
@@ -252,7 +257,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       // mark) may be a person whose autofill filled it — a warning, not a trap (owner, 2026-10-28).
       // No signals at all (a direct post to the API) or any program sign stays a trap. The partner
       // site keeps its rule: any filled decoy is a trap.
-      flags.push(site === 'main' && data.signals && !programDriven(data.signals) ? 'decoy_filled' : 'honeypot');
+      flags.push(site === 'main' && !partnerRules && data.signals && !programDriven(data.signals) ? 'decoy_filled' : 'honeypot');
     }
     if (phoneLooksSynthetic(data.phone.slice(4))) flags.push('phone_pattern');
     // The number was filled in by autofill (Instagram's from the Meta account): often an old one.
@@ -261,7 +266,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // Not refused (a refused one would just try again slower): it goes to the «Spam» tab and gets no
     // Lead (registry.ts MAIN_SPAM_SHEET_FLAGS); the group still sees it. Old cached pages send no times.
     const s = data.signals;
-    if (site === 'main' && s && ((s.pageMs !== undefined && s.pageMs < RUSHED_PAGE_MS) || (s.fillMs !== undefined && s.fillMs < RUSHED_FILL_MS))) {
+    if (site === 'main' && !partnerRules && s && ((s.pageMs !== undefined && s.pageMs < RUSHED_PAGE_MS) || (s.fillMs !== undefined && s.fillMs < RUSHED_FILL_MS))) {
       flags.push('rushed');
     }
     // The main site's page asks for the check everywhere but inside the Instagram / Facebook app
@@ -276,7 +281,8 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // holds the order, and its result is only measured (`appCheckCode`, in the sheet's «Sabab»), until
     // two weeks of it say whether it tells spam from customers (owner, 2026-11-04).
     const userAgent = request.headers.get('user-agent');
-    const inApp = site === 'main' && fromSocialApp(userAgent);
+    // The test page asks inside the app too (as the partner site does), so there a failure counts.
+    const inApp = site === 'main' && !partnerRules && fromSocialApp(userAgent);
     if (site === 'main' && !check.ok && !data.signals) flags.push('no_browser');
     if (!check.ok && !inApp) flags.push('no_captcha');
     // Failed the check and not opened from the Instagram / Facebook app the ads run in: often a
@@ -331,6 +337,7 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
       now,
       meta: match,
       device: data.deviceId,
+      partnerRules,
       fingerprint: data.fingerprint,
       click: data.clickId,
       model: readableModel(data.deviceModel ?? modelFromUserAgent(userAgent)),

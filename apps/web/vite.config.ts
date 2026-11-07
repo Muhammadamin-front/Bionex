@@ -179,14 +179,22 @@ export default defineConfig(({ command, mode }) => {
   // (src/sites/classic, owner 2026-10-28). MAIN_DESIGN=oromgoh builds the light-blue «Оромгоҳ»
   // design instead (npm run deploy:oromgoh). The partner site is always the original page.
   const oromgoh = mode !== 't2' && process.env.MAIN_DESIGN === 'oromgoh';
-  const site = mode === 't2' ? './src/sites/partner.tsx' : oromgoh ? './src/sites/main/index.tsx' : './src/sites/classic/index.tsx';
+  // MAIN_PAGE=plain (the Worker's `deploy`, owner 2026-11-07): the workers.dev test page — the original page
+  // with only the certificate added, and the partner site's rules (src/sites/classic/plain.tsx). Never for
+  // zeynara.com.uz (`build:site`), which keeps the full page.
+  const plain = mode !== 't2' && !oromgoh && process.env.MAIN_PAGE === 'plain';
+  const site = mode === 't2' ? './src/sites/partner.tsx' : oromgoh ? './src/sites/main/index.tsx' : plain ? './src/sites/classic/plain.tsx' : './src/sites/classic/index.tsx';
   // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {
     plugins: [react(), tailwindcss(), legacyBrowserCss(), cloudflareHeaders(), ...(oromgoh ? [mainSiteHead()] : [])],
     // The «not a robot» check: everyone on the partner site, and on the main site everyone except
     // visitors inside the Instagram / Facebook app (OrderForm HUMAN_CHECK, owner 2026-10-31).
-    define: { 'import.meta.env.VITE_HUMAN_CHECK': JSON.stringify(mode === 't2' ? '1' : 'web') },
+    // The plain test page asks everyone too, like the partner, and tells the Worker it follows the partner's rules.
+    define: {
+      'import.meta.env.VITE_HUMAN_CHECK': JSON.stringify(mode === 't2' || plain ? '1' : 'web'),
+      'import.meta.env.VITE_ORDER_RULES': JSON.stringify(plain ? 'partner' : ''),
+    },
     resolve: {
       // Each site is its own tree: the partner build never even sees the main site's page.
       alias: {

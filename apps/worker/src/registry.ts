@@ -99,6 +99,14 @@ const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_
  * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
  */
 const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
+/**
+ * The workers.dev test page's orders (`partnerRules`, owner 2026-11-07: «sherik sayti bilan bir xil qil»):
+ * the «Spam» tab takes what the partner's sheet leaves out (PARTNER_SHEET_HIDDEN_FLAGS) and the orders
+ * that come back silent here (SILENT_FLAGS, #52); a Lead goes at once for every order but a trap or a
+ * device or number marked spam, as `acceptPartner` sends one (it skips traps and `spam_device`).
+ */
+const PARTNER_RULES_SPAM_SHEET_FLAGS = [...PARTNER_SHEET_HIDDEN_FLAGS, ...SILENT_FLAGS];
+const PARTNER_RULES_NO_LEAD_FLAGS = [...TRAP_FLAGS, ...SILENT_FLAGS];
 const PARTNER_SHEET_WRITE_ALERT =
   '⚠️ <b>2-сайт жадвали буюртмани қабул қилмади.</b> У буюртмаларни бошқа ҳеч ким кўрмайди. Жадвалнинг Apps Script’ини текширинг ёки дастурчига ёзинг.';
 const SHEET_WRITE_ALERT =
@@ -208,6 +216,8 @@ export interface OrderInput {
   meta?: { userData: MetaUserData; sourceUrl: string };
   /** The browser's own random id (apps/web lib/device.ts); absent for bot orders and blocked storage. */
   device?: string;
+  /** A main-site order from the workers.dev test page, under the partner site's rules (index.ts `partnerRules`). */
+  partnerRules?: boolean;
   /** The ad click's id (Meta's fbclid); hashed before it is kept. Absent without an ad click. */
   click?: string;
   /** The phone's likeness, a SHA-256 the browser made (apps/web lib/device.ts); absent for bot orders. */
@@ -389,7 +399,7 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /** Before Turnstile: an already-answered attempt gets its answer again; floods are cut off. */
-  async check(input: { submissionId: string; ip: string; phone: string; device?: string; site?: SiteId; now: number }): Promise<CheckResult> {
+  async check(input: { submissionId: string; ip: string; phone: string; device?: string; site?: SiteId; now: number; partnerRules?: boolean }): Promise<CheckResult> {
     const prior = this.sql.exec<{ status: 'accepted' | 'duplicate' }>('SELECT status FROM submissions WHERE id = ?', input.submissionId).toArray()[0];
     if (prior) return { kind: 'replay', status: prior.status };
     const ipKey = `ip:${await this.hash(input.ip)}`;
@@ -406,7 +416,7 @@ export class LeadRegistry extends DurableObject<Env> {
     const reason =
       count(sourceKey, since) > perHour
         ? (sourceKey === ipKey ? 'network' : 'device')
-        : count(ipKey, since) > ((input.site ?? 'main') === 'main' ? perHour : NETWORK_ATTEMPTS_PER_HOUR)
+        : count(ipKey, since) > ((input.site ?? 'main') === 'main' && !input.partnerRules ? perHour : NETWORK_ATTEMPTS_PER_HOUR)
           ? 'network'
           : count(phoneKey, since) > PHONE_REQUESTS_PER_HOUR
             ? 'phone'
@@ -428,7 +438,14 @@ export class LeadRegistry extends DurableObject<Env> {
    * phone (device id) when known, else the network. The main site holds the network to the same small
    * limit; the partner site caps it only against floods and otherwise just warns (`multi_phone_ip`).
    */
-  private numbersToday(table: 'leads' | 'partner_leads', site: SiteId, ipHash: string, deviceHash: string | null, now: number): { limited: boolean; networkPhones: number } {
+  private numbersToday(
+    table: 'leads' | 'partner_leads',
+    site: SiteId,
+    ipHash: string,
+    deviceHash: string | null,
+    now: number,
+    partnerRules = false,
+  ): { limited: boolean; networkPhones: number } {
     const scope = table === 'partner_leads' ? ' AND site = ?' : '';
     const extra = table === 'partner_leads' ? [site] : [];
     const distinct = (column: 'ip_hash' | 'device_hash', value: string) =>
@@ -438,7 +455,8 @@ export class LeadRegistry extends DurableObject<Env> {
     const networkPhones = distinct('ip_hash', ipHash);
     const perSource = deviceHash ? distinct('device_hash', deviceHash) : networkPhones;
     const perDay = Number(this.env.LEADS_PER_IP_PER_DAY || 3);
-    const networkCap = table === 'leads' ? perDay : NETWORK_PHONES_PER_DAY;
+    // The workers.dev test page has the partner's network cap (#35), not the main site's (#54).
+    const networkCap = table === 'leads' && !partnerRules ? perDay : NETWORK_PHONES_PER_DAY;
     const reason = perSource >= perDay ? (deviceHash ? 'device_numbers' : 'network_numbers') : networkPhones >= networkCap ? 'network_numbers' : null;
     if (reason) this.refused(site, reason, now);
     return { limited: Boolean(reason), networkPhones };
@@ -475,7 +493,7 @@ export class LeadRegistry extends DurableObject<Env> {
     }
 
     // Someone typing strangers' numbers: one phone, and one network, may order for only a few numbers a day.
-    const { limited, networkPhones: otherPhones } = this.numbersToday('leads', 'main', ipHash, deviceHash, now);
+    const { limited, networkPhones: otherPhones } = this.numbersToday('leads', 'main', ipHash, deviceHash, now, input.partnerRules);
     if (limited) return { status: 'ip_limited' };
     if (otherPhones >= NETWORK_PHONES_WARNING) input = { ...input, flags: [...input.flags, 'multi_phone_ip'] };
 
@@ -506,7 +524,7 @@ export class LeadRegistry extends DurableObject<Env> {
     if (input.meta && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
       // A clean order is a Lead at once (owner, 2026-10-29): with Leads only from the sheet the ads
       // had a few signals a day. A suspect one (NO_INSTANT_LEAD_FLAGS) waits for a person.
-      const instant = !input.flags.some((f) => NO_INSTANT_LEAD_FLAGS.includes(f));
+      const instant = !input.flags.some((f) => (input.partnerRules ? PARTNER_RULES_NO_LEAD_FLAGS : NO_INSTANT_LEAD_FLAGS).includes(f));
       this.sql.exec(
         'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at, lead_sent) VALUES (?, ?, ?, ?, ?, ?)',
         leadId,
@@ -567,7 +585,7 @@ export class LeadRegistry extends DurableObject<Env> {
     // tab, every other one to «Lidlar» — never both.
     const sheet = sheetsConfig(this.env, 'main');
     if (sheet) {
-      const suspect = input.flags.some((f) => MAIN_SPAM_SHEET_FLAGS.includes(f));
+      const suspect = input.flags.some((f) => (input.partnerRules ? PARTNER_RULES_SPAM_SHEET_FLAGS : MAIN_SPAM_SHEET_FLAGS).includes(f));
       const { info = [], ...logged } = input.log ?? {};
       const sent = sendSheetOrder(
         sheet,
@@ -585,7 +603,7 @@ export class LeadRegistry extends DurableObject<Env> {
           log: input.log
             ? ({
                 ...logged,
-                status: input.flags.some((f) => NO_INSTANT_LEAD_FLAGS.includes(f)) ? 'shubhali' : 'ok',
+                status: input.flags.some((f) => (input.partnerRules ? PARTNER_RULES_NO_LEAD_FLAGS : NO_INSTANT_LEAD_FLAGS).includes(f)) ? 'shubhali' : 'ok',
                 reason: reasonCodes(input.flags, info),
               } as SheetLog)
             : undefined,

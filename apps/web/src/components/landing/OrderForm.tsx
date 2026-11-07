@@ -454,6 +454,8 @@ export function OrderForm({
         signals: { ...signals, autofill: phoneAutofilled || undefined, check: silentOutcome.current },
         turnstileToken: token ?? undefined,
         offerTap: offer && offerTapped() ? offer.percent : undefined,
+        // The workers.dev test page (MAIN_PAGE=plain): the Worker applies the partner site's rules to it.
+        rules: import.meta.env.VITE_ORDER_RULES === 'partner' ? ('partner' as const) : undefined,
         // Either decoy filled is the same trap.
         [HONEYPOT_FIELD]: `${honeypotRef.current?.value ?? ''}${websiteRef.current?.value ?? ''}`.slice(0, 500),
         utm,

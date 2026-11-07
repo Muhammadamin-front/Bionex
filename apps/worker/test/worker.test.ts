@@ -1237,6 +1237,74 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
       expect((await order({ phone: '+998 90 312 45 53', offerTap: '25' }, { ip: '203.0.113.53' })).status).toBe(400);
     });
 
+    describe("the workers.dev test page (rules: 'partner', owner 2026-11-07)", () => {
+      const instagram = 'Mozilla/5.0 (Linux; Android 14; SM-A135F; wv) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36 Instagram 400.0';
+      const chrome = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36';
+      const fast = { touch: 5, taps: 3, keys: 4, pageMs: 6_000, fillMs: 3_000 };
+      const rowsSettled = async (n: number) => {
+        for (let i = 0; i < 50 && sheets.rows.length < n; i++) await new Promise((r) => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 100));
+      };
+      const tab = (name: string) => sheets.rows.filter((r) => r.sheet === name).map((r) => r.row[2]);
+      const leadIds = () => counted().filter((e) => e.event_name === 'Lead').map((e) => e.event_id);
+
+      it('keeps a fast order in «Lidlar» with its Lead at once; the same order from zeynara.com.uz still goes to «Spam» unreported', async () => {
+        const tested = sid();
+        await order({ fullName: 'Тез Синов', submissionId: tested, rules: 'partner', signals: fast }, { ip: '203.0.113.91', userAgent: instagram });
+        const plain = sid();
+        await order({ fullName: 'Тез Асосий', phone: '+998 90 312 45 92', submissionId: plain, signals: fast }, { ip: '203.0.113.92', userAgent: instagram });
+        await rowsSettled(2);
+        expect(tab('Lidlar')).toEqual(['Тез Синов']);
+        expect(tab('Spam')).toEqual(['Тез Асосий']);
+        await settled(1);
+        await quiet();
+        expect(leadIds()).toEqual([tested]);
+        // Both still reach the operators' group.
+        expect(leadMessages()).toHaveLength(2);
+        expect(leadMessages()[0]!.text).not.toContain('жуда тез');
+      });
+
+      it('counts a failed check inside the Instagram app: «!» in «Lidlar» and a Lead; outside the app «Spam»; a trap never reaches Meta', async () => {
+        const inApp = sid();
+        await order({ fullName: 'Илова Синов', submissionId: inApp, rules: 'partner', turnstileToken: undefined, signals: inBrowser }, { ip: '203.0.113.93', userAgent: instagram });
+        const outside = sid();
+        await order({ fullName: 'Браузер Синов', phone: '+998 90 312 45 94', submissionId: outside, rules: 'partner', turnstileToken: 'bad', signals: inBrowser }, { ip: '203.0.113.94', userAgent: chrome });
+        await order({ fullName: 'Дастур Синов', phone: '+998 90 312 45 95', rules: 'partner', signals: { ...inBrowser, webdriver: true } }, { ip: '203.0.113.95', userAgent: instagram });
+        await rowsSettled(3);
+        expect(tab('Lidlar')).toEqual(['Илова Синов']);
+        expect(sheets.rows.find((r) => r.row[2] === 'Илова Синов')!.row[7]).toMatch(/^! /);
+        expect(tab('Spam').sort()).toEqual(['Браузер Синов', 'Дастур Синов']);
+        // As on the partner site: a Lead for every order but a trap, a failed check included.
+        await settled(2);
+        await quiet();
+        expect(leadIds().sort()).toEqual([inApp, outside].sort());
+        // On the main site's own rules the same failure inside the app is no failure at all (the app is not asked).
+        await order({ fullName: 'Илова Асосий', phone: '+998 90 312 45 96', turnstileToken: undefined, signals: inBrowser }, { ip: '203.0.113.96', userAgent: instagram });
+        await rowsSettled(4);
+        expect(sheets.rows.find((r) => r.row[2] === 'Илова Асосий')!.row[7]).toBe('');
+      });
+
+      it("has the partner site's network limits; the main site keeps three an hour", async () => {
+        const many = async (rules?: 'partner') => {
+          const codes: number[] = [];
+          for (let i = 0; i < 4; i++) {
+            const res = await order(
+              { phone: `+998 90 41${rules ? 1 : 2} 45 ${10 + i}`, deviceId: `bbbbbbbb-000${rules ? 1 : 2}-4000-8000-00000000000${i}`, ...(rules ? { rules } : {}) },
+              { ip: rules ? '203.0.113.97' : '203.0.113.98', userAgent: instagram },
+            );
+            codes.push(res.status);
+          }
+          return codes;
+        };
+        expect(await many('partner')).toEqual([201, 201, 201, 201]);
+        expect((await many()).at(-1)).toBe(429);
+      });
+
+      it('accepts only the one marker', async () => {
+        expect((await order({ phone: '+998 90 312 45 99', rules: 'main' }, { ip: '203.0.113.99' })).status).toBe(400);
+      });
+    });
+
     it('a made-up click alone (a confirmed customer) goes to «Lidlar» with a warning; with the automation mark it is a trap', async () => {
       const person = { touch: 5, taps: 4, keys: 5, synthetic: 2, pageMs: 35_000 };
       await order({ fullName: 'Ҳақиқий Мижоз', signals: person }, { ip: '203.0.113.71' });

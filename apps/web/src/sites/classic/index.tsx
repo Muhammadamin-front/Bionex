@@ -6,12 +6,13 @@
 // missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 import { ConfirmAutofillContext } from '../../components/landing/OrderForm';
 import { AskConcernContext, TelegramChannelContext } from '../../lib/concern';
 import { ProductPhotoContext, type ProductPhoto } from '../../components/ui/ProductPack';
 import { AdHero } from './AdHero';
+import { Certificate, useNear } from './certificate';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg,webp}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
@@ -67,26 +68,6 @@ const packPhotos = [
  * and pauses the one before. Off the screen it pauses. Never on a data saver or for someone who
  * asked the phone for less motion.
  */
-/**
- * True once the element comes within a screen or so of the visible part of the page; never before the page
- * is taken over (the prerendered HTML has no picture to fetch). Measured 2026-11-06 on a throttled phone:
- * the video covers and the certificate (~400 KB, all far down the page) downloaded at once beside the
- * script that makes the form work, so on slow 3G the form could be typed into only after 14.7 s
- * (the partner page: 4.4 s). `loading="lazy"` did not help: on slow networks Chrome fetches 2500 px ahead.
- */
-function useNear<T extends Element>(): [RefObject<T | null>, boolean] {
-  const ref = useRef<T>(null);
-  const [near, setNear] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || near) return;
-    if (typeof IntersectionObserver === 'undefined') return setNear(true);
-    const io = new IntersectionObserver(([e]) => e?.isIntersecting && setNear(true), { rootMargin: '800px 0px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [near]);
-  return [ref, near];
-}
 
 /** The page has had a tap or a key press, so a browser lets a video play with its sound. */
 const touchedPage = () => {
@@ -249,7 +230,6 @@ function PackPhotos() {
 }
 
 function Proof() {
-  const [certRef, certNear] = useNear<HTMLAnchorElement>();
   if (!videos.length && !certificate.full && !packPhotos.length) return null;
   return (
     <section aria-labelledby="ishonch-title" className="bg-paper-2">
@@ -268,30 +248,7 @@ function Proof() {
 
         <PackPhotos />
 
-        {certificate.full && (
-          <figure className={`grid grid-cols-1 items-center gap-6 rounded-3xl bg-card p-6 shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:grid-cols-[12rem_1fr] sm:p-8 ${videos.length || packPhotos.length ? 'mt-10' : ''}`}>
-            <a ref={certRef} href={certificate.full} target="_blank" rel="noopener" className="mx-auto block w-40 sm:w-48">
-              {/* width/height keep its place on the page before the picture is fetched. */}
-              <img
-                src={certNear ? (certificate.small ?? certificate.full) : undefined}
-                width={480}
-                height={643}
-                alt="Санитария-эпидемиологик хулоса № 482583"
-                className="h-auto w-full rounded-xl border border-line bg-paper-2"
-              />
-            </a>
-            <figcaption>
-              <h3 className="font-display text-xl font-extrabold sm:text-2xl">Давлат текширувидан ўтган</h3>
-              <p className="mt-3 text-lg leading-relaxed text-ink-2">
-                Ўзбекистон Республикаси Соғлиқни сақлаш вазирлигининг санитария-эпидемиологик хулосаси № 482583: «Зейнара» сиропи
-                хавфсизлик кўрсаткичлари бўйича санитария меъёрларига мос. 29.07.2028 гача амал қилади.
-              </p>
-              <a href={certificate.full} target="_blank" rel="noopener" className="mt-4 inline-block font-bold text-brand underline underline-offset-4">
-                Ҳужжатни тўлиқ кўриш
-              </a>
-            </figcaption>
-          </figure>
-        )}
+        {certificate.full && <Certificate full={certificate.full} small={certificate.small} spaced={videos.length > 0 || packPhotos.length > 0} />}
       </div>
     </section>
   );
