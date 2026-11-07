@@ -836,6 +836,16 @@ user's Mac.
     To end the test: `deploy:full` (or decide what workers.dev should be) — and a deploy from another folder without media would
     again strip workers.dev's certificate.
 
+65. **The partner site gets the Telegram channel link** (2026-11-07, owner: «sherik saytidan ham shu telegram guruhga qo'shilish
+    button chiqsin»). `sites/partner.tsx` now wraps the original page in `TelegramChannelContext` (t.me/zeynare); #57's «the partner
+    build has no trace of it» no longer holds. `AfterOrderQuestions` without `AskConcernContext` shows only «Телеграм каналимизга ўтиш»
+    (`ChannelLink`): no concern question (its answer goes to the operators' group, principle #2) and no automatic move (on the partner
+    the move would come as the order lands and could cut off the browser Pixel Lead, principle #3). Main site and plain page unchanged
+    (checked by rendering the three variants). The t2 bundle still has no «bionex»; it grew 238 bytes. **But the channel page itself
+    shows «@bionexecobot»** (description «Buyurtma berish yoki ma'lumot olish uchun @bionexecobot ni bosing» and a post), so a partner
+    customer who taps sees the brand the partner's new Instagram account hides, and may order through our bot, past the partner's sheet.
+    Committed, NOT deployed: the owner was asked to choose (edit the channel's description/post first, or deploy as is).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`
