@@ -33,5 +33,12 @@ export const onRequest = async ({ request, env }: { request: Request; env: Env }
   }
   const headers = new Headers(request.headers);
   if (origin) headers.set('origin', env.MAIN_ORIGIN);
+  // The customer's network, which the Worker cannot see over the binding (worker/src/network.ts: an order from a
+  // server or VPN network is a warning). Whatever a visitor sent under these names is dropped first.
+  headers.delete('x-bx-asn');
+  headers.delete('x-bx-as-org');
+  const cf = (request as Request & { cf?: { asn?: unknown; asOrganization?: unknown } }).cf;
+  if (typeof cf?.asn === 'number') headers.set('x-bx-asn', String(cf.asn));
+  if (typeof cf?.asOrganization === 'string') headers.set('x-bx-as-org', encodeURIComponent(cf.asOrganization.slice(0, 100)));
   return env.MAIN.fetch(new Request(`${env.MAIN_ORIGIN}${url.pathname}`, { method: 'POST', headers, body: await request.arrayBuffer() }));
 };

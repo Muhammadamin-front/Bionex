@@ -90,6 +90,7 @@ once, `shubhali` when it waits for a person. No code refuses an order.
 | `spam_qurilma` / `spam_raqam` / `spam_oxshash` | this phone / number / a look-alike was marked spam | «Spam» tab, no instant Lead |
 | `havola_takror` | this ad click was behind another number's order | no instant Lead |
 | `spam_tarmoq`, `kop_raqam`, `soxta_raqam`, `avto_raqam`, `havola_tashqarida`, `dastur_bosgan` | warnings | nothing |
+| `vpn_server` + `tarmoq: <name>` | sent from a hosting company's, a cloud's or a VPN's network, not a home line or a mobile operator (worker/src/network.ts; VPNs are common in Uzbekistan, so a person too) | no instant Lead; stays in «Lidlar» |
 | `fbclid_yoq` | no ad click id | nothing |
 
 A repeat of a number within 24 h adds no row: it is noted in «Takror» on the order's own row.

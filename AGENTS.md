@@ -904,6 +904,21 @@ user's Mac.
     over). `npm run deploy` builds the full page again (as `deploy:full`); #64's plain page with the partner's rules is
     `deploy:plain`. The Worker code still knows `rules: 'partner'`; only the page that sent it is no longer built by default.
 
+69. **Server / VPN networks are a warning** (2026-11-14, owner's yes to the item «VPN, proxy, server networks» from a pasted
+    ad-fraud article; the other items were already built or declined, see the reply that day). `worker/src/network.ts`:
+    `networkOf` reads Cloudflare's `request.cf.asn` / `asOrganization`; an order through zeynara.com.uz arrives over the
+    service binding without the customer's `cf`, so the domain's Pages function adds `x-bx-asn` / `x-bx-as-org` (dropping
+    any a visitor sent), read only when the request has no `cf.asn` or Cloudflare's own (a direct post's real network always
+    wins). `serverNetwork`: a list of hosting / cloud / VPN ASNs (AWS, Google, Azure, DigitalOcean, Hetzner, OVH, M247,
+    Datacamp, NordVPN's Tefincom, Selectel, Timeweb, Yandex Cloud …) or a name with hosting / server / cloud / vps / vpn /
+    proxy; never Cloudflare (WARP) or iCloud Private Relay's partners (Akamai, Fastly, Apple). Main site only → flag
+    `server_network`: in `NO_INSTANT_LEAD_FLAGS` only (no instant Lead; «Kerakli»/«Sotildi» still report it), «Lidlar» with
+    «Status» `shubhali`, «Sabab» `vpn_server, tarmoq: <name>`, a warning in Telegram and the sheet's «Belgi». Not the «Spam»
+    tab: VPNs are common in Uzbekistan (blocked sites), so customers can arrive this way; mobile proxies (an operator's own
+    network) are not caught. If a week of such rows is mostly marked spam, moving it into `MAIN_SPAM_SHEET_FLAGS` is one word.
+    Partner unchanged. Test: 136. **Check after the deploy** that domain orders do not all carry `vpn_server` (it would mean
+    the binding passes some network of its own; Cloudflare's is excluded for that reason).
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

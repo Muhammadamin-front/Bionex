@@ -113,6 +113,7 @@ const FLAG_TEXT: Record<string, string> = {
   reused_click: 'шу реклама босилиши аввал бошқа рақамдан ишлатилган (ҳавола кўчирилган бўлиши мумкин)',
   no_captcha: '«бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)',
   likely_bot: 'Instagram/Facebook орқали эмас — бот эҳтимоли бор (одам ҳам бўлиши мумкин)',
+  server_network: 'VPN ёки сервер тармоғидан юборилган (уй интернети ёки мобил алоқа эмас; VPN ёққан одам ҳам бўлиши мумкин)',
 };
 
 /** The flags an order's group message carried, read back from its saved text (for orders from before the flags were kept apart). */

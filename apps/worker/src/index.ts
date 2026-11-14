@@ -14,6 +14,7 @@ import type { SiteId } from './sites';
 import { CONFIG_ERRORS, TurnstileUnavailable, verifyTurnstile } from './turnstile';
 import { serveVideo } from './video';
 import { micTestPage } from './mic-test';
+import { networkOf, serverNetwork } from './network';
 
 export { LeadRegistry } from './registry';
 
@@ -300,6 +301,10 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // The copy itself cannot be seen from a page. Information only (owner, 2026-11-01); the same
     // click behind another number's order is `reused_click` (registry.ts).
     if (site === 'main' && (data.clickId || data.signals?.adClick) && !fromSocialApp(userAgent)) flags.push('link_copied');
+    // Sent from a hosting company's, a cloud's or a VPN's network, not a home line or a mobile operator
+    // (network.ts, owner 2026-11-14): a warning and no instant Lead; the order stays in «Lidlar» for a call.
+    const serverNet = site === 'main' ? serverNetwork(networkOf(request)) : null;
+    if (serverNet) flags.push('server_network');
 
     // 4. What Meta would need to match this customer, collected now because the IP, the
     //    user agent and the _fbp / _fbc cookies only exist during this request. Nothing is
@@ -352,7 +357,12 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
         fbclid: data.clickId ?? '',
         fillSeconds: s?.fillMs === undefined ? ('' as const) : Math.round(s.fillMs / 1000),
         pageSeconds: s?.pageMs === undefined ? ('' as const) : Math.round(s.pageMs / 1000),
-        info: [...(data.clickId ? [] : ['fbclid_yoq']), ...(inApp && !check.ok ? [appCheckCode(data.turnstileToken, s?.check)] : [])],
+        info: [
+          ...(data.clickId ? [] : ['fbclid_yoq']),
+          ...(inApp && !check.ok ? [appCheckCode(data.turnstileToken, s?.check)] : []),
+          // Which server network, for whoever reads «Sabab» (a comma would split it into two codes).
+          ...(serverNet ? [`tarmoq: ${serverNet.replace(/,/g, ' ').slice(0, 60)}`] : []),
+        ],
       },
     };
     // The partner site's orders are its owner's alone: their sheet and dataset, never the group.

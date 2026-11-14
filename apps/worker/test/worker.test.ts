@@ -128,14 +128,18 @@ const sid = () => `3f2c1d4e-5b6a-4c7d-8e9f-${String(++ids).padStart(12, '0')}`;
 /** What a real page always sends. A failed check with no signals at all is a direct post (`no_browser`). */
 const inBrowser = { touch: 5, taps: 6, keys: 14 };
 
-function order(body: Record<string, unknown> = {}, opts: { ip?: string; origin?: string | null; cookie?: string; userAgent?: string } = {}) {
-  const headers: Record<string, string> = { 'content-type': 'application/json', 'cf-connecting-ip': opts.ip ?? '198.51.100.7' };
+function order(
+  body: Record<string, unknown> = {},
+  opts: { ip?: string; origin?: string | null; cookie?: string; userAgent?: string; cf?: Record<string, unknown>; headers?: Record<string, string> } = {},
+) {
+  const headers: Record<string, string> = { 'content-type': 'application/json', 'cf-connecting-ip': opts.ip ?? '198.51.100.7', ...opts.headers };
   if (opts.origin !== null) headers.origin = opts.origin ?? SITE;
   if (opts.cookie) headers.cookie = opts.cookie;
   if (opts.userAgent) headers['user-agent'] = opts.userAgent;
   return mf.dispatchFetch(`${SITE}/api/leads`, {
     method: 'POST',
     headers,
+    ...(opts.cf ? { cf: opts.cf } : {}),
     body: JSON.stringify({ fullName: 'Ойша Тошева', phone: '+998 90 312 45 67', submissionId: sid(), turnstileToken: 'good', ...body }),
   });
 }
@@ -1424,6 +1428,39 @@ describe("the Lead event sent to Meta once the sheet's «Holat» confirms the or
         expect(await quiet()).toHaveLength(0);
         // The group still sees it (AGENTS.md #13); the panel and lists do not.
         expect(leadMessages().at(-1)!.text).toContain('тўғридан-тўғри юборилган');
+      });
+
+      it('an order from a server or VPN network is a warning: «Lidlar», no instant Lead; a made-up network on a direct post is not read', async () => {
+        // Its own network (a direct post): Hetzner.
+        await order({ fullName: 'Сервер Тармоқ', phone: '+998 90 312 46 21', signals: person }, { ip: '203.0.113.121', userAgent: instagram, cf: { asn: 24940, asOrganization: 'Hetzner Online GmbH' } });
+        const server = await rowOf('Сервер Тармоқ');
+        expect(server.sheet).toBe('Lidlar');
+        expect(cell(server, 'Status')).toBe('shubhali');
+        expect(cell(server, 'Sabab')).toContain('vpn_server');
+        expect(cell(server, 'Sabab')).toContain('tarmoq: Hetzner Online GmbH');
+        expect(leadMessages().at(-1)!.text).toContain('VPN ёки сервер тармоғидан');
+        // Forwarded by zeynara.com.uz: no customer `cf` over the binding (or Cloudflare's own), so the domain's headers say it.
+        await order(
+          { fullName: 'Домен Орқали', phone: '+998 90 312 46 22', signals: person },
+          { ip: '203.0.113.122', userAgent: instagram, cf: { asn: 13335, asOrganization: 'Cloudflare, Inc.' }, headers: { 'x-bx-asn': '16509', 'x-bx-as-org': encodeURIComponent('Amazon.com, Inc.') } },
+        );
+        const forwarded = await rowOf('Домен Орқали');
+        expect(cell(forwarded, 'Status')).toBe('shubhali');
+        expect(cell(forwarded, 'Sabab')).toContain('tarmoq: Amazon.com  Inc.');
+        // A home line's own network wins over a header a script made up; Cloudflare's WARP alone is not counted.
+        await order(
+          { fullName: 'Уй Интернети', phone: '+998 90 312 46 23', signals: person },
+          { ip: '203.0.113.123', userAgent: instagram, cf: { asn: 8193, asOrganization: 'Uzbektelecom JSC' }, headers: { 'x-bx-asn': '24940' } },
+        );
+        await order({ fullName: 'Варп Мижоз', phone: '+998 90 312 46 24', signals: person }, { ip: '203.0.113.124', userAgent: instagram, cf: { asn: 13335, asOrganization: 'Cloudflare, Inc.' } });
+        for (const name of ['Уй Интернети', 'Варп Мижоз']) {
+          const r = await rowOf(name);
+          expect(cell(r, 'Status')).toBe('ok');
+          expect(cell(r, 'Sabab')).not.toContain('vpn_server');
+        }
+        // Only the two clean ones got a Lead at once.
+        await settled(2);
+        expect((await quiet()).filter((e) => e.event_name === 'Lead')).toHaveLength(2);
       });
 
       it('inside the Instagram app the silent check only measures: same tab, same Lead, nothing in the group', async () => {

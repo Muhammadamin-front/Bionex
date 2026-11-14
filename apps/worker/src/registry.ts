@@ -98,7 +98,7 @@ const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_
  * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
  * trap) and is reported if a person marks it «Sotildi» / «Kerakli» in the sheet.
  */
-const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click'];
+const NO_INSTANT_LEAD_FLAGS = [...MAIN_SPAM_SHEET_FLAGS, 'spam_lookalike', 'reused_click', 'server_network'];
 /**
  * The workers.dev test page's orders (`partnerRules`, owner 2026-11-07: «sherik sayti bilan bir xil qil»):
  * the «Spam» tab takes what the partner's sheet leaves out (PARTNER_SHEET_HIDDEN_FLAGS) and the orders
