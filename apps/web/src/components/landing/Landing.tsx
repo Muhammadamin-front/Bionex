@@ -3,6 +3,7 @@ import { initPixel } from '../../lib/pixel';
 import { captureUtm } from '../../lib/utm';
 import { Hero, Promises, QuickOrder } from './Hero';
 import type { OrderResult } from './OrderForm';
+import { OrderForm } from './OrderForm';
 import { OrderModal } from './OrderModal';
 import {
   About,
@@ -20,7 +21,10 @@ import {
 } from './Sections';
 
 /**
- * `hero`: the main site's own first screen (sites/classic AdHero); without it, the original one.
+ * `hero`: the main site's own first screen (sites/classic AdHero); without it, the original one. Given
+ * as a function, it receives the first order form and places it inside the first screen itself
+ * (main site, 2026-11-14: the form was ~900 px down a phone, under the headline and Gulchehra opa);
+ * the separate form section under the first screen is then left out.
  * `proof`: what the main site adds right under the first form (real customers' videos, the certificate).
  * `popup: false`: no order dialog on arrival. `popupAfterMs`: when it opens, from the start of loading
  * (main site 2000); unset, it opens as soon as the page is ready (partner site).
@@ -34,7 +38,13 @@ export function Landing({
   popup = true,
   popupAfterMs,
   barOverForms = false,
-}: { hero?: ReactNode; proof?: ReactNode; popup?: boolean; popupAfterMs?: number; barOverForms?: boolean } = {}) {
+}: {
+  hero?: ReactNode | ((form: ReactNode) => ReactNode);
+  proof?: ReactNode;
+  popup?: boolean;
+  popupAfterMs?: number;
+  barOverForms?: boolean;
+} = {}) {
   const utm = useMemo(() => captureUtm(), []);
   const quickRef = useRef<HTMLElement>(null);
   const orderRef = useRef<HTMLElement>(null);
@@ -104,8 +114,19 @@ export function Landing({
         {/* The visitor's path. Most arrive from the Instagram video, which has already named
             the illness and the product, so they are ready to order: the form comes first and
             the symptom check stays right below it for whoever still needs convincing. */}
-        {hero ?? <Hero />}
-        <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+        {typeof hero === 'function' ? (
+          hero(
+            // Same id and ref as QuickOrder's section: the header link, early.js and the order bar find it.
+            <section id="tez-buyurtma" ref={quickRef} aria-label="Буюртма формаси" className="scroll-mt-4 [--focus-ring:var(--color-forest)]">
+              <OrderForm utm={utm} variant="hero" completed={order} onSuccess={setOrder} />
+            </section>,
+          )
+        ) : (
+          <>
+            {hero ?? <Hero />}
+            <QuickOrder sectionRef={quickRef} utm={utm} order={order} onOrdered={setOrder} />
+          </>
+        )}
         {/* Main site: the proof right under the first form, for whoever scrolls on undecided. Above
             the form (2026-10-28) it pushed the form four phone screens down and orders stopped. */}
         {proof}

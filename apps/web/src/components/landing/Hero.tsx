@@ -44,7 +44,11 @@ function BrandMark() {
   );
 }
 
-export function Header() {
+/**
+ * `cta: false` (main site, whose first screen holds the form itself): no «Консультация» button, so the
+ * header stays one row on a phone — with the phone button beside it, it wrapped to two rows at 380–420 px.
+ */
+export function Header({ cta = true }: { cta?: boolean } = {}) {
   return (
     <header className="relative z-20 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6 sm:pt-6">
       <a href="#asosiy" className="flex min-w-0 items-center gap-2.5 rounded-xl sm:gap-3">
@@ -65,12 +69,14 @@ export function Header() {
             <span className="hidden whitespace-nowrap tabular-nums sm:inline">{site.phone}</span>
           </a>
         )}
-        <a
-          href="#tez-buyurtma"
-          className="inline-flex h-12 items-center rounded-full bg-accent px-4 font-display font-bold text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)] transition-colors hover:bg-accent-2 sm:px-6"
-        >
-          Консультация
-        </a>
+        {cta && (
+          <a
+            href="#tez-buyurtma"
+            className="inline-flex h-12 items-center rounded-full bg-accent px-4 font-display font-bold text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.6)] transition-colors hover:bg-accent-2 sm:px-6"
+          >
+            Консультация
+          </a>
+        )}
       </div>
     </header>
   );

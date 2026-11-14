@@ -16,7 +16,15 @@ const { render } = await import(pathToFileURL(join(ssr, 'entry-server.js')).href
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 const EMPTY = '<div id="root"></div>';
 if (!html.includes(EMPTY)) throw new Error(`${dist}/index.html has no empty <div id="root"></div> to fill`);
-let page = html.replace(EMPTY, `<div id="root">${render()}</div>`);
+const app = render();
+let page = html.replace(EMPTY, `<div id="root">${app}</div>`);
+
+// index.html's <head> preloads the drawn pack, the partner page's first picture. A page that never shows it (the main
+// page shows the owner's photo of the box, and only on a computer) would fetch it first on every phone, at high
+// priority, beside the script that makes the form work (2026-11-14).
+if (!app.includes('/images/zeynara/zeynara')) {
+  page = page.replace(/<link rel="preload" as="image" href="\/images\/zeynara\/zeynara\.webp"[^>]*>\s*/, '');
+}
 
 // The stylesheet goes into the page itself: one round trip less before anything is drawn (the
 // content security policy allows inline styles; its font addresses are absolute, /assets/…).

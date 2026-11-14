@@ -2,9 +2,11 @@
 // Gulchehra opa's video: they should see her again at once, the product named in the ad's own words,
 // the ad's discount and its button — not a box photo with the headline a screen further down. The
 // partner site keeps the original first screen (components/landing/Hero.tsx).
-import { useEffect, useRef, useState } from 'react';
+// Since 2026-11-14 the order form itself is in this screen (owner, with the targetologist's reading: the form must be
+// seen without scrolling): on a phone it sat ~900 px down, under the headline, her quote and a button that only
+// scrolled to it. Now: headline, her face and one sentence, then name, number and the button.
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { DrawnUnderline, Header, ProductStage } from '../../components/landing/Hero';
-import { AntiMetalLink } from '../../components/ui/AntiMetalButton';
 import { AuroraBackdrop } from '../../components/ui/AuroraBackdrop';
 import { CheckIcon } from '../../components/ui/Icons';
 import { tapOffer, useOffer } from '../../lib/offer';
@@ -12,16 +14,17 @@ import { tapOffer, useOffer } from '../../lib/offer';
 /** What the ad's last screen promises, in the ad's order. */
 const PROMISES = ['Олдиндан тўлов йўқ', 'Бепул етказиб бериш', 'Бепул консультация'];
 
-function PlayIcon() {
+function PlayIcon({ className }: { className: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" fill="currentColor" />
     </svg>
   );
 }
 
 /**
- * Her face from the ad, ringed in yellow as the ad frames its customers, and her own words beside it.
+ * Her face from the ad, ringed in yellow as the ad frames its customers, and her own words beside it
+ * (on a phone small, and only her last sentence, so the form below still fits the first screen).
  * A tap opens her video in its place, large, with sound (the tap allows it); it pauses once scrolled
  * away, so it never talks over the videos further down.
  */
@@ -52,23 +55,24 @@ function Testimonial({ video, poster, face }: { video: string; poster: string; f
     );
   }
   return (
-    <figure className="mt-5 flex items-center gap-4 sm:mt-8 sm:gap-6">
+    <figure className="mt-3 flex items-center gap-3.5 sm:mt-8 sm:gap-6 lg:mt-6">
       <button
         type="button"
         onClick={() => setPlaying(true)}
         aria-label="Гулчеҳра опанинг видеосини кўриш"
         className="group/play relative flex-none rounded-full"
       >
-        <img src={face} alt="" width={300} height={300} className="h-[6.5rem] w-[6.5rem] rounded-full object-cover ring-[3px] ring-accent ring-offset-2 ring-offset-forest sm:h-36 sm:w-36" />
-        <span className="absolute -bottom-1 -right-1 grid h-11 w-11 place-items-center rounded-full bg-accent pl-0.5 text-ink shadow-[0_8px_16px_-6px_rgba(0,0,0,0.6)] transition-transform group-hover/play:scale-105">
-          <PlayIcon />
+        <img src={face} alt="" width={300} height={300} className="h-14 w-14 rounded-full object-cover ring-[3px] ring-accent ring-offset-2 ring-offset-forest sm:h-36 sm:w-36 lg:h-28 lg:w-28" />
+        <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full bg-accent pl-0.5 text-ink shadow-[0_8px_16px_-6px_rgba(0,0,0,0.6)] transition-transform group-hover/play:scale-105 sm:-bottom-1 sm:-right-1 sm:h-11 sm:w-11">
+          <PlayIcon className="h-4 w-4 sm:h-5 sm:w-5" />
         </span>
       </button>
       <figcaption className="min-w-0">
-        <blockquote className="text-[1.08rem] font-semibold leading-snug text-white sm:text-[1.3rem]">
-          «Тез чарчоқ, уйқусизлик мени безовта қиларди. Ҳозир ўзимни жуда яхши ҳис қиламан.»
+        <blockquote className="text-[1.02rem] font-semibold leading-snug text-white sm:text-[1.3rem]">
+          <span className="hidden sm:inline">«Тез чарчоқ, уйқусизлик мени безовта қиларди. Ҳозир ўзимни жуда яхши ҳис қиламан.»</span>
+          <span className="sm:hidden">«Ҳозир ўзимни жуда яхши ҳис қиламан.»</span>
         </blockquote>
-        <p className="mt-1.5 text-[0.98rem] font-bold text-accent">Гулчеҳра опа, 55 ёш</p>
+        <p className="mt-1 text-[0.95rem] font-bold text-accent sm:mt-1.5 sm:text-[0.98rem]">Гулчеҳра опа, 55 ёш</p>
       </figcaption>
     </figure>
   );
@@ -97,7 +101,7 @@ function OfferLine() {
   );
 }
 
-/** «Ҳозироқ буюртма беринг»: to the first form, right below, with the name field ready to type in. */
+/** The discount (none since 2026-11-06): to the form, with the name field ready to type in. */
 function orderWithOffer(e: React.MouseEvent) {
   tapOffer();
   const name = document.querySelector<HTMLInputElement>('#tez-buyurtma form input[name=zn-customer]');
@@ -107,14 +111,18 @@ function orderWithOffer(e: React.MouseEvent) {
   name.focus({ preventScroll: true });
 }
 
-export function AdHero({ video, poster, face }: { video: string; poster: string; face: string }) {
+/** `form`: the first order form (Landing.tsx), placed here so it is on the first screen. */
+export function AdHero({ video, poster, face, form }: { video: string; poster: string; face: string; form: ReactNode }) {
   return (
-    <section id="asosiy" className="on-dark relative isolate overflow-hidden bg-forest pb-8 text-white sm:pb-20">
+    <section id="asosiy" className="on-dark relative isolate overflow-hidden bg-forest pb-10 text-white sm:pb-20">
       <AuroraBackdrop />
-      <Header />
-      <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 pt-4 sm:px-6 sm:pt-12 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-14 lg:pt-16">
+      {/* No «Консультация» button: the form it pointed to is right here. */}
+      <Header cta={false} />
+      <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 pt-2 sm:px-6 sm:pt-12 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-14 lg:pt-8">
         <div className="min-w-0">
-          <h1 className="text-[1.65rem] font-extrabold leading-[1.1] tracking-[-0.02em] text-balance sm:text-5xl lg:text-[3.2rem]">
+          {/* Three lines' room on a phone: with the stand-in font it took two, and when Montserrat arrived the third
+              pushed the form down ~29 px, perhaps under a finger about to tap it. */}
+          <h1 className="text-[clamp(1.4rem,6.4vw,1.65rem)] max-sm:min-h-[3.3em] font-extrabold leading-[1.1] tracking-[-0.02em] text-balance sm:text-5xl lg:text-[2.75rem]">
             Юрак ва қон томирлар учун{' '}
             <span className="relative inline-block whitespace-nowrap text-accent">
               табиий
@@ -127,13 +135,10 @@ export function AdHero({ video, poster, face }: { video: string; poster: string;
 
           <OfferLine />
 
-          {/* This screen's own button: the phones' order bar steps aside while it is in view
-              (data-order-button, Landing.tsx), and also while the form below is. */}
-          <AntiMetalLink href="#tez-buyurtma" onClick={orderWithOffer} tone="accent" data-order-button="" className="mt-4 w-full sm:w-auto">
-            <span className="whitespace-nowrap text-[clamp(0.95rem,4.4vw,1.05rem)]">Ҳозироқ буюртма беринг</span>
-          </AntiMetalLink>
+          {/* The form: name, number, button. The phones' order bar steps aside while it is on screen. */}
+          <div className="mt-3.5 sm:mt-8 lg:mt-6">{form}</div>
 
-          <ul className="mt-4 grid gap-1.5 sm:mt-6 sm:flex sm:flex-wrap sm:gap-x-6">
+          <ul className="mt-5 grid gap-1.5 sm:mt-6 sm:flex sm:flex-wrap sm:gap-x-6">
             {PROMISES.map((p) => (
               <li key={p} className="flex items-center gap-2 text-[1.02rem] font-semibold text-on-forest">
                 <CheckIcon className="h-5 w-5 flex-none text-accent" />

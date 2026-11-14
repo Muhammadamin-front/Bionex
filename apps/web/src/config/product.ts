@@ -21,12 +21,12 @@ export const site = {
   brand: 'Зейнара',
   /**
    * Contact phone for click-to-call (header, form, sticky bar, footer, error messages).
-   * null = hidden everywhere. Switched off on 2026-10-14 because the number does not work yet;
-   * to restore: phone '+998 55 508 56 56', phoneHref 'tel:+998555085656' (and the <noscript>
-   * line in index.html).
+   * null = hidden everywhere. The company's official number since 2026-11-10 (owner: on every
+   * site — main, zeynara.com.uz and the partner page). Also in the <noscript> line in index.html.
+   * (Carried over 2026-11-14 from the copy that deployed it on 11-10; see AGENTS.md #66.)
    */
-  phone: null as string | null,
-  phoneHref: null as string | null,
+  phone: '+998 50 731 92 82' as string | null,
+  phoneHref: 'tel:+998507319282' as string | null,
   /** Shown in the footer. VERIFY */
   legalName: 'Зейнара',
 };

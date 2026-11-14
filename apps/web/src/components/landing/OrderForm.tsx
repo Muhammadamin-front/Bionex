@@ -62,6 +62,12 @@ const NO_AUTOFILL = { 'data-lpignore': 'true', 'data-1p-ignore': true, 'data-bwi
  */
 export const ConfirmAutofillContext = createContext(false);
 
+/** The thank-you screen names only the number's last four digits, the rest hidden (owner, 2026-11-14): «•• ••• 45-67». */
+function lastFour(phone: string): string {
+  const d = phone.replace(/\D/g, '').slice(-4);
+  return `•• ••• ${d.slice(0, 2)}-${d.slice(2)}`;
+}
+
 export interface OrderResult {
   message: string;
   /** Formatted for display: "+998 90 123 45 67". */
@@ -82,7 +88,10 @@ const CHECK_FAILED = `Хавфсизлик текширувини ўтказиб
 
 /**
  * `full`: the order section's form. `compact`: the hero form — same behaviour, fields side
- * by side on wider screens, so the working action sits in the first screen.
+ * by side on wider screens, so the working action sits in the first screen. `hero`: the main
+ * site's form inside its first screen (sites/classic AdHero, 2026-11-14): as `compact`, but
+ * denser — no heading, smaller labels, 56 px fields — so name, number and button fit a
+ * 360×560 in-app browser. The partner site never uses it.
  *
  * `completed` is shared by both forms on the page: once either one succeeds, both show the
  * confirmation, so nobody is asked to order a second time.
@@ -94,11 +103,12 @@ export function OrderForm({
   onSuccess,
 }: {
   utm: Utm;
-  variant?: 'full' | 'compact';
+  variant?: 'full' | 'compact' | 'hero';
   completed: OrderResult | null;
   onSuccess: (result: OrderResult) => void;
 }) {
-  const compact = variant === 'compact';
+  const hero = variant === 'hero';
+  const compact = variant === 'compact' || hero;
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -524,7 +534,7 @@ export function OrderForm({
           {completed.message}
         </p>
         <p className="mt-4 text-lg text-ink-2">
-          Қўнғироқ қилинадиган рақам: <span className="font-bold text-ink tabular-nums">{completed.phone}</span>
+          Қўнғироқ қилинадиган рақам: <span className="whitespace-nowrap font-bold text-ink tabular-nums">{lastFour(completed.phone)}</span>
         </p>
         <ol className="mx-auto mt-6 max-w-sm space-y-3 border-t border-line pt-5 text-left">
           {[
@@ -564,20 +574,20 @@ export function OrderForm({
       }}
       className={cn(
         'relative min-w-0 rounded-3xl bg-card text-ink shadow-[0_30px_60px_-30px_rgba(0,0,0,0.55)]',
-        compact ? 'p-5 sm:p-6' : 'p-5 sm:p-8',
+        hero ? 'p-4 sm:p-6' : compact ? 'p-5 sm:p-6' : 'p-5 sm:p-8',
       )}
       aria-describedby={`${id}-privacy`}
     >
       <OfferBanner className="mb-4" />
-      {compact && (
+      {compact && !hero && (
         <p className="mb-4 font-display text-xl font-extrabold leading-snug">
           Рақамингизни қолдиринг.{' '}
           <span className="text-brand">{offer ? 'Мутахассисларимиз чегирмали нархни айтади.' : 'Консультация бепул.'}</span>
         </p>
       )}
-      <div className={cn(compact ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-5')}>
+      <div className={cn(hero ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4' : compact ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-5')}>
         <div className="min-w-0">
-          <label htmlFor={`${id}-name`} className="mb-2 block font-display text-lg font-bold">
+          <label htmlFor={`${id}-name`} className={cn('block font-display font-bold', hero ? 'mb-1 text-base' : 'mb-2 text-lg')}>
             Исмингиз
           </label>
           <input
@@ -600,7 +610,8 @@ export function OrderForm({
             aria-invalid={Boolean(errors.fullName)}
             aria-describedby={errors.fullName ? errorId('fullName') : undefined}
             className={cn(
-              'block h-16 w-full min-w-0 rounded-2xl border-2 bg-paper px-4 text-xl outline-none transition-[border-color,background-color,box-shadow] focus:border-brand focus:bg-card focus:shadow-[0_0_0_4px_rgba(23,120,74,0.2)]',
+              hero ? 'h-14' : 'h-16',
+              'block w-full min-w-0 rounded-2xl border-2 bg-paper px-4 text-xl outline-none transition-[border-color,background-color,box-shadow] focus:border-brand focus:bg-card focus:shadow-[0_0_0_4px_rgba(23,120,74,0.2)]',
               errors.fullName ? 'border-danger' : 'border-line',
             )}
           />
@@ -612,12 +623,13 @@ export function OrderForm({
         </div>
 
         <div className="min-w-0">
-          <label htmlFor={`${id}-phone`} className="mb-2 block font-display text-lg font-bold">
+          <label htmlFor={`${id}-phone`} className={cn('block font-display font-bold', hero ? 'mb-1 text-base' : 'mb-2 text-lg')}>
             Телефон рақамингиз
           </label>
           <div
             className={cn(
-              'flex h-16 min-w-0 items-center rounded-2xl border-2 bg-paper transition-[border-color,background-color,box-shadow] focus-within:border-brand focus-within:bg-card focus-within:shadow-[0_0_0_4px_rgba(23,120,74,0.2)]',
+              hero ? 'h-14' : 'h-16',
+              'flex min-w-0 items-center rounded-2xl border-2 bg-paper transition-[border-color,background-color,box-shadow] focus-within:border-brand focus-within:bg-card focus-within:shadow-[0_0_0_4px_rgba(23,120,74,0.2)]',
               errors.phone ? 'border-danger' : phoneAutofilled ? 'border-accent-2 bg-accent/15' : 'border-line',
             )}
           >
@@ -652,8 +664,9 @@ export function OrderForm({
               Рақам автоматик ёзилди. Шу рақам ҳозир ишлайдими? Текшириб, керак бўлса тузатинг.
             </p>
           ) : (
-            <p id={`${id}-phone-hint`} className="mt-2 text-base text-muted">
-              9 та рақам. Масалан: 90 123 45 67
+            <p id={`${id}-phone-hint`} className={cn('text-base text-muted', hero ? 'mt-1' : 'mt-2')}>
+              {/* One line in the narrow first-screen form. */}
+              {hero ? 'Масалан: 90 123 45 67' : '9 та рақам. Масалан: 90 123 45 67'}
             </p>
           )}
         </div>

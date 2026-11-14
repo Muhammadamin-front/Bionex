@@ -6,7 +6,7 @@
 // missing file just leaves its part out.
 import '@fontsource-variable/montserrat/wght.css';
 import '../../styles.css';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 import { ConfirmAutofillContext } from '../../components/landing/OrderForm';
 import { AskConcernContext, TelegramChannelContext } from '../../lib/concern';
@@ -16,6 +16,8 @@ import { Certificate, useNear } from './certificate';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg,webp}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
+/** A picture: its WebP copy when there is one (2026-11-14: the covers and the certificate as JPEG were ~2× larger). */
+const pic = (name: string) => file(`${name}.webp`) ?? file(`${name}.jpg`);
 
 /**
  * In the order shown: the filmed stories with the box in hand first (vertical, `cover`), then the
@@ -30,9 +32,9 @@ const videos = [
   { name: 'review-2', length: '0:35', fit: 'object-contain' },
   { name: 'review-3', length: '0:36', fit: 'object-contain' },
 ]
-  .map((v) => ({ ...v, src: file(`${v.name}.mp4`), poster: file(`${v.name}.jpg`) }))
+  .map((v) => ({ ...v, src: file(`${v.name}.mp4`), poster: pic(v.name) }))
   .filter((v): v is typeof v & { src: string } => Boolean(v.src));
-const certificate = { full: file('certificate.jpg'), small: file('certificate-small.jpg') };
+const certificate = { full: pic('certificate'), small: pic('certificate-small') };
 
 /**
  * The owner's own photos of the box (2026-11-06; the sharp ones of ten, cropped and shrunk to WebP without
@@ -254,9 +256,14 @@ function Proof() {
   );
 }
 
-/** The ad's own video (Gulchehra opa) opens the page; without its files, the original first screen. */
-const ad = { video: file('story-0.mp4'), poster: file('story-0.jpg'), face: file('story-0-face.jpg') };
-const adHero = ad.video && ad.poster && ad.face ? <AdHero video={ad.video} poster={ad.poster} face={ad.face} /> : undefined;
+/**
+ * The ad's own video (Gulchehra opa) opens the page, with the first order form inside that first screen (2026-11-14);
+ * without its files, the original first screen with the form under it.
+ */
+const ad = { video: file('story-0.mp4'), poster: pic('story-0'), face: pic('story-0-face') };
+const { video: adVideo, poster: adPoster, face: adFace } = ad;
+const adHero =
+  adVideo && adPoster && adFace ? (form: ReactNode) => <AdHero video={adVideo} poster={adPoster} face={adFace} form={form} /> : undefined;
 
 /*
  * No discount on the page any more (owner, 2026-11-06: «chegirma degan yozuvlarni butunlay olib tashlash kerak»).
@@ -273,11 +280,13 @@ export function Landing() {
         <TelegramChannelContext.Provider value="https://t.me/zeynare">
           {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
           <ConfirmAutofillContext.Provider value={true}>
-            {/* The order dialog opens 2 s after arrival (owner, 2026-11-06; it was off from 11-04). The first
-                form stays right under the first screen. */}
+            {/* No order dialog on arrival (2026-11-14): the first form is inside the first screen now, and the dialog
+                (2 s after arrival, owner 2026-11-06) covered it with the same form and, as the page's largest paint,
+                put PageSpeed's LCP at 3.6–5.8 s against 1.2 s without it. To bring it back: popupAfterMs={2000}
+                in place of popup={false}. */}
             {/* The owner's photo of the box in place of the drawn pack (2026-11-06). */}
             <ProductPhotoContext.Provider value={packPhoto}>
-              <Page hero={adHero} proof={<Proof />} popupAfterMs={2000} barOverForms={false} />
+              <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
             </ProductPhotoContext.Provider>
           </ConfirmAutofillContext.Provider>
         </TelegramChannelContext.Provider>

@@ -835,6 +835,10 @@ user's Mac.
     order post caught. On slow 3G a «send» pressed before hydration now also waits for Turnstile (~15 s in the throttled test).
     To end the test: `deploy:full` (or decide what workers.dev should be) — and a deploy from another folder without media would
     again strip workers.dev's certificate.
+    Same day, the owner: the partner's ads run from a **newly opened Instagram account, not «Bionex»**, so people who speak ill of the
+    brand do not recognise it; ours run from «Bionex». Checked: none of the three sites (HTML, script, title, og:site_name) shows
+    «Bionex»; only the ad's account name (and comments under the ads) does. Advised: the one-ad test from a new page/account named for
+    the product, knowing it then tests the account and the rules together; V3 left alone (changing a running ad's identity restarts it).
 
 65. **The partner site gets the Telegram channel link** (2026-11-07, owner: «sherik saytidan ham shu telegram guruhga qo'shilish
     button chiqsin»). `sites/partner.tsx` now wraps the original page in `TelegramChannelContext` (t.me/zeynare); #57's «the partner
@@ -845,6 +849,32 @@ user's Mac.
     shows «@bionexecobot»** (description «Buyurtma berish yoki ma'lumot olish uchun @bionexecobot ni bosing» and a post), so a partner
     customer who taps sees the brand the partner's new Instagram account hides, and may order through our bot, past the partner's sheet.
     Committed, NOT deployed: the owner was asked to choose (edit the channel's description/post first, or deploy as is).
+
+66. **Live was an old copy; the form is now in the main page's first screen** (2026-11-14, owner pasting a targetologist's list:
+    PageSpeed under 3 s, compress images, a 2-field form seen on the first screen, «28.10 lifted LPV→lead 5.7 % → ~11 %, keep going»,
+    «40 % leave the site»). **Found first:** Worker `d6816373` (2026-11-10 12:06Z) and Pages `6512dab5` (~11-11, git source `56ba4dd`)
+    came from another copy of the project, not this folder: both addresses served the 4-Nov code (bundle `index-BECULjL7.js`; a build
+    of `56ba4dd` differs only by the phone below), so #55–#65 were off live: no www in `MAIN_SITE_HOSTS` (#59), no fast form (#62),
+    no box photos (#63), no 2-s dialog (#61), workers.dev the full page (not #64's test), the partner's channel link never deployed.
+    The live Worker's code = `56ba4dd` + 504295e's `no_browser` line + the phone. That copy's one new thing, carried over here:
+    `site.phone` = **+998 50 731 92 82** («the company's official number since 2026-11-10, on every site») and the <noscript> line.
+    Built (main page = sites/classic only; partner and plain pages unchanged): `Landing`'s `hero` may be a function that receives the
+    first form; AdHero puts it right under the headline and a small Gulchehra opa row (her last sentence on phones), with the
+    promises under it; no «Ҳозироқ буюртма беринг» button, no header «Консультация» (`Header cta={false}`; with the phone button the
+    header wrapped to two rows at 380–420 px). `OrderForm variant="hero"`: no heading, smaller labels, 56-px fields, a one-line hint.
+    Same `#tez-buyurtma` id and `quickRef` (early.js, the order bar). Measured at 360–412 px: fields at 324–493 px, button bottom 612 px
+    (whole from a 612-px-high in-app view; 360×560 shows the fields and the button's top). h1 `max-sm:min-h-[3.3em]`: the stand-in
+    font set it in two lines and Montserrat's third pushed the form down 29 px. **Dialog off** (`popup={false}`): it covered the form
+    now on screen and, as the largest paint, put Lighthouse's LCP at 3.6–5.8 s; to restore, `popupAfterMs={2000}`. Pictures: covers,
+    the face and the certificate as WebP beside the JPEGs (`pic()` prefers .webp; 590 → 230 KB covers, certificate 140 → 70 KB,
+    full 800 → 330 KB; plain.tsx keeps its JPEGs); prerender drops index.html's drawn-pack preload when the page never shows it
+    (every phone fetched it first, at high priority). Thank-you screen: «Қўнғироқ қилинадиган рақам: •• ••• 45-67» (owner: last four
+    only), shared code, so the partner gets it with `deploy:t2`. Lighthouse mobile, same brotli server: old 0.89 (LCP 1.2 s, CLS 0.218)
+    → new 0.99–1.00 (LCP 0.8–0.9 s, CLS 0.048); live (old code) 0.98, LCP 1.8 s. Google's PSI API refused (no key, quota 0).
+    Not deployed: deploying from here replaces the 11-10 copy; the owner was asked who made it and whether it had more.
+    Told the owner: part of 5.7 % → 11 % was counting (#27 rule gone, #32 instant Lead); «40 % leave», if clicks → LPV, is partly our
+    Pixel loading after `load` + idle (fast leavers never count); Turnstile pulls ~1.7 MB per visit in plain browsers (and the in-app
+    silent check, #53) — deferring it is the owner's call.
 
 ## Open items
 
