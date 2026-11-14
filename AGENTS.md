@@ -937,7 +937,7 @@ user's Mac.
     (c) Same day, owner: «qayta harid qilayotgan mijozlarimiz 70%». Both figures live in `sites/classic/stats.ts` (`CUSTOMERS`,
     `REPEAT_BUYERS`); `Stats` at the top of the proof section, right under the first screen: «400 000+ мижозларимиз» and «70%
     мижозларимиз қайта харид қилади», one card under the other on a phone (side by side they broke mid-word at 320–360 px), two
-    columns from 640 px. Not in the header: a second figure there would not fit beside the phone button.
+    columns from 640 px. Not in the header: a second figure there would not fit beside the phone button. Deployed on the owner's «deploy qil»: Worker 9eb43562, Pages 6caff6e1 (bundle index-a-bAAc9I.js on all three addresses).
 
 ## Open items
 
