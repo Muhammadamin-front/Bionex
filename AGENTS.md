@@ -871,13 +871,16 @@ user's Mac.
     (every phone fetched it first, at high priority). Thank-you screen: «Қўнғироқ қилинадиган рақам: •• ••• 45-67» (owner: last four
     only), shared code, so the partner gets it with `deploy:t2`. Lighthouse mobile, same brotli server: old 0.89 (LCP 1.2 s, CLS 0.218)
     → new 0.99–1.00 (LCP 0.8–0.9 s, CLS 0.048); live (old code) 0.98, LCP 1.8 s. Google's PSI API refused (no key, quota 0).
-    Not deployed: deploying from here replaces the 11-10 copy; the owner was asked who made it and whether it had more.
+    Not deployed (deploying from here replaces the 11-10 copy's build; see «The other copy» below).
     Told the owner: part of 5.7 % → 11 % was counting (#27 rule gone, #32 instant Lead); «40 % leave», if clicks → LPV, is partly our
     Pixel loading after `load` + idle (fast leavers never count); Turnstile pulls ~1.7 MB per visit in plain browsers (and the in-app
     silent check, #53) — deferring it is the owner's call.
-    **Before any `deploy:t2`:** `site.phone` and the <noscript> line are shared, so the partner build now carries +998 50 731 92 82
-    (checked in dist-t2). That copy's comment says «every site», but it never deployed t2, and the number ties the partner page to the
-    company (principle #2; the partner's fresh Instagram account, #64; calls bypassing its sheet, as with @bionexecobot in #65). Ask first.
+    **The other copy** (owner, same day): a Claude session on this Mac deployed from **/Volumes/Muhammad/Bionex** (an SSD «Muhammad»),
+    a copy taken at `56ba4dd` (4 Nov) and never updated with 5–7 Nov's commits. Its only content changes (fileMode ignored: the drive
+    shows every file as modified): the phone (carried over), 504295e's `no_browser` fix with its tests (already here), and its AGENTS.md
+    #55, which records the owner's explicit «barcha saytlarga» — **the partner page too** (needs `deploy:t2`). Its stash is the old
+    10-16 «Symptoms» one. Nothing else was lost. This folder (Desktop) is the newest: deploy from here, or bring the SSD copy up to date first.
+    Still worth a word before `deploy:t2`: the number ties the partner page to the company that its fresh Instagram account (#64) hides.
 
 ## Open items
 
