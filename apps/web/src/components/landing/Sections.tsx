@@ -139,6 +139,7 @@ export function Expert() {
 
 export function Symptoms() {
   const { symptoms, vesselImage } = product;
+  const copy = usePageCopy();
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const toggle = (i: number) =>
     setPicked((prev) => {
@@ -212,7 +213,7 @@ export function Symptoms() {
               </p>
             )}
             <AntiMetalLink href="#tez-buyurtma" tone="accent" className="mt-5 w-full">
-              Бепул маслаҳат олиш
+              {copy?.sectionButton ?? 'Бепул маслаҳат олиш'}
             </AntiMetalLink>
           </div>
         </div>
@@ -495,6 +496,7 @@ export function Family() {
 }
 
 export function Footer() {
+  const copy = usePageCopy();
   return (
     <footer className="on-dark bg-forest text-on-forest">
       {/* Extra bottom room on phones so the last links can scroll clear of the fixed order bar. */}
@@ -513,7 +515,7 @@ export function Footer() {
             {[
               ['#mahsulot', 'Маҳсулот'],
               ['#alomatlar', 'Аломатлар'],
-              ['#forma', 'Бепул консультация'],
+              ['#forma', copy?.bar ?? 'Бепул консультация'],
             ].map(([href, label]) => (
               <a key={href} href={href} className="inline-flex min-h-11 items-center rounded underline-offset-4 hover:text-white hover:underline">
                 {label}
@@ -528,6 +530,7 @@ export function Footer() {
 
 export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; quickFormOnScreen: boolean }) {
   const offer = useOffer();
+  const copy = usePageCopy();
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_28px_-18px_rgba(13,58,39,0.55)] transition-transform duration-300 ease-out md:hidden"
@@ -567,7 +570,7 @@ export function StickyCta({ visible, quickFormOnScreen }: { visible: boolean; qu
           tabIndex={visible ? 0 : -1}
           className="inline-flex h-16 min-w-0 flex-1 items-center justify-center rounded-2xl bg-forest px-4 font-display text-[1.05rem] font-bold text-white shadow-[0_10px_24px_-10px_rgba(13,58,39,0.6)] active:scale-[0.98]"
         >
-          {offer ? `−${offer.percent}% чегирма билан буюртма` : 'Бепул консультация'}
+          {offer ? `−${offer.percent}% чегирма билан буюртма` : (copy?.bar ?? 'Бепул консультация')}
         </a>
       </div>
     </div>

@@ -883,19 +883,22 @@ user's Mac.
     10-16 «Symptoms» one. Nothing else was lost. This folder (Desktop) is the newest: deploy from here, or bring the SSD copy up to date first.
     Still worth a word before `deploy:t2`: the number ties the partner page to the company that its fresh Instagram account (#64) hides.
 
-67. **Main page: a free consultation, not «буюртма»; the number read back** (2026-11-14, owner: «буюртма беринг» puts older
+67. **Main page: «Зейнарага ариза қолдириш», not «буюртма»; the number read back** (2026-11-14, owner: «буюртма беринг» puts older
     visitors off, «Кардиолог билан боғланинг» or the like instead; many leave a wrong number on purpose; the specialist rings
-    9:00–21:00 and makes time for you). `PageCopyContext` (lib/copy.tsx), provided only by sites/classic (`MAIN_COPY`,
-    sites/classic/copy.ts); null elsewhere, so the partner and the workers.dev page keep every text. The forms' button and the
-    sections' buttons «Бепул маслаҳат олиш»; under the button «Мутахассисимиз 9:00 дан 21:00 гача қўнғироқ қилиб, сиз учун вақт
-    ажратади ва бепул маслаҳат беради.»; once 9 digits are in, the hint becomes «Мутахассис шу рақамга қўнғироқ қилади: +998 …
-    Рақамингиз тўғрими?» (no extra tap; the autofill question #49 unchanged); the bottom section «Нега маслаҳатни кечиктирмаслик
-    керак?» / «Маслаҳат олиш жуда осон» and its steps; FAQ «Рақамимни қолдирсам нима бўлади?»; the thank-you screen shows its own
-    text in place of the Worker's «Буюртмангиз қабул қилинди» (the Worker's MESSAGES unchanged: the partner reads them too), first
-    step with the hours and «Кечқурун қолдирсангиз, эртасига эрталаб». Left: Promises' «15 дақиқада қўнғироқ», the bar's «Бепул
-    консультация», the skip link. **«Мутахассис», not «кардиолог»**, until the owner confirms a cardiologist really makes or joins
-    the calls (WHO / WHOS in copy.ts): a sales call announced as a doctor's breaks trust, and Meta's health-ad policy and the rules
-    for advertising supplements. A read-back catches mistyped and old autofilled numbers, not deliberate false ones. Not deployed.
+    9:00–21:00). Tried first the same day: «Бепул маслаҳат олиш» — the owner turned it down («нархини сўрайдиганлар бизга керак
+    эмас») and picked «Зейнарага ариза қолдириш» of three offered. `PageCopyContext` (lib/copy.tsx), provided only by sites/classic
+    (`MAIN_COPY`, sites/classic/copy.ts); null elsewhere, so the partner and the workers.dev test page keep every text (t2 bundle
+    checked: no «ариза»). The forms' button, the sections' buttons (Symptoms, Process, Reviews) «Зейнарага ариза қолдириш»; the
+    phones' bar and the footer link «Ариза қолдириш»; under the button «Олдиндан тўлов йўқ. Мутахассисимиз 9:00–21:00 оралиғида
+    қўнғироқ қилиб, манзилингизни аниқлайди.»; once 9 digits are in, the hint becomes «Мутахассис шу рақамга қўнғироқ қилади: +998 …
+    Рақамингиз тўғрими?» (no extra tap; the autofill question #49 unchanged); the bottom section «Нега кечиктирмаслик керак?» /
+    «Ариза қолдириш жуда осон» and its steps; FAQ «Ариза қолдирсам нима бўлади?»; the first screen's third promise «1–3 кунда
+    уйингизгача» in place of the ad's «Бепул консультация»; the thank-you screen shows its own text in place of the Worker's
+    «Буюртмангиз қабул қилинди» (the Worker's MESSAGES unchanged: the partner reads them too), first step with the hours and
+    «Кечқурун қолдирсангиз, эртасига эрталаб». Left: Promises' «15 дақиқада қўнғироқ», the thank-you step «… бепул маслаҳат беради»
+    (after the order), the skip link. **«Мутахассис», not «кардиолог»**, until the owner confirms a cardiologist really makes or
+    joins the calls (WHO / WHOS in copy.ts): a sales call announced as a doctor's breaks trust, and Meta's health-ad policy and the
+    rules for advertising supplements. A read-back catches mistyped and old autofilled numbers, not deliberate false ones.
 
 68. **workers.dev is the full page again** (2026-11-14, owner: «barcha reklamalar zeynara.com.uz da», so #64's one-ad test is
     over). `npm run deploy` builds the full page again (as `deploy:full`); #64's plain page with the partner's rules is

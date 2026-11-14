@@ -1,5 +1,6 @@
 // Wording one site may change without touching the others'. The main site provides it (sites/classic/copy.ts,
-// 2026-11-14: «буюртма» put older visitors off, and many left a wrong number); the partner and the workers.dev
+// 2026-11-14: «буюртма» put older visitors off, «бепул маслаҳат» drew price-askers,
+// and many left a wrong number); the partner and the workers.dev
 // test page provide nothing and keep every original text.
 import { createContext, useContext } from 'react';
 
@@ -8,6 +9,8 @@ export interface PageCopy {
   submit: string;
   /** The buttons in the page's sections that lead to the form. */
   sectionButton: string;
+  /** The phones' bottom bar button. */
+  bar: string;
   /** The line under every form's send button. */
   underButton: string;
   /** Read the number back once all 9 digits are in, before sending ("+998 90 123 45 67"). */

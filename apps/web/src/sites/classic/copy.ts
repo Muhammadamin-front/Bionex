@@ -1,6 +1,7 @@
-// The main site's own wording (owner, 2026-11-14): not «буюртма» — a free consultation with a specialist, the hours
-// they ring, and the number read back before it is sent (many orders came with a wrong number). Older visitors are
-// asked for a phone call, not a purchase.
+// The main site's own wording (owner, 2026-11-14). Not «буюртма» (it put older visitors off), and not «бепул маслаҳат»
+// either (tried the same day; the owner: it draws people who only ask the price): «Зейнарага ариза қолдириш», the owner's
+// pick of three. The hours the specialist rings, and the number read back before it is sent (many orders came with a
+// wrong number).
 //
 // «Мутахассис», not «кардиолог»: the owner asked for «Кардиолог билан боғланинг» or something like it. Write
 // «кардиолог» only if a cardiologist really makes or joins these calls: a customer told a doctor will ring, and then
@@ -12,33 +13,34 @@ import { product } from '../../config/product';
 
 const WHO = 'мутахассис';
 const WHOS = 'мутахассисимиз';
-const HOURS = '9:00 дан 21:00 гача';
+const HOURS = '9:00–21:00 оралиғида';
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const ORDER_FAQ = 'Буюртма берсам нима бўлади?';
 
 export const MAIN_COPY: PageCopy = {
-  submit: 'Бепул маслаҳат олиш',
-  sectionButton: 'Бепул маслаҳат олиш',
-  underButton: `${cap(WHOS)} ${HOURS} қўнғироқ қилиб, сиз учун вақт ажратади ва бепул маслаҳат беради.`,
+  submit: 'Зейнарага ариза қолдириш',
+  sectionButton: 'Зейнарага ариза қолдириш',
+  bar: 'Ариза қолдириш',
+  underButton: `Олдиндан тўлов йўқ. ${cap(WHOS)} ${HOURS} қўнғироқ қилиб, манзилингизни аниқлайди.`,
   numberCheck: (phone) => `${cap(WHO)} шу рақамга қўнғироқ қилади: ${formatUzPhone(phone)}. Рақамингиз тўғрими?`,
   thanks: {
     accepted: `Раҳмат! ${cap(WHOS)} сиз билан боғланади.`,
-    duplicate: `Сўровингиз аллақачон қабул қилинган. ${cap(WHOS)} ${HOURS} сизга қўнғироқ қилади.`,
+    duplicate: `Аризангиз аллақачон қабул қилинган. ${cap(WHOS)} ${HOURS} сизга қўнғироқ қилади.`,
     firstStep: `Телефонингизни ёнингизда сақланг: ${WHOS} ${HOURS} қўнғироқ қилади. Кечқурун қолдирсангиз, эртасига эрталаб.`,
   },
-  urgencyTitle: 'Нега маслаҳатни кечиктирмаслик керак?',
-  stepsTitle: 'Маслаҳат олиш жуда осон',
+  urgencyTitle: 'Нега кечиктирмаслик керак?',
+  stepsTitle: 'Ариза қолдириш жуда осон',
   steps: [
     'Исмингиз ва телефон рақамингизни қолдиринг',
-    `${cap(WHOS)} ${HOURS} қўнғироқ қилиб, бепул маслаҳат беради`,
-    'Олишга қарор қилсангиз, маҳсулот 1–3 кунда уйингизгача бепул етказилади',
+    `${cap(WHOS)} ${HOURS} қўнғироқ қилиб, манзилингизни аниқлайди`,
+    'Маҳсулот 1–3 кунда уйингизгача бепул етказилади',
     'Тўловни маҳсулотни олганингиздан кейин қиласиз',
   ],
   faq: {
     [ORDER_FAQ]: {
-      q: 'Рақамимни қолдирсам нима бўлади?',
-      a: `${cap(WHOS)} ${HOURS} қўнғироқ қилади, саволларингизга жавоб беради ва маҳсулот ҳақида тўлиқ маълумот беради. Олиш-олмасликни ўзингиз ҳал қиласиз. Олсангиз, маҳсулот 1–3 кунда етказилади, тўловни курьердан олганда қиласиз. Қадоқ ташқаридан нима эканлиги кўринмайди.`,
+      q: 'Ариза қолдирсам нима бўлади?',
+      a: `${cap(WHOS)} ${HOURS} қўнғироқ қилади, маҳсулот ҳақида тўлиқ маълумот беради ва манзилингизни аниқлайди. Маҳсулот 1–3 кунда етказилади. Тўловни курьердан олганда қиласиз. Қадоқ ташқаридан нима эканлиги кўринмайди.`,
     },
   },
 };

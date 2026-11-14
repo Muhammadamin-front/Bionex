@@ -11,8 +11,11 @@ import { AuroraBackdrop } from '../../components/ui/AuroraBackdrop';
 import { CheckIcon } from '../../components/ui/Icons';
 import { tapOffer, useOffer } from '../../lib/offer';
 
-/** What the ad's last screen promises, in the ad's order. */
-const PROMISES = ['Олдиндан тўлов йўқ', 'Бепул етказиб бериш', 'Бепул консультация'];
+/**
+ * What the ad's last screen promises, in the ad's order — but not its «Бепул консультация» (owner, 2026-11-14: the page
+ * asks for an «ариза» for Zeynara, not for a consultation; consultation drew people who only wanted the price).
+ */
+const PROMISES = ['Олдиндан тўлов йўқ', 'Бепул етказиб бериш', '1–3 кунда уйингизгача'];
 
 function PlayIcon({ className }: { className: string }) {
   return (
