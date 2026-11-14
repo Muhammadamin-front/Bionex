@@ -875,6 +875,9 @@ user's Mac.
     Told the owner: part of 5.7 % → 11 % was counting (#27 rule gone, #32 instant Lead); «40 % leave», if clicks → LPV, is partly our
     Pixel loading after `load` + idle (fast leavers never count); Turnstile pulls ~1.7 MB per visit in plain browsers (and the in-app
     silent check, #53) — deferring it is the owner's call.
+    **Before any `deploy:t2`:** `site.phone` and the <noscript> line are shared, so the partner build now carries +998 50 731 92 82
+    (checked in dist-t2). That copy's comment says «every site», but it never deployed t2, and the number ties the partner page to the
+    company (principle #2; the partner's fresh Instagram account, #64; calls bypassing its sheet, as with @bionexecobot in #65). Ask first.
 
 ## Open items
 
