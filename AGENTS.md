@@ -916,8 +916,9 @@ user's Mac.
     «Status» `shubhali`, «Sabab» `vpn_server, tarmoq: <name>`, a warning in Telegram and the sheet's «Belgi». Not the «Spam»
     tab: VPNs are common in Uzbekistan (blocked sites), so customers can arrive this way; mobile proxies (an operator's own
     network) are not caught. If a week of such rows is mostly marked spam, moving it into `MAIN_SPAM_SHEET_FLAGS` is one word.
-    Partner unchanged. Test: 136. **Check after the deploy** that domain orders do not all carry `vpn_server` (it would mean
-    the binding passes some network of its own; Cloudflare's is excluded for that reason).
+    Partner unchanged. Test: 136. Deployed 2026-11-14 (Worker 8c0d1661, Pages 804ca3b3). Checked with `wrangler tail` on a real
+    order through the domain at 18:11: over the binding `request.cf` is null and `x-bx-asn` 64466 «UNIVERSAL MOBILE SYSTEMS LLC»
+    (Mobiuz) arrived, so domain orders are judged by the customer's own network, and a mobile one is not flagged.
 
 70. **«400 000+ мижозларимиз» and written reviews** (2026-11-14, owner: «mijozlar soni 400 000+ dan oshdi … videodagi
     mijozlarning review larini yozma tarzda qo'shish»). (a) `Header` gained `note`; AdHero passes «400 000+ мижозларимиз» (the
@@ -930,7 +931,9 @@ user's Mac.
     off — **the owner was asked to check them against the videos before deploying**. review-2 and review-3 (the two older men's
     Telegram circles) left out: too unclear, and a prompt made whisper repeat the prompt's own words. story-3 is filmed during a
     visit with gifts (15 boxes, a voucher); only her own words are quoted. No company name in any card (#16). «Натижалар ҳар бир
-    инсонда турлича бўлиши мумкин» stays under them. Partner build: none of it. Not deployed when written.
+    инсонда турлича бўлиши мумкин» stays under them. Partner build: none of it. The face crops are under 4 KB, so Vite inlines
+    them as data: URIs (CSP img-src allows data:). Deployed the same day on the owner's «deploy qil» after they saw the texts:
+    Worker 43a39113, Pages afd62494; all three addresses checked (bundle index-BCZ_3aW0.js).
 
 ## Open items
 
