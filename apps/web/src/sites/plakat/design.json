@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T15:10:26Z",
+  "title": "Design System: Зейнара — Саломатлик плакати",
+  "extensions": {
+    "colorMeta": {
+      "ultra": { "role": "primary", "displayName": "Poster Ultramarine", "canonical": "#2443a8", "tonalRamp": ["#0c1638", "#142560", "#1c3488", "#2443a8", "#4a65bf", "#7d93d4", "#b3c0e8", "#e4e9fa"] },
+      "ultra-deep": { "role": "primary", "displayName": "Deep Ultramarine", "canonical": "#182f7d", "tonalRamp": ["#08102b", "#0f1d4f", "#182f7d", "#2443a8", "#4a65bf", "#7d93d4", "#b3c0e8", "#e4e9fa"] },
+      "ochre": { "role": "secondary", "displayName": "Printer's Ochre", "canonical": "#f0b429", "tonalRamp": ["#3d2a03", "#6b4a06", "#a06e09", "#d99a0b", "#f0b429", "#f5c24a", "#f9da8f", "#fdf1d4"] },
+      "ochre-press": { "role": "secondary", "displayName": "Pressed Ochre", "canonical": "#f5c24a", "tonalRamp": ["#3d2a03", "#6b4a06", "#a06e09", "#d99a0b", "#f0b429", "#f5c24a", "#f9da8f", "#fdf1d4"] },
+      "ochre-deep": { "role": "secondary", "displayName": "Deep Ochre", "canonical": "#d99a0b", "tonalRamp": ["#3d2a03", "#6b4a06", "#a06e09", "#d99a0b", "#f0b429", "#f5c24a", "#f9da8f", "#fdf1d4"] },
+      "ink": { "role": "neutral", "displayName": "Black Ink", "canonical": "#141414", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#e2e2dc", "#fafaf7"] },
+      "ink-2": { "role": "neutral", "displayName": "Soft Ink", "canonical": "#262626", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#e2e2dc", "#fafaf7"] },
+      "muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#4a4a4a", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#e2e2dc", "#fafaf7"] },
+      "rule-grey": { "role": "neutral", "displayName": "Rule Grey", "canonical": "#8d8d86", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#e2e2dc", "#fafaf7"] },
+      "sheet": { "role": "neutral", "displayName": "Matte Paper", "canonical": "#fafaf7", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#eeeee8", "#fafaf7"] },
+      "field": { "role": "neutral", "displayName": "Field White", "canonical": "#ffffff", "tonalRamp": ["#141414", "#262626", "#4a4a4a", "#6b6b67", "#8d8d86", "#b8b8b1", "#eeeee8", "#ffffff"] },
+      "on-ultra": { "role": "neutral", "displayName": "Pale Ultramarine", "canonical": "#e4e9ff", "tonalRamp": ["#0c1638", "#142560", "#1c3488", "#2443a8", "#4a65bf", "#7d93d4", "#b3c0e8", "#e4e9ff"] },
+      "screen": { "role": "neutral", "displayName": "Dot Screen", "canonical": "rgba(255, 255, 255, 0.11)", "tonalRamp": ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.07)", "rgba(255,255,255,0.09)", "rgba(255,255,255,0.11)", "rgba(255,255,255,0.15)", "rgba(255,255,255,0.2)", "rgba(255,255,255,0.3)", "rgba(255,255,255,0.45)"] },
+      "danger": { "role": "neutral", "displayName": "Error Red (shared)", "canonical": "#b42318", "tonalRamp": ["#3a0b08", "#6b150f", "#912016", "#b42318", "#d4473b", "#e57d74", "#f2b7b1", "#fdecea"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The hero question only; clamp(3.4rem, 6vw, 5.25rem) from 640px; reserves two lines on phones." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles, uppercase, second half inked ultramarine or ochre." },
+      "title": { "displayName": "Title", "purpose": "Step-1 title, specialist's point headings, order button and bar labels." },
+      "quote": { "displayName": "Quote", "purpose": "The lead customer quote in ultramarine; same face sets the figures sentence on the ochre band." },
+      "body": { "displayName": "Body", "purpose": "All reading text in the platform sans, 1.02-1.15rem." },
+      "label": { "displayName": "Label", "purpose": "Shared form field labels, rendered in the condensed face." },
+      "small": { "displayName": "Small", "purpose": "Privacy line, disclaimer, captions, footer; never below 1rem." }
+    },
+    "shadows": [
+      { "name": "field-focus-ring", "value": "0 0 0 3px rgba(36, 67, 168, 0.28)", "purpose": "The only box-shadow: a state ring on a focused input, not elevation." }
+    ],
+    "borders": [
+      { "name": "rule-heavy", "value": "3px solid #141414", "purpose": "Order button, step panel, video frames, list heads, ochre band, bottom bar." },
+      { "name": "rule-hair", "value": "1.5px solid #141414", "purpose": "Between ruled list rows." },
+      { "name": "double-rule", "value": "border: 3px solid #141414; outline: 1.5px solid #fafaf7; outline-offset: 3px", "purpose": "The step-1 panel's printed double rule." },
+      { "name": "focus-outline", "value": "outline: 3px solid #f0b429; outline-offset: 3px", "purpose": "Keyboard focus on every interactive element." }
+    ],
+    "textures": [
+      { "name": "dot-screen", "value": "background-image: radial-gradient(rgba(255,255,255,0.11) 1.1px, transparent 1.5px); background-size: 7px 7px", "purpose": "The halftone screen on every ultramarine field." }
+    ],
+    "motion": [
+      { "name": "print-plate-lift", "value": "opacity, transform scale(1.04), filter blur(2px) over 1.6s cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The one authored motion: the box's halftone print lifts away once 45% in view; not shown under reduced motion." },
+      { "name": "bar-slide", "value": "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The phones' bottom bar leaving and returning." }
+    ],
+    "breakpoints": [
+      { "name": "xs-max", "value": "340px" },
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Order Button",
+      "kind": "button",
+      "refersTo": "button-order",
+      "description": "The one action: an ochre block in a black rule, condensed uppercase label.",
+      "html": "<button class=\"ds-btn-order\">Зейнарага ариза қолдириш</button>",
+      "css": ".ds-btn-order { background: #f0b429; color: #141414; border: 3px solid #141414; border-radius: 0; min-height: 3.75rem; padding: 0.5rem 0.9rem; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; text-transform: uppercase; font-size: 1.35rem; line-height: 1.02; letter-spacing: 0.01em; cursor: pointer; } .ds-btn-order:hover { background: #f5c24a; } .ds-btn-order:focus-visible { background: #f5c24a; outline: 3px solid #f0b429; outline-offset: 3px; }"
+    },
+    {
+      "name": "Call Ring",
+      "kind": "button",
+      "refersTo": "button-call",
+      "description": "Masthead call link on the ultramarine field; a pill with the number from 640px.",
+      "html": "<div class=\"ds-field-blue\"><a class=\"ds-call\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2\"/></svg><span>+998 50 731 92 82</span></a></div>",
+      "css": ".ds-field-blue { background-color: #2443a8; background-image: radial-gradient(rgba(255,255,255,0.11) 1.1px, transparent 1.5px); background-size: 7px 7px; padding: 1rem; } .ds-call { display: inline-flex; align-items: center; gap: 0.5rem; height: 2.6rem; padding-inline: 1rem; border: 2px solid #f0b429; border-radius: 999px; color: #f0b429; font-weight: 700; text-decoration: none; font-variant-numeric: tabular-nums; } .ds-call:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "A white blank on paper in a black rule; ultramarine border and ring on focus.",
+      "html": "<label class=\"ds-label\">Исмингиз<input class=\"ds-input\" /></label>",
+      "css": ".ds-label { display: block; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 1rem; color: #141414; } .ds-input { display: block; width: 100%; margin-top: 0.25rem; height: 3.5rem; padding: 0 1rem; background: #fff; color: #141414; border: 2px solid #141414; border-radius: 0; font-size: 1.3rem; caret-color: #2443a8; } .ds-input:focus { outline: none; border-color: #2443a8; box-shadow: 0 0 0 3px rgba(36, 67, 168, 0.28); }"
+    },
+    {
+      "name": "Step Panel",
+      "kind": "card",
+      "refersTo": "step-panel",
+      "description": "Signature: the form as the poster's step 1, paper in a double printed rule with an ochre roundel.",
+      "html": "<div class=\"ds-field-blue2\"><section class=\"ds-step\"><span class=\"ds-roundel\">1</span><p class=\"ds-step-title\">Исм ва рақамингиз</p><p class=\"ds-step-body\">Name and +998 phone fields, then the ochre button.</p></section></div>",
+      "css": ".ds-field-blue2 { background-color: #2443a8; background-image: radial-gradient(rgba(255,255,255,0.11) 1.1px, transparent 1.5px); background-size: 7px 7px; padding: 2rem 1rem 1rem; } .ds-step { position: relative; background: #fafaf7; color: #141414; border: 3px solid #141414; outline: 1.5px solid #fafaf7; outline-offset: 3px; padding: 0.95rem 0.9rem 0.6rem; } .ds-step .ds-roundel { position: absolute; top: -1.05rem; left: 0.75rem; display: inline-grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 999px; border: 2.5px solid #141414; background: #f0b429; color: #141414; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 1.3rem; line-height: 1; } .ds-step-title { margin: 0 0 0.25rem 2.35rem; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; text-transform: uppercase; font-size: 1.35rem; line-height: 1; } .ds-step-body { font-size: 1rem; }"
+    },
+    {
+      "name": "Next Steps Strip",
+      "kind": "custom",
+      "refersTo": "roundel-paper",
+      "description": "Steps 2 and 3 on ultramarine: paper roundels in a two-column ruled strip.",
+      "html": "<div class=\"ds-field-blue3\"><ol class=\"ds-next\"><li><span class=\"ds-r\">2</span><span><b>Мутахассис қўнғироқ қилади</b> 9:00–21:00</span></li><li><span class=\"ds-r\">3</span><span><b>Мос бўлса, уйингизга</b> 1–3 кунда</span></li></ol></div>",
+      "css": ".ds-field-blue3 { background-color: #2443a8; background-image: radial-gradient(rgba(255,255,255,0.11) 1.1px, transparent 1.5px); background-size: 7px 7px; padding: 1rem; } .ds-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; border-top: 2px solid #e4e9ff; } .ds-next li { display: flex; gap: 0.55rem; align-items: flex-start; padding: 0.7rem 0.6rem 0.2rem 0; font-size: 1rem; line-height: 1.3; color: #e4e9ff; } .ds-next li + li { border-left: 1px solid #e4e9ff; padding-left: 0.7rem; } .ds-next b { display: block; color: #fff; } .ds-r { display: inline-grid; place-items: center; flex: none; width: 2.2rem; height: 2.2rem; border-radius: 999px; border: 2.5px solid #fafaf7; background: #fafaf7; color: #182f7d; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 1.3rem; }"
+    },
+    {
+      "name": "Ruled Points List",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The specialist's points: ruled rows with a single-stroke pictogram in the margin.",
+      "html": "<ul class=\"ds-explains\"><li><svg class=\"ds-picto\" viewBox=\"0 0 32 32\"><path d=\"M7 25C7 13 14 6 26 6c0 12-7 19-19 19Z\"/><path d=\"M7 25 18 14\"/></svg><div><h3>Таркибида нима бор</h3><p>9 хил ўсимлик экстрактидан тайёрланган сироп, 330 мл.</p></div></li></ul>",
+      "css": ".ds-explains { list-style: none; margin: 0; padding: 0; border-top: 3px solid #141414; background: #fafaf7; color: #141414; } .ds-explains li { display: grid; grid-template-columns: 2.6rem 1fr; gap: 0.9rem; padding: 1.05rem 0; border-bottom: 1.5px solid #141414; } .ds-explains h3 { margin: 0; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; text-transform: uppercase; font-size: 1.4rem; line-height: 1.05; } .ds-explains p { margin: 0.3rem 0 0; font-size: 1.08rem; line-height: 1.5; color: #262626; } .ds-picto { width: 2.6rem; height: 2.6rem; fill: none; stroke: #2443a8; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }"
+    },
+    {
+      "name": "Figures Band",
+      "kind": "custom",
+      "refersTo": "ochre-band",
+      "description": "The owner's figures said as one sentence on ochre between heavy ink rules.",
+      "html": "<section class=\"ds-ochre\"><p><span class=\"ds-fig\">400 000+</span> мижозимиз бор. Улардан <span class=\"ds-fig\">70%</span> қайта харид қилади.</p></section>",
+      "css": ".ds-ochre { background: #f0b429; color: #141414; padding: 2.75rem 1rem; border-block: 3px solid #141414; } .ds-ochre p { margin: 0; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; text-transform: uppercase; font-size: clamp(1.9rem, 8.5vw, 3.6rem); line-height: 1.02; } .ds-fig { color: #2443a8; white-space: nowrap; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Bottom Bar",
+      "kind": "nav",
+      "refersTo": "bottom-bar",
+      "description": "Phones only: a square call button and the ochre order button on paper under an ink rule.",
+      "html": "<div class=\"ds-bar\"><a class=\"ds-bar-call\" href=\"#\" aria-label=\"call\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2\"/></svg></a><button class=\"ds-bar-order\">Ариза қолдириш</button></div>",
+      "css": ".ds-bar { display: flex; gap: 0.6rem; padding: 0.6rem 0.75rem; background: #fafaf7; border-top: 3px solid #141414; } .ds-bar-call { display: grid; place-items: center; flex: none; width: 3.75rem; height: 3.75rem; border: 3px solid #141414; color: #141414; } .ds-bar-order { flex: 1; height: 3.75rem; background: #f0b429; border: 3px solid #141414; border-radius: 0; color: #141414; font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif; font-weight: 800; text-transform: uppercase; font-size: 1.35rem; cursor: pointer; } .ds-bar-order:hover, .ds-bar-order:focus-visible { background: #f5c24a; } .ds-bar-call:focus-visible, .ds-bar-order:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Corridor Health Poster",
+    "overview": "The specialist's explanation, printed as the numbered health poster on a clinic corridor wall. Offset print in three inks on matte stock: an ultramarine field carrying a visible halftone dot screen, one ochre, black ink, and the unprinted paper. Everything reads as print: flat ink, square sheets, ruled rows, numbered roundels, single-stroke pictograms. The order form is not a card floating over a hero. It is the poster's step 1, a paper panel inside a double printed rule, and steps 2 and 3 follow as a ruled strip under it.\n\nDensity is poster-like: big condensed capitals for the few words that matter, then reading text in the phone's own sans at generous sizes for an older audience. Sections alternate ultramarine field, paper, and one ochre band, separated by colour and heavy ink rules rather than by cards or shadows.",
+    "keyCharacteristics": [
+      "Three inks plus paper; ultramarine fields always carry the halftone dot screen.",
+      "Condensed 800-weight capitals for headlines, labels and the order button; the platform sans for reading.",
+      "Square sheets and fully round roundels, nothing in between.",
+      "Depth by printed rules (heavy ink borders, a double rule around step 1), never by drop shadows.",
+      "Numbered roundels carry the story: 1 is the form, 2 and 3 what happens next.",
+      "One authored motion: the box's halftone plate lifting away to the photograph."
+    ],
+    "rules": [
+      { "name": "The Three Inks Rule", "body": "Ultramarine, ochre and black on paper. A fourth hue enters only as a functional state (the shared error red), never as decoration.", "section": "colors" },
+      { "name": "The Screened Field Rule", "body": "Every ultramarine field carries the 7px halftone dot screen; a flat blue field is a different world.", "section": "colors" },
+      { "name": "The One Ochre Action Rule", "body": "The filled ochre block with a black rule is the order action. Ochre elsewhere is highlight (words, roundel 1, the figures band, links), never a second filled button.", "section": "colors" },
+      { "name": "The 1rem Floor Rule", "body": "No reading text below 1rem, including privacy lines, captions, small print and the footer. The audience is 40–65.", "section": "typography" },
+      { "name": "The Capitals Are Ink Rule", "body": "Uppercase belongs to the condensed face at 800. Reading text in the platform sans stays sentence case.", "section": "typography" },
+      { "name": "The Printed Rule Rule", "body": "Separation and emphasis come from ink rules and ink colour. If something needs to stand forward, give it a heavier rule or the double rule, never a shadow.", "section": "elevation" },
+      { "name": "The One Moment Rule", "body": "One authored motion: the box's halftone print fades, scales to 1.04 and blurs away to the photograph (1.6s, cubic-bezier(0.16, 1, 0.3, 1)) once it is 45% in view. The bottom bar's 0.3s slide is the only other movement. Under reduced motion the plate is not shown.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do set every ultramarine field with the 7px halftone dot screen.",
+      "Do keep the order action a single ochre block with a 3px black rule and condensed uppercase label.",
+      "Do frame the order form as a numbered step on paper inside the double printed rule.",
+      "Do separate content with ink rules (3px heads, 1.5px between rows) instead of cards.",
+      "Do keep every reading size at 1rem or more.",
+      "Do keep corners either square (0) or fully round (999px).",
+      "Do gate the one authored motion behind reduced-motion."
+    ],
+    "donts": [
+      "Don't use drop shadows for depth; the only box-shadow is the field focus ring.",
+      "Don't use tonal or colour gradients; the dot screen is the only gradient.",
+      "Don't add a fourth decorative hue beyond ultramarine, ochre and black on paper.",
+      "Don't use intermediate corner radii (rounded cards, pill buttons for the order action).",
+      "Don't set reading paragraphs in the condensed display face or in capitals."
+    ]
+  }
+}
