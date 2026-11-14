@@ -38,6 +38,7 @@ npm test --workspace=@bionex/shared      # 66 tests
 npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
 npm run deploy:oromgoh --workspace=@bionex/worker    # the light-blue «Оромгоҳ» design instead (see #28)
+npm run deploy:plain --workspace=@bionex/worker      # workers.dev as #64's one-ad test page (off since 2026-11-14)
 ```
 `apps/web/.env.production` and `apps/web/.env.t2` are gitignored (values are public: Turnstile
 site key, site URL, Pixel id, `VITE_META_BROWSER_LEAD=1` for t2). They exist only on the
@@ -895,6 +896,10 @@ user's Mac.
     консультация», the skip link. **«Мутахассис», not «кардиолог»**, until the owner confirms a cardiologist really makes or joins
     the calls (WHO / WHOS in copy.ts): a sales call announced as a doctor's breaks trust, and Meta's health-ad policy and the rules
     for advertising supplements. A read-back catches mistyped and old autofilled numbers, not deliberate false ones. Not deployed.
+
+68. **workers.dev is the full page again** (2026-11-14, owner: «barcha reklamalar zeynara.com.uz da», so #64's one-ad test is
+    over). `npm run deploy` builds the full page again (as `deploy:full`); #64's plain page with the partner's rules is
+    `deploy:plain`. The Worker code still knows `rules: 'partner'`; only the page that sent it is no longer built by default.
 
 ## Open items
 
