@@ -972,7 +972,9 @@ user's Mac.
     Reviewed by the impeccable finish reviewer in two rounds (8 material fixes: 5 resolved, then the seed line, the 320×568 capture
     and a tall step-2 column fixed). Measured: name, number and button whole at 320×568 (button 486–560), 360×640 (525–598);
     steps 2–3 inside 390×844; headline positions identical with and without the web font; Lighthouse mobile 1.00, LCP 1.4 s, CLS
-    0.005. Not deployed when written: `npm run deploy:plakat` (Worker) puts it on workers.dev; zeynara.com.uz is untouched.
+    0.005. Deployed on the owner's «deploy qil» the same day: `npm run deploy:plakat`, Worker 981af16d; workers.dev serves the
+    poster (checked live: form, number read-back, 360×640 first screen), zeynara.com.uz untouched. **To end the test:**
+    `npm run deploy` (workers.dev back to the full page).
     Its design record is `src/sites/plakat/DESIGN.md` + `design.json` (the root DESIGN.md stays the «Оромгоҳ» world's). Known
     fragility, noted there: plakat.css restyles the shared form through its Tailwind class names, button structure and input
     names (`form.rounded-3xl`, `.am-btn > span[aria-hidden]`, `input[name='zn-customer']`): recheck this page after changing them.
