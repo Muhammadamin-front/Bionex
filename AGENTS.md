@@ -975,6 +975,11 @@ user's Mac.
     0.005. Deployed on the owner's «deploy qil» the same day: `npm run deploy:plakat`, Worker 981af16d; workers.dev serves the
     poster (checked live: form, number read-back, 360×640 first screen), zeynara.com.uz untouched. **To end the test:**
     `npm run deploy` (workers.dev back to the full page).
+    Two minutes after that deploy (15:17:57Z; another at 15:14Z), a Worker version 800c8332 from **another folder** replaced it:
+    the same recent code (www in `MAIN_SITE_HOSTS`, «Зейнарага ариза» in the bundle) but no `sites/classic/media/`, so workers.dev
+    showed the original green first screen with no videos (the owner: «hali ham eski yashil sayt»). Not this session; the SSD
+    copy was unmounted when checked. Redeployed from here: Worker 753043b9, `/` checked live. Before trusting workers.dev, run
+    `npx wrangler deployments list` and compare the latest version with the one you deployed.
     Its design record is `src/sites/plakat/DESIGN.md` + `design.json` (the root DESIGN.md stays the «Оромгоҳ» world's). Known
     fragility, noted there: plakat.css restyles the shared form through its Tailwind class names, button structure and input
     names (`form.rounded-3xl`, `.am-btn > span[aria-hidden]`, `input[name='zn-customer']`): recheck this page after changing them.
