@@ -233,6 +233,73 @@ function PackPhotos() {
   );
 }
 
+/**
+ * What the customers in the videos say, written out (owner, 2026-11-14: «videodagi mijozlarning review larini yozma
+ * tarzda qo'shish»). Their own words, lightly shortened: Gulchehra opa's from the ad's captions; the others heard with
+ * whisper.cpp (large-v3, on this Mac) and read back by the agent, so a word may be off — the owner checks them against
+ * the videos. Names only where the video says them. Not the two Telegram video messages of the older men (review-2,
+ * review-3): too unclear to write down without inventing words. No company name: the visitor never learns it (#16).
+ */
+const writtenReviews: Array<{ video: string; who: string; text: string }> = [
+  {
+    video: 'story-0',
+    who: 'Гулчеҳра опа, 55 ёш',
+    text: 'Тез чарчоқ, уйқусизлик мени безовта қиларди. Бир танишим менга Зейнара маҳсулотини тавсия қилди. Ҳозир ўзимни жуда яхши ҳис қиламан. Бунинг учун Зейнарага раҳмат!',
+  },
+  {
+    video: 'story-2',
+    who: 'Мижозимиз, 58 ёш',
+    text: 'Қон босимим 180 га 100, 170 га 100 бўлиб юрардим, қанча касалхоналарда ётиб чиқдим. Юрак оғриқларим жуда кўп эди. Бир куни Instagram’да Зейнарани кўриб қолдим. Ичгандан бери анча яхшиман: босимим 140 га 100, 130 га 90 бўлди. Ҳолсизлик кетди, ўзимда куч сезяпман. Ҳаммага тавсия қиламан.',
+  },
+  {
+    video: 'story-1',
+    who: 'Мижозимиз, Сурхондарё вилояти',
+    text: 'Бир неча ой олдин юрак уриши, қон босими, юракда безовталик, асабийлашиш пайдо бўлди. Бир неча шифокорга мурожаат қилиб, дори-дармон қилдим, лекин унча фойда кўрмадим. Instagram’да Зейнара рекламасини кўриб, харид қилдим ва ича бошладим. Яхши тарафга ўзгарди, раҳмат!',
+  },
+  {
+    video: 'story-3',
+    who: 'Мижозимиз, 65 ёш, Самарқанд вилояти',
+    text: 'Қон босимим кўтарилиб, ҳолатим, кучим йўқ эди. Зейнарани эшитиб, аввал оламми-олмайми деб ўйландим. Бир ҳафтадан кейин фарқини сездим. Жуда яхши. Дугоналаримга ҳам тавсия қиламан, улар ҳам баҳра топсин.',
+  },
+  {
+    video: 'review-1',
+    who: 'Мижозимиз, Тошкент шаҳри',
+    text: 'Тошкентдан буюртма қилиб олиб, ичяпман. Илгари нафас етишмасди, ентикиб қолардим, юриш ҳам қийин эди. Ҳозир юришда қийинчилик йўқ, анча ўзгариш бор. Фойдаси жуда-жуда зўр!',
+  },
+];
+
+/** The written reviews, each with its customer's face from the video (the cover), fetched only near the screen. */
+function WrittenReviews() {
+  const [ref, near] = useNear<HTMLDivElement>();
+  // `face-<video>.webp`: a 120-px crop of the face from the video (story-0's is the first screen's); else the cover.
+  const items = writtenReviews.map((r) => ({ ...r, face: pic(`face-${r.video}`) ?? pic(`${r.video}-face`) ?? pic(r.video) }));
+  return (
+    <div ref={ref} className="mt-12">
+      <h3 className="font-display text-[1.5rem] font-extrabold leading-tight sm:text-[1.9rem]">Видеодаги мижозларимиз нима дейди</h3>
+      <ul className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5">
+        {items.map((r) => (
+          <li key={r.video} className="flex flex-col rounded-3xl bg-card p-5 shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:p-6">
+            <blockquote className="flex-1 text-[1.05rem] leading-relaxed text-ink">«{r.text}»</blockquote>
+            <p className="mt-4 flex items-center gap-3 border-t border-line pt-4">
+              {r.face && (
+                <img
+                  src={near ? r.face : undefined}
+                  alt=""
+                  width={48}
+                  height={48}
+                  decoding="async"
+                  className="h-12 w-12 flex-none rounded-full bg-paper-2 object-cover"
+                />
+              )}
+              <span className="font-display text-[1rem] font-bold text-ink">{r.who}</span>
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Proof() {
   if (!videos.length && !certificate.full && !packPhotos.length) return null;
   return (
@@ -246,6 +313,7 @@ function Proof() {
             <p className="mt-3 max-w-2xl text-lg text-ink-2">Зейнарани ичган мижозларимиз ўзлари айтиб беради.</p>
             <VideoRow />
             {videos.length > 1 && <p className="mt-2 text-[0.95rem] text-muted sm:hidden">← Бошқа видеоларни кўриш учун суринг →</p>}
+            <WrittenReviews />
             <p className="mt-5 text-[0.95rem] text-muted">Натижалар ҳар бир инсонда турлича бўлиши мумкин.</p>
           </>
         )}

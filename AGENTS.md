@@ -919,6 +919,19 @@ user's Mac.
     Partner unchanged. Test: 136. **Check after the deploy** that domain orders do not all carry `vpn_server` (it would mean
     the binding passes some network of its own; Cloudflare's is excluded for that reason).
 
+70. **«400 000+ мижозларимиз» and written reviews** (2026-11-14, owner: «mijozlar soni 400 000+ dan oshdi … videodagi
+    mijozlarning review larini yozma tarzda qo'shish»). (a) `Header` gained `note`; AdHero passes «400 000+ мижозларимиз» (the
+    owner's figure; worded as the company's customers, not Zeynara's alone), between the logo and the phone button: no height,
+    one row at 320–430 px, inline on a computer. (b) `WrittenReviews` (sites/classic/index.tsx), under the video row: five cards,
+    each the customer's words lightly shortened, her/his face (`media/face-<video>.webp`, 120-px crops from the videos,
+    gitignored like all media) and «Мижозимиз, <age / place>» (a name only where the video says it: Gulchehra opa). Words:
+    story-0 from the ad's burned-in captions; story-1/2/3 and review-1 transcribed on this Mac with whisper.cpp (`brew install
+    whisper-cpp`, model ggml-large-v3-q5_0 in the scratchpad, `-l uz`) and read back by the agent: phonetic, so a word may be
+    off — **the owner was asked to check them against the videos before deploying**. review-2 and review-3 (the two older men's
+    Telegram circles) left out: too unclear, and a prompt made whisper repeat the prompt's own words. story-3 is filmed during a
+    visit with gifts (15 boxes, a voucher); only her own words are quoted. No company name in any card (#16). «Натижалар ҳар бир
+    инсонда турлича бўлиши мумкин» stays under them. Partner build: none of it. Not deployed when written.
+
 ## Open items
 
 - **Targetologist's Conversions API token** → `npx wrangler secret put META_T2_CAPI_TOKEN`

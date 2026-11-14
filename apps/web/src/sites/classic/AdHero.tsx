@@ -12,6 +12,21 @@ import { CheckIcon } from '../../components/ui/Icons';
 import { tapOffer, useOffer } from '../../lib/offer';
 
 /**
+ * The number of customers, the owner's figure (2026-11-14: «mijozlar soni 400 000+ dan oshdi»): the company's
+ * customers, not Zeynara's alone. In the header, so it costs the first screen no height.
+ */
+const CUSTOMERS = '400 000+';
+
+function Customers() {
+  return (
+    <p className="ml-auto flex flex-col items-center text-center leading-none sm:ml-6 sm:flex-row sm:items-baseline sm:gap-2">
+      <span className="font-display text-[1.15rem] font-extrabold tabular-nums text-accent sm:text-[1.35rem]">{CUSTOMERS}</span>
+      <span className="mt-1 text-[0.85rem] font-semibold text-on-forest sm:mt-0 sm:text-[1rem]">мижозларимиз</span>
+    </p>
+  );
+}
+
+/**
  * What the ad's last screen promises, in the ad's order — but not its «Бепул консультация» (owner, 2026-11-14: the page
  * asks for an «ариза» for Zeynara, not for a consultation; consultation drew people who only wanted the price).
  */
@@ -120,7 +135,7 @@ export function AdHero({ video, poster, face, form }: { video: string; poster: s
     <section id="asosiy" className="on-dark relative isolate overflow-hidden bg-forest pb-10 text-white sm:pb-20">
       <AuroraBackdrop />
       {/* No «Консультация» button: the form it pointed to is right here. */}
-      <Header cta={false} />
+      <Header cta={false} note={<Customers />} />
       <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 pt-2 sm:px-6 sm:pt-12 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-14 lg:pt-8">
         <div className="min-w-0">
           {/* Three lines' room on a phone: with the stand-in font it took two, and when Montserrat arrived the third

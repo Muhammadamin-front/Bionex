@@ -1,5 +1,5 @@
 import type { Utm } from '@bionex/shared/utm';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPrice, product, site } from '../../config/product';
 import { useInView } from '../../lib/in-view';
 import { OfferBanner } from '../../lib/offer';
@@ -47,8 +47,9 @@ function BrandMark() {
 /**
  * `cta: false` (main site, whose first screen holds the form itself): no «Консультация» button, so the
  * header stays one row on a phone — with the phone button beside it, it wrapped to two rows at 380–420 px.
+ * `note`: something short between the brand and the buttons (main site: the number of customers).
  */
-export function Header({ cta = true }: { cta?: boolean } = {}) {
+export function Header({ cta = true, note }: { cta?: boolean; note?: ReactNode } = {}) {
   return (
     <header className="relative z-20 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6 sm:pt-6">
       <a href="#asosiy" className="flex min-w-0 items-center gap-2.5 rounded-xl sm:gap-3">
@@ -58,6 +59,7 @@ export function Header({ cta = true }: { cta?: boolean } = {}) {
           <span className="hidden text-[0.95rem] text-on-forest sm:block">{product.tagline}</span>
         </span>
       </a>
+      {note}
       <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
         {site.phone && site.phoneHref && (
           <a
