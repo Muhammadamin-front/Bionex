@@ -14,6 +14,7 @@ import { ProductPhotoContext, type ProductPhoto } from '../../components/ui/Prod
 import { AdHero } from './AdHero';
 import { Certificate, useNear } from './certificate';
 import { MAIN_COPY } from './copy';
+import { CUSTOMERS, REPEAT_BUYERS } from './stats';
 import { PageCopyContext } from '../../lib/copy';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg,webp}', { eager: true, query: '?url', import: 'default' });
@@ -300,14 +301,34 @@ function WrittenReviews() {
   );
 }
 
+/** Two of the owner's figures, the first thing under the first screen (owner, 2026-11-14). */
+function Stats() {
+  const items = [
+    { value: CUSTOMERS, label: 'мижозларимиз' },
+    { value: REPEAT_BUYERS, label: 'мижозларимиз қайта харид қилади' },
+  ];
+  return (
+    // A phone: one card under the other, each the full width (two side by side broke «400 000+» and «мижозларимиз» in two).
+    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
+      {items.map((s) => (
+        <li key={s.label} className="flex flex-col items-center rounded-3xl bg-card px-4 py-5 text-center shadow-[0_18px_40px_-28px_rgba(13,58,39,0.45)] sm:py-8">
+          <span className="whitespace-nowrap font-display text-[2.2rem] font-extrabold leading-none tabular-nums text-brand sm:text-[2.8rem]">{s.value}</span>
+          <span className="mt-2 text-[1.05rem] font-semibold leading-snug text-ink-2 sm:text-[1.15rem]">{s.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Proof() {
   if (!videos.length && !certificate.full && !packPhotos.length) return null;
   return (
     <section aria-labelledby="ishonch-title" className="bg-paper-2">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+        <Stats />
         {videos.length > 0 && (
           <>
-            <h2 id="ishonch-title" className="text-[1.8rem] font-extrabold leading-[1.15] tracking-[-0.02em] text-balance sm:text-[2.4rem]">
+            <h2 id="ishonch-title" className="mt-12 text-[1.8rem] font-extrabold leading-[1.15] tracking-[-0.02em] text-balance sm:text-[2.4rem]">
               Мижозларимиз ўз овози билан
             </h2>
             <p className="mt-3 max-w-2xl text-lg text-ink-2">Зейнарани ичган мижозларимиз ўзлари айтиб беради.</p>

@@ -934,6 +934,10 @@ user's Mac.
     инсонда турлича бўлиши мумкин» stays under them. Partner build: none of it. The face crops are under 4 KB, so Vite inlines
     them as data: URIs (CSP img-src allows data:). Deployed the same day on the owner's «deploy qil» after they saw the texts:
     Worker 43a39113, Pages afd62494; all three addresses checked (bundle index-BCZ_3aW0.js).
+    (c) Same day, owner: «qayta harid qilayotgan mijozlarimiz 70%». Both figures live in `sites/classic/stats.ts` (`CUSTOMERS`,
+    `REPEAT_BUYERS`); `Stats` at the top of the proof section, right under the first screen: «400 000+ мижозларимиз» and «70%
+    мижозларимиз қайта харид қилади», one card under the other on a phone (side by side they broke mid-word at 320–360 px), two
+    columns from 640 px. Not in the header: a second figure there would not fit beside the phone button.
 
 ## Open items
 

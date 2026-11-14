@@ -10,12 +10,9 @@ import { DrawnUnderline, Header, ProductStage } from '../../components/landing/H
 import { AuroraBackdrop } from '../../components/ui/AuroraBackdrop';
 import { CheckIcon } from '../../components/ui/Icons';
 import { tapOffer, useOffer } from '../../lib/offer';
+import { CUSTOMERS } from './stats';
 
-/**
- * The number of customers, the owner's figure (2026-11-14: «mijozlar soni 400 000+ dan oshdi»): the company's
- * customers, not Zeynara's alone. In the header, so it costs the first screen no height.
- */
-const CUSTOMERS = '400 000+';
+/** The number of customers (stats.ts). In the header, so it costs the first screen no height. */
 
 function Customers() {
   return (
