@@ -4,8 +4,8 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace=@bionex/web"],
-      "port": 5173
+      "runtimeArgs": ["run", "dev", "--workspace=@bionex/web", "--", "--port", "5180", "--strictPort"],
+      "port": 5180
     }
   ]
 }
