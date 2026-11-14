@@ -31,3 +31,5 @@ apps/web/src/sites/main/photos/doctor.*
 
 # Real customers' review videos and the product certificate: deployed from this Mac, never in the public repo.
 apps/web/src/sites/classic/media/
+# The poster page's prints of the box and of customers' faces (made from the media above): never in the public repo.
+apps/web/src/sites/plakat/media/

@@ -750,7 +750,8 @@ export function OrderForm({
           </AntiMetalButton>
         )}
 
-        <p className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
+        {/* data-part: a page may restyle or move these (sites/plakat); nothing reads them otherwise. */}
+        <p data-part="under-button" className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
           {copy?.underButton ?? 'Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.'}
         </p>
 
@@ -764,13 +765,13 @@ export function OrderForm({
         </ul>
 
         {callButton && (
-          <div className="sm:col-span-2">
+          <div data-part="call" className="sm:col-span-2">
             <p className="mb-2 text-center text-base text-muted">Ёзишга қийналсангиз, ўзингиз қўнғироқ қилинг:</p>
             {callButton}
           </div>
         )}
 
-        <p id={`${id}-privacy`} className="text-center text-[0.95rem] leading-relaxed text-muted sm:col-span-2">
+        <p id={`${id}-privacy`} data-part="privacy" className="text-center text-[0.95rem] leading-relaxed text-muted sm:col-span-2">
           Исмингиз ва рақамингиз фақат сиз билан боғланиш учун ишлатилади.
         </p>
       </div>

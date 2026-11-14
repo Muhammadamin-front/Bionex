@@ -183,7 +183,19 @@ export default defineConfig(({ command, mode }) => {
   // with only the certificate added, and the partner site's rules (src/sites/classic/plain.tsx). Never for
   // zeynara.com.uz (`build:site`), which keeps the full page.
   const plain = mode !== 't2' && !oromgoh && process.env.MAIN_PAGE === 'plain';
-  const site = mode === 't2' ? './src/sites/partner.tsx' : oromgoh ? './src/sites/main/index.tsx' : plain ? './src/sites/classic/plain.tsx' : './src/sites/classic/index.tsx';
+  // MAIN_PAGE=plakat (the Worker's `deploy:plakat`, owner 2026-11-14): workers.dev as the «Саломатлик плакати» test page,
+  // a new design and structure A/B-tested against zeynara.com.uz, with the main site's rules (src/sites/plakat).
+  const plakat = mode !== 't2' && !oromgoh && !plain && process.env.MAIN_PAGE === 'plakat';
+  const site =
+    mode === 't2'
+      ? './src/sites/partner.tsx'
+      : oromgoh
+        ? './src/sites/main/index.tsx'
+        : plain
+          ? './src/sites/classic/plain.tsx'
+          : plakat
+            ? './src/sites/plakat/index.tsx'
+            : './src/sites/classic/index.tsx';
   // 'production' is the main site, 't2' the partner site (.env.t2): both go live.
   if (command === 'build' && mode !== 'development') warnAboutProductionConfig(env);
   return {

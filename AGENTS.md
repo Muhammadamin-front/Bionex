@@ -39,6 +39,7 @@ npm run deploy --workspace=@bionex/worker      # main site + worker
 npm run deploy:t2 --workspace=@bionex/worker   # partner site (Pages); deploy the worker FIRST
 npm run deploy:oromgoh --workspace=@bionex/worker    # the light-blue «Оромгоҳ» design instead (see #28)
 npm run deploy:plain --workspace=@bionex/worker      # workers.dev as #64's one-ad test page (off since 2026-11-14)
+npm run deploy:plakat --workspace=@bionex/worker     # workers.dev as #71's «Саломатлик плакати» A/B page
 ```
 `apps/web/.env.production` and `apps/web/.env.t2` are gitignored (values are public: Turnstile
 site key, site URL, Pixel id, `VITE_META_BROWSER_LEAD=1` for t2). They exist only on the
@@ -938,6 +939,40 @@ user's Mac.
     `REPEAT_BUYERS`); `Stats` at the top of the proof section, right under the first screen: «400 000+ мижозларимиз» and «70%
     мижозларимиз қайта харид қилади», one card under the other on a phone (side by side they broke mid-word at 320–360 px), two
     columns from 640 px. Not in the header: a second figure there would not fit beside the phone button. Deployed on the owner's «deploy qil»: Worker 9eb43562, Pages 6caff6e1 (bundle index-a-bAAc9I.js on all three addresses).
+
+71. **workers.dev as a new-design A/B page: «Саломатлик плакати»** (2026-11-14, owner: «claudflare linklik saytni … dizayn va
+    structure ni o'zgartirib test uchun sinab ko'rmoqchi edim»; all ads are on zeynara.com.uz, so workers.dev is free). Chosen
+    through the impeccable flow: the owner's answers — above all «a specialist explains» (not proof-first or product-first),
+    «Зейнара» with free colours, no frightening disease pictures — then a decision round (the page closed unanswered; the same
+    options went through the question tool) where they took the poster over the chat-thread and the category standard.
+    Direction contract: `.impeccable/surfaces/src-sites-plakat-index-tsx.md`. `src/sites/plakat/` (`MAIN_PAGE=plakat`,
+    `npm run deploy:plakat`): the clinic corridor's numbered health poster in three inks (ultramarine #2443a8 with a halftone dot
+    screen, ochre #f0b429, black) on matte paper; Fira Sans Extra Condensed 800 (self-hosted, @fontsource 5.3.0, cyrillic-ext
+    has қ ғ ҳ) for headlines, the phone's own sans for reading; two local fallbacks sized to its width so headlines wrap the
+    same before it loads (measured: identical positions with and without the web font, 320–412 px). Structure: masthead → «Босим,
+    бош оғриғи, тез чарчоқ?» → step 1 = the order form on paper in a double rule (shared `OrderForm variant="hero"`, restyled by
+    re-pointed tokens and scoped CSS: square corners, ink rules, a flat ochre button, the old slider knob hidden) → steps 2–3
+    (the specialist rings 9:00–21:00; if it suits, 1–3 days, pay on receipt) → «Мутахассис қўнғироқда нимани тушунтиради» (five
+    ruled points with drawn pictograms; facts from product.ts / copy.ts, incl. «don't stop prescribed medicines») → the real box
+    photo printed as a halftone that resolves into the photograph when it comes into view (the one authored motion; none under
+    reduced motion) with the certificate → «400 000+ … 70% …» as a sentence on an ochre band → the customers' videos and their
+    words (the first set large) → step 1 again → small print. No arrival dialog. Same rules, group, sheet and Pixel as the main
+    site (`VITE_HUMAN_CHECK` 'web', no `rules`): **orders carry no page mark**, so give the test its own ad (own ad set name) and
+    read «Ad set» in the sheet. To make this possible, classic's media, written reviews and video row moved to
+    `sites/classic/media.ts` / `video-row.tsx` (zeynara.com.uz's prerendered HTML checked byte-identical after the move).
+    The box photo is shown as this page's own print first: `src/sites/plakat/media/` (gitignored like all customer media) holds
+    computed rasters with embedded provenance — `pack-print-360/720.png`, the owner's box photo as a one-ink AM halftone
+    (ultramarine dots on ochre, dot size from tone, 45° screen, 6-colour PNG, 48 / 185 KB), and the review faces as two-ink
+    duotones. Made by a scratch script with sharp (the recipe is in each file's provenance); a fresh Mac must make them again or the
+    page falls back to the original photo / colour faces. The print lifts away to the photograph once in view (none under reduced
+    motion). In the first screen's form the pay line and the call box are hidden (shared OrderForm gained `data-part` hooks:
+    `under-button`, `call`, `privacy`; zeynara.com.uz's HTML differs only by those attributes); steps 2–3 say the same right under
+    it. ≤340 px: smaller headline, no panel title. VideoRow gained `look.soundLabel` (a drawn speaker here; the emoji stays on
+    zeynara.com.uz). Reading text stays on the phone's own sans on purpose (#62's slow-network priority; the contract says so).
+    Reviewed by the impeccable finish reviewer in two rounds (8 material fixes: 5 resolved, then the seed line, the 320×568 capture
+    and a tall step-2 column fixed). Measured: name, number and button whole at 320×568 (button 486–560), 360×640 (525–598);
+    steps 2–3 inside 390×844; headline positions identical with and without the web font; Lighthouse mobile 1.00, LCP 1.4 s, CLS
+    0.005. Not deployed when written: `npm run deploy:plakat` (Worker) puts it on workers.dev; zeynara.com.uz is untouched.
 
 ## Open items
 

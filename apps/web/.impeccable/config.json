@@ -8,6 +8,18 @@
         "value": "montserrat fallback",
         "createdAt": "2026-11-06T07:39:51.943Z",
         "reason": "Claude: a metric-matched local fallback face (Arial/Roboto) for the page's Montserrat, so headings do not jump while the web font loads; not a new typeface"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "poster fallback",
+        "createdAt": "2026-11-14T14:50:55.911Z",
+        "reason": "Claude: a metric-matched local fallback (Arial Narrow/Roboto Condensed) for the poster page's condensed display face, so the headline does not jump while it loads; not a new typeface"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "poster fallback wide",
+        "createdAt": "2026-11-14T14:53:28.539Z",
+        "reason": "Claude: the poster page's second local fallback (Arial/Roboto shrunk to the condensed face's width) so headlines wrap the same before the web font arrives; not a new typeface"
       }
     ]
   }
