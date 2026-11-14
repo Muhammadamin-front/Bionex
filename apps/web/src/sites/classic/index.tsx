@@ -13,6 +13,8 @@ import { AskConcernContext, TelegramChannelContext } from '../../lib/concern';
 import { ProductPhotoContext, type ProductPhoto } from '../../components/ui/ProductPack';
 import { AdHero } from './AdHero';
 import { Certificate, useNear } from './certificate';
+import { MAIN_COPY } from './copy';
+import { PageCopyContext } from '../../lib/copy';
 
 const media = import.meta.glob<string>('./media/*.{mp4,jpg,webp}', { eager: true, query: '?url', import: 'default' });
 const file = (name: string) => media[`./media/${name}`];
@@ -286,7 +288,10 @@ export function Landing() {
                 in place of popup={false}. */}
             {/* The owner's photo of the box in place of the drawn pack (2026-11-06). */}
             <ProductPhotoContext.Provider value={packPhoto}>
-              <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
+              {/* A free specialist's consultation, not «буюртма»; the number read back before it goes (2026-11-14). */}
+              <PageCopyContext.Provider value={MAIN_COPY}>
+                <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
+              </PageCopyContext.Provider>
             </ProductPhotoContext.Provider>
           </ConfirmAutofillContext.Provider>
         </TelegramChannelContext.Provider>

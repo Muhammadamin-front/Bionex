@@ -12,6 +12,7 @@ import { trackInitiateCheckout, trackLead } from '../../lib/pixel';
 import { loadTurnstile } from '../../lib/turnstile';
 import { AntiMetalButton } from '../ui/AntiMetalButton';
 import { AfterOrderQuestions } from '../../lib/concern';
+import { usePageCopy } from '../../lib/copy';
 import { OfferBanner, offerTapped, useOffer } from '../../lib/offer';
 import { CheckIcon, PhoneIcon } from '../ui/Icons';
 
@@ -133,6 +134,8 @@ export function OrderForm({
   /** The «not a robot» widget is asking the visitor to do something, so it needs an Uzbek line. */
   const [challenging, setChallenging] = useState(false);
   const offer = useOffer();
+  /** The main site's own wording (lib/copy.tsx); null elsewhere, which keeps every original text. */
+  const copy = usePageCopy();
   /** The number arrived all at once (autofill, often an old one): ask the visitor to check it. */
   const [phoneAutofilled, setPhoneAutofilled] = useState(false);
   const confirmAutofill = useContext(ConfirmAutofillContext);
@@ -531,14 +534,14 @@ export function OrderForm({
           Сўровингиз қабул қилинди
         </h3>
         <p className="mx-auto mt-2 max-w-sm text-lg text-ink-2" role="status">
-          {completed.message}
+          {copy ? (completed.submissionId ? copy.thanks.accepted : copy.thanks.duplicate) : completed.message}
         </p>
         <p className="mt-4 text-lg text-ink-2">
           Қўнғироқ қилинадиган рақам: <span className="whitespace-nowrap font-bold text-ink tabular-nums">{lastFour(completed.phone)}</span>
         </p>
         <ol className="mx-auto mt-6 max-w-sm space-y-3 border-t border-line pt-5 text-left">
           {[
-            'Телефонингизни ёнингизда сақланг: мутахассисларимиз 15 дақиқа ичида қўнғироқ қилади.',
+            copy?.thanks.firstStep ?? 'Телефонингизни ёнингизда сақланг: мутахассисларимиз 15 дақиқа ичида қўнғироқ қилади.',
             'Мутахассисларимиз саволларингизга жавоб беради ва бепул маслаҳат беради.',
             'Маҳсулотни олишга қарор қилсангиз, 1–3 кунда етказилади. Тўловни олганингизда қиласиз.',
           ].map((t, i) => (
@@ -663,6 +666,11 @@ export function OrderForm({
             <p id={`${id}-phone-hint`} role="status" className="mt-2 rounded-xl bg-accent/30 px-3 py-2 text-base font-bold text-ink">
               Рақам автоматик ёзилди. Шу рақам ҳозир ишлайдими? Текшириб, керак бўлса тузатинг.
             </p>
+          ) : copy && phone.replace(/\D/g, '').length === 9 ? (
+            // All 9 digits in: the number read back before it is sent (main site; many orders came with a wrong one).
+            <p id={`${id}-phone-hint`} role="status" className={cn('text-base font-semibold text-ink', hero ? 'mt-1' : 'mt-2')}>
+              {copy.numberCheck(`+998${phone.replace(/\D/g, '')}`)}
+            </p>
           ) : (
             <p id={`${id}-phone-hint`} className={cn('text-base text-muted', hero ? 'mt-1' : 'mt-2')}>
               {/* One line in the narrow first-screen form. */}
@@ -737,13 +745,13 @@ export function OrderForm({
             ) : offer ? (
               `−${offer.percent}% чегирма билан буюртма`
             ) : (
-              'Батафсил маълумот олиш'
+              (copy?.submit ?? 'Батафсил маълумот олиш')
             )}
           </AntiMetalButton>
         )}
 
         <p className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
-          Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.
+          {copy?.underButton ?? 'Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.'}
         </p>
 
         <ul className={cn('grid gap-2 text-base font-semibold text-brand-2 sm:grid-cols-3', compact && 'hidden')}>

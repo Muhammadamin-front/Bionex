@@ -2,6 +2,7 @@ import type { Utm } from '@bionex/shared/utm';
 import { useState } from 'react';
 import { formatPrice, product, site } from '../../config/product';
 import { cn } from '../../lib/cn';
+import { usePageCopy } from '../../lib/copy';
 import { AntiMetalLink } from '../ui/AntiMetalButton';
 import { AlertIcon, CheckIcon, PhoneIcon, QuoteMark } from '../ui/Icons';
 import { ProductPack } from '../ui/ProductPack';
@@ -19,10 +20,11 @@ function Title({ id, children, className }: { id?: string; children: React.React
   );
 }
 
-function OrderButton({ children = 'Ҳозироқ буюртма бериш', className }: { children?: string; className?: string }) {
+function OrderButton({ children, className }: { children?: string; className?: string }) {
+  const copy = usePageCopy();
   return (
     <AntiMetalLink href="#forma" className={cn('w-full sm:w-auto', className)}>
-      {children}
+      {children ?? copy?.sectionButton ?? 'Ҳозироқ буюртма бериш'}
     </AntiMetalLink>
   );
 }
@@ -347,12 +349,14 @@ export function Order({
   order: OrderResult | null;
   onOrdered: (r: OrderResult) => void;
 }) {
-  const { urgency, orderSteps } = product;
+  const { urgency } = product;
+  const copy = usePageCopy();
+  const orderSteps = copy?.steps ?? product.orderSteps;
   return (
     <section id="forma" ref={orderRef} aria-labelledby="forma-title" className="on-dark bg-forest text-white">
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-2 lg:items-start lg:gap-16">
         <div>
-          <Title className="text-white">{urgency.title}</Title>
+          <Title className="text-white">{copy?.urgencyTitle ?? urgency.title}</Title>
           <p className="mt-4 text-lg leading-relaxed text-on-forest">{urgency.intro}</p>
           <ul className="mt-5 space-y-2.5">
             {urgency.items.map((u) => (
@@ -365,7 +369,7 @@ export function Order({
           <p className="mt-5 text-lg leading-relaxed text-accent">{urgency.outro}</p>
 
           <h3 id="forma-title" className="mt-12 text-2xl font-extrabold">
-            Буюртма бериш жуда осон
+            {copy?.stepsTitle ?? 'Буюртма бериш жуда осон'}
           </h3>
           <ol className="mt-5 space-y-4">
             {orderSteps.map((s, i) => (
@@ -441,11 +445,13 @@ export function Reviews() {
 }
 
 export function Faq() {
+  const copy = usePageCopy();
+  const faq = product.faq.map((item) => copy?.faq[item.q] ?? item);
   return (
     <section aria-labelledby="savol-title" className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24">
       <Title id="savol-title">Кўп бериладиган саволлар</Title>
       <div className="mt-8 border-y border-line">
-        {product.faq.map((item) => (
+        {faq.map((item) => (
           <details key={item.q} className="faq-item border-b border-line last:border-b-0">
             <summary className="flex min-h-16 items-center justify-between gap-4 py-5 text-left font-display text-lg font-bold">
               {item.q}
