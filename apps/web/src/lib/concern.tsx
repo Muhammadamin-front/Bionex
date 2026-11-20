@@ -1,5 +1,5 @@
-import { CONCERN_IDS, CONCERNS, type ConcernId } from '@bionex/shared/concerns';
-import { createContext, useContext, useState } from 'react';
+import { CONCERN_IDS, CONCERNS, type ConcernId } from '@bionex/shared/concern-list';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { sendConcern } from './api';
 import { cn } from './cn';
 
@@ -11,6 +11,28 @@ export const AskConcernContext = createContext(false);
  * the questions. Partner site (sites/partner.tsx, owner 2026-11-07): no questions, so only the link.
  */
 export const TelegramChannelContext = createContext<string | null>(null);
+
+/**
+ * Main site: right after the order the phone moves on to the channel by itself, with no question first.
+ * Rebuilt 2026-11-20 from the live page (the source of that version was lost with the Mac's folders).
+ */
+export const TelegramRedirectContext = createContext(false);
+
+const REDIRECT_AFTER_MS = 1200;
+
+/** «Opening our channel…», then the move; the link stays in case the phone does not hand over to Telegram. */
+function ChannelOpening({ href }: { href: string }) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => window.location.assign(href), REDIRECT_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [href]);
+  return (
+    <div className="mx-auto mt-6 max-w-sm" role="status">
+      <p className="text-lg font-bold text-brand-2">Телеграм каналимиз очилмоқда…</p>
+      <ChannelLink href={href} />
+    </div>
+  );
+}
 
 /** The channel link on the thank-you screen. */
 function ChannelLink({ href }: { href: string }) {
@@ -28,11 +50,14 @@ function ChannelLink({ href }: { href: string }) {
  * Without the question (partner site) only the link shows, and nothing moves the phone by itself:
  * a move as the order lands could cut off the browser Pixel Lead sent at that moment.
  */
-export function AfterOrderQuestions({ submissionId }: { submissionId: string }) {
+export function AfterOrderQuestions({ submissionId }: { submissionId?: string }) {
   const ask = useContext(AskConcernContext);
   const channel = useContext(TelegramChannelContext);
+  const redirect = useContext(TelegramRedirectContext);
   const [done, setDone] = useState(false);
   const [answered, setAnswered] = useState(false);
+  if (channel && redirect) return <ChannelOpening href={channel} />;
+  if (!submissionId) return null;
   if (!ask) {
     return channel ? (
       <div className="mx-auto mt-6 max-w-sm">

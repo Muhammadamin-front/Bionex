@@ -1,7 +1,7 @@
 # AGENTS.md — handover for AI agents
 
 Read this first. It records what the codebase is, how it is deployed, and what was decided
-in the working sessions so far (last updated 2026-10-21). Details live in `docs/`.
+in the working sessions so far (last updated 2026-11-20). Details live in `docs/`.
 
 ## The user
 
@@ -983,6 +983,28 @@ user's Mac.
     Its design record is `src/sites/plakat/DESIGN.md` + `design.json` (the root DESIGN.md stays the «Оромгоҳ» world's). Known
     fragility, noted there: plakat.css restyles the shared form through its Tailwind class names, button structure and input
     names (`form.rounded-3xl`, `.am-btn > span[aria-hidden]`, `input[name='zn-customer']`): recheck this page after changing them.
+
+72. **The Mac's folders were lost; this folder is the only copy. The live page's lost changes rebuilt; the phone number in
+    the header** (2026-11-20). Around 2026-11-16 the owner's Mac lost every folder by mistake. This folder
+    (`/Volumes/Muhammad/Tiklangan-GitHub/Bionex`, an SSD) was cloned again from GitHub at `068137f`, with no node_modules,
+    no `.env.production` and no media. zeynara.com.uz was then serving Pages build `3ea8566` (≈2026-11-16), a commit that
+    never reached GitHub. Rebuilt from that live page (its bundle and HTML compared with a build from here, text and class
+    names): (a) **the media**: all 42 files of `sites/classic/media/` downloaded from zeynara.com.uz by the names in the
+    bundle's glob map (the four <4 KB faces decoded from its data: URIs). Plakat's media (`sites/plakat/media/`) were not on
+    any live page, so they are lost: that page falls back to the photos. (b) `.env.production` written again from the public
+    values in the live bundle. (c) the live page's own changes: a round Telegram channel button in the header (from
+    `TelegramChannelContext`, so the partner's header gets it with its next `deploy:t2`); `TelegramRedirectContext` (main
+    site): right after an order «Телеграм каналимиз очилмоқда…» and the move to t.me/zeynare after 1.2 s, the concern
+    question no longer asked (also after a repeat order); the arrival dialog back at `popupAfterMs={2000}`; the concern list
+    split into `@bionex/shared/concern-list` (no zod), so the order schema and zod (~90 KB) load only when the form is sent.
+    Not rebuilt: the live page had a `promised` thank-you note whose context no page provided (dead code). The Worker was
+    not redeployed, and what `3ea8566` changed in it (if anything) is unknown.
+    New the same day (owner: «400 000+ mijoz o'rniga telefon raqam to'liq chiqsin, bosilganda qo'ng'iroq»): `Header`
+    `phoneFull` (AdHero): on phones the whole number +998 50 731 92 82 in the tel: button, beside the Telegram button; the
+    brand's name and «400 000+» hide below 640 px (the figure stays in the Stats block). Fits one row at 340–430 px; under
+    340 px the Telegram button hides so the number fits. Deployed with `deploy:site` (Pages 62442a59); checked live on
+    zeynara.com.uz and www, a video answers 206, POST /api/leads reaches the Worker. Also: macOS `._*` files on this
+    drive broke vitest and git; deleted (tests 68 + 136 pass). **Back up `sites/classic/media/` somewhere off this Mac.**
 
 ## Open items
 

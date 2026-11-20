@@ -9,7 +9,7 @@ import '../../styles.css';
 import type { ReactNode } from 'react';
 import { Landing as Page } from '../../components/landing/Landing';
 import { ConfirmAutofillContext } from '../../components/landing/OrderForm';
-import { AskConcernContext, TelegramChannelContext } from '../../lib/concern';
+import { AskConcernContext, TelegramChannelContext, TelegramRedirectContext } from '../../lib/concern';
 import { ProductPhotoContext, type ProductPhoto } from '../../components/ui/ProductPack';
 import { AdHero } from './AdHero';
 import { Certificate, useNear } from './certificate';
@@ -156,20 +156,23 @@ export function Landing() {
       <AskConcernContext.Provider value={true}>
         {/* After those questions the phone moves on to the Telegram channel (owner, 2026-11-05). */}
         <TelegramChannelContext.Provider value="https://t.me/zeynare">
+          {/* …now at once after the order, and a channel button in the header (live since ~2026-11-16, rebuilt 2026-11-20). */}
+          <TelegramRedirectContext.Provider value={true}>
           {/* An autofilled number is confirmed with one tap before the order goes (owner, 2026-11-01). */}
           <ConfirmAutofillContext.Provider value={true}>
             {/* No order dialog on arrival (2026-11-14): the first form is inside the first screen now, and the dialog
                 (2 s after arrival, owner 2026-11-06) covered it with the same form and, as the page's largest paint,
-                put PageSpeed's LCP at 3.6–5.8 s against 1.2 s without it. To bring it back: popupAfterMs={2000}
-                in place of popup={false}. */}
+                put PageSpeed's LCP at 3.6–5.8 s against 1.2 s without it. Back by ~2026-11-16 (the live page had
+                popupAfterMs={2000}; rebuilt 2026-11-20). */}
             {/* The owner's photo of the box in place of the drawn pack (2026-11-06). */}
             <ProductPhotoContext.Provider value={packPhoto}>
               {/* A free specialist's consultation, not «буюртма»; the number read back before it goes (2026-11-14). */}
               <PageCopyContext.Provider value={MAIN_COPY}>
-                <Page hero={adHero} proof={<Proof />} popup={false} barOverForms={false} />
+                <Page hero={adHero} proof={<Proof />} popupAfterMs={2000} barOverForms={false} />
               </PageCopyContext.Provider>
             </ProductPhotoContext.Provider>
           </ConfirmAutofillContext.Provider>
+          </TelegramRedirectContext.Provider>
         </TelegramChannelContext.Provider>
       </AskConcernContext.Provider>
     </>

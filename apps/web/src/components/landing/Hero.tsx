@@ -1,6 +1,8 @@
 import type { Utm } from '@bionex/shared/utm';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPrice, product, site } from '../../config/product';
+import { cn } from '../../lib/cn';
+import { TelegramChannelContext } from '../../lib/concern';
 import { useInView } from '../../lib/in-view';
 import { OfferBanner } from '../../lib/offer';
 import { AuroraBackdrop } from '../ui/AuroraBackdrop';
@@ -14,7 +16,7 @@ import { OrderForm, type OrderResult } from './OrderForm';
  * comes into view, then rests. A finite run keeps it within WCAG 2.2.2 and stops it from
  * pulling older readers' eyes away from the text.
  */
-function BrandMark() {
+function BrandMark({ small = false }: { small?: boolean }) {
   const [ref, inView] = useInView<HTMLSpanElement>();
   const [run, setRun] = useState(0);
   useEffect(() => {
@@ -22,7 +24,7 @@ function BrandMark() {
   }, [inView]);
   return (
     <span ref={ref} className="flex-none">
-      <svg viewBox="0 0 40 40" className="h-11 w-11" aria-hidden="true">
+      <svg viewBox="0 0 40 40" className={cn('h-11 w-11', small && 'max-sm:h-10 max-sm:w-10')} aria-hidden="true">
         <rect width="40" height="40" rx="12" fill="var(--color-accent)" />
         <g key={run} className={run > 0 ? 'logo-heart' : undefined}>
           <path
@@ -49,26 +51,55 @@ function BrandMark() {
  * header stays one row on a phone — with the phone button beside it, it wrapped to two rows at 380–420 px.
  * `note`: something short between the brand and the buttons (main site: the number of customers).
  */
-export function Header({ cta = true, note }: { cta?: boolean; note?: ReactNode } = {}) {
+/**
+ * `phoneFull` (main site, owner 2026-11-20): on phones the whole number, tappable, in place of the customers'
+ * figure, beside the Telegram channel's button (when the page has a channel; under 340 px only the number fits, and
+ * the channel is still offered after the order); the brand's name steps aside.
+ */
+export function Header({ cta = true, note, phoneFull = false }: { cta?: boolean; note?: ReactNode; phoneFull?: boolean } = {}) {
+  const channel = useContext(TelegramChannelContext);
+  const round = phoneFull ? 'h-12 w-12 max-sm:h-10 max-sm:w-10' : 'h-12 w-12';
   return (
-    <header className="relative z-20 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6 sm:pt-6">
+    <header className={cn('relative z-20 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6 sm:pt-6', phoneFull && 'max-sm:gap-2')}>
       <a href="#asosiy" className="flex min-w-0 items-center gap-2.5 rounded-xl sm:gap-3">
-        <BrandMark />
-        <span className="leading-tight max-[379px]:sr-only">
+        <BrandMark small={phoneFull} />
+        <span className={cn('leading-tight', phoneFull ? 'max-sm:sr-only' : 'max-[379px]:sr-only')}>
           <span className="block font-display text-[1.15rem] font-extrabold tracking-tight text-white sm:text-[1.35rem]">{site.brand}</span>
           <span className="hidden text-[0.95rem] text-on-forest sm:block">{product.tagline}</span>
         </span>
       </a>
       {note}
-      <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className={cn('ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2', phoneFull && 'max-sm:gap-1.5')}>
+        {channel && (
+          <a
+            href={channel}
+            target="_blank"
+            rel="noopener"
+            aria-label="Телеграм каналимиз"
+            title="Телеграм каналимиз"
+            className={cn('inline-flex flex-none items-center justify-center rounded-full', round, phoneFull && 'max-[339px]:hidden')}
+          >
+            <TelegramIcon className="h-full w-full" />
+          </a>
+        )}
         {site.phone && site.phoneHref && (
           <a
             href={site.phoneHref}
             aria-label={`Қўнғироқ қилиш: ${site.phone}`}
-            className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-full border-2 border-white/25 font-display font-bold text-white transition-colors hover:border-white/50 hover:bg-white/5 sm:w-auto sm:px-4"
+            className={cn(
+              'inline-flex items-center justify-center gap-2 rounded-full border-2 border-white/25 font-display font-bold text-white transition-colors hover:border-white/50 hover:bg-white/5',
+              phoneFull ? 'h-12 max-sm:h-10 max-sm:gap-1.5 max-sm:px-2.5 sm:px-4' : `${round} sm:w-auto sm:px-4`,
+            )}
           >
-            <PhoneIcon className="h-5 w-5 text-accent" />
-            <span className="hidden whitespace-nowrap tabular-nums sm:inline">{site.phone}</span>
+            <PhoneIcon className="h-5 w-5 shrink-0 text-accent max-sm:h-4 max-sm:w-4" />
+            <span
+              className={cn(
+                'whitespace-nowrap tabular-nums',
+                phoneFull ? 'text-base max-[389px]:text-[0.9rem] max-[359px]:text-[0.8rem]' : 'hidden sm:inline',
+              )}
+            >
+              {site.phone}
+            </span>
           </a>
         )}
         {cta && (
@@ -81,6 +112,18 @@ export function Header({ cta = true, note }: { cta?: boolean; note?: ReactNode }
         )}
       </div>
     </header>
+  );
+}
+
+function TelegramIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="12" fill="#229ED9" />
+      <path
+        fill="#fff"
+        d="M16.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"
+      />
+    </svg>
   );
 }
 

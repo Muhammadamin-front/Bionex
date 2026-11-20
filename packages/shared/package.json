@@ -12,7 +12,8 @@
     "./lead": "./src/lead.ts",
     "./constants": "./src/constants.ts",
     "./device": "./src/device.ts",
-    "./concerns": "./src/concerns.ts"
+    "./concerns": "./src/concerns.ts",
+    "./concern-list": "./src/concern-list.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -6,6 +6,7 @@ dist-site/
 coverage/
 *.log
 .DS_Store
+._*
 
 # Secrets — never commit real credentials
 .env

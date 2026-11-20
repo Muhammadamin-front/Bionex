@@ -554,7 +554,7 @@ export function OrderForm({
           ))}
         </ol>
         {/* Only in the form the order was sent from: the other one shows the same confirmation. */}
-        {completed.submissionId && submittedHere.current && <AfterOrderQuestions submissionId={completed.submissionId} />}
+        {submittedHere.current && <AfterOrderQuestions submissionId={completed.submissionId} />}
         {callButton && <div className="mx-auto mt-6 max-w-sm">{callButton}</div>}
       </div>
     );
