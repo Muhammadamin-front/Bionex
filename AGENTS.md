@@ -1,7 +1,7 @@
 # AGENTS.md — handover for AI agents
 
 Read this first. It records what the codebase is, how it is deployed, and what was decided
-in the working sessions so far (last updated 2026-11-20). Details live in `docs/`.
+in the working sessions so far (last updated 2026-11-22). Details live in `docs/`.
 
 ## The user
 
@@ -1005,6 +1005,54 @@ user's Mac.
     340 px the Telegram button hides so the number fits. Deployed with `deploy:site` (Pages 62442a59); checked live on
     zeynara.com.uz and www, a video answers 206, POST /api/leads reaches the Worker. Also: macOS `._*` files on this
     drive broke vitest and git; deleted (tests 68 + 136 pass). **Back up `sites/classic/media/` somewhere off this Mac.**
+
+73. **A robot every 17–20 minutes, then strangers' numbers by hand: a Cloudflare rule, confirmation through the bot, and
+    one phone's second number** (2026-11-21/22). (a) Zone analytics (`httpRequestsAdaptiveGroups` has `clientIP` and
+    `userAgent`; the OAuth token's 401 after a while is fixed by any `wrangler` command, which refreshes it): from 19.11
+    a robot posted to zeynara.com.uz every 17–20 min, 08:25–21:00 Tashkent, each time a new Uzmobile / Beeline mobile IP
+    (52 IPs in 2 days, the same /24s as real Instagram customers, so no IP rule could hold it), always the plain Chrome UA
+    `Android 10; K … Chrome/151.0.0.0` (current Chrome is 157), loading the whole page; it never passed Turnstile
+    (account `turnstileAdaptiveGroups`: every siteverify-solved on 21.11 was an in-app UA), so its orders sat in «Spam» but
+    reached the group (`likely_bot`). 36 of the 42 «Spam» rows of 21.11 were it. The owner added a WAF custom rule on the
+    zone (the token cannot): `(http.request.uri.path eq "/api/leads" and http.request.method eq "POST" and
+    http.user_agent contains "Android 10; K)" and http.user_agent contains "Chrome/151.0.0.0")` → Block. Offered, not
+    built: failed-check plain-browser orders silent (Spam tab only); the owner may ask if the robot changes its UA.
+    (b) Then people in the Instagram app typing strangers' numbers (owners: «men qoldirmaganman»). Read of the sheet
+    exports (14–21.11, «Lidlar», good = Kerakli+Sotildi): Latin-script name 28 % good / 46 % bad vs Cyrillic 51 / 20;
+    filled in under 30 s 24 / 42; iPhone 25 / 56; autofill 33 / 47; two or more of these 19 / 54 vs 50 / 21; videos V6 and
+    V5 ~51 % bad, V1 27 %. Not acted on (told the owner; operators may ring Cyrillic / slow first).
+    Built (owner: «telegram tasdiqlashni qil, qoidani ham qo'sh»): the Worker answers a new main-site order with
+    `confirmUrl` = `https://t.me/<bot>?start=c_<submissionId>` (bot @username from getMe, kept in `meta`; never for the
+    partner, whose submissions have no `lead_id`). The thank-you screen (`ConfirmStep`, lib/concern.tsx, above the three
+    steps) says «Охирги қадам: рақамингизни Телеграмда тасдиқланг» and, where the page moved to the channel before
+    (TelegramRedirectContext), moves to that link after 2 s instead. `botMessage`: `/start c_<id>` → step `confirm`
+    (`bot_sessions.lead_id`), share-contact keyboard; only a shared contact of the user's own counts (typed numbers are
+    asked again). `confirmOrder`: same number → ✅ reply under the order, «Tasdiq» = «✅ <time>» in the sheet (needs
+    SHEETS_NOTES), the panel name gets « ✅»; another number → «📱 … Телеграм рақами бошқа: +998 …» and «Telegram: …»;
+    either way `list_items.confirmed`, `hidden` 0 (a silent order is posted then), and the order's Lead goes to Meta if
+    not sent yet. **`LEAD_AFTER_CONFIRM` = "1" (wrangler var): no Lead on arrival on the main site any more**; a Lead
+    goes on confirmation or on «Kerakli» / «Sotildi». "0" restores the instant Lead. Watch Events Manager's Lead count.
+    Rule: `device_other_number` — the same device id, within 24 h, another number under another name (letters compared,
+    case and emoji ignored) → «Spam» tab, in the group with a warning, no instant Lead. Tests: 140. The live Worker's code
+    was first compared with a dry-run build from here (identical bytes), so nothing was rolled back. Deployed the Worker
+    (02ff87b4, workers.dev gets the full page); `deploy:site` was refused to the agent by the permission classifier, so
+    **zeynara.com.uz shows the confirmation only once the owner runs it** (until then: no instant Lead and no confirm
+    step there). This drive makes `._*` AppleDouble files on every write: vitest picks up `test/._worker.test.ts` and
+    fails; delete them (`find . -name "._*" -not -path "*/node_modules/*" -delete`). The owner's sheet CSVs sit in the
+    repo root, kept out of git by `.git/info/exclude` (`*.csv`).
+    **Undone within the hour (owner: «yo'q, bunday qilmaymiz, lead narxi juda qimmat»):** `LEAD_AFTER_CONFIRM` = "0"
+    (the instant Lead is back; orders of the ~30 minutes between Worker 02ff87b4 and 6b7c5a1f wait for «Kerakli»), the
+    Worker returns no `confirmUrl`, the page's ConfirmStep was removed. The bot side (`/start c_<id>`, `confirmOrder`,
+    `confirmLink`) and its tests stay, unused. The `device_other_number` rule stays.
+    Same day, owner: the forms' button back to **«Батафсил маълумот олиш»** (MAIN_COPY submit, sectionButton, bar; the
+    Pixel config was checked first: no `estRules`, so #27's automatic Lead rule is not back — never turn on Events
+    Manager's «track events automatically without code»), and the number **right under the button** (OrderForm
+    `callUnderButton`: «📞 Ёки қўнғироқ қилинг: +998 50 731 92 82», replacing the call box at the form's bottom, which
+    sat under the fold in the arrival dialog). AntiMetalButton's label is smaller below 360 px (three words spilled out of
+    the 64-px button at 320 px). Shared code: the partner page gets the call line with `deploy:t2`. Needs `deploy:site`.
+    Funnel read the same day (15–21.11, UZ phones, robot excluded): ~3 740 page renders → ~660 scrolled → 273 orders
+    (7.3 %, 5–14 % by day); the owner's Events Manager ratio InitiateCheckout → Lead ~50 %. Offered A/B tests (phone-only
+    form, a one-tap Telegram order, no autofill question, no arrival dialog) and asked for the Ads Manager export.
 
 ## Open items
 

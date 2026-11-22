@@ -43,7 +43,11 @@
     // forwards each order here as a post to this Worker's address). Its «not a robot» checks are solved
     // there, so they are accepted for it. This list is matched exactly: www must be named. The Turnstile
     // widget's Hostnames list in Cloudflare must include the domain too (there, subdomains come with it).
-    "MAIN_SITE_HOSTS": "zeynara.com.uz,www.zeynara.com.uz"
+    "MAIN_SITE_HOSTS": "zeynara.com.uz,www.zeynara.com.uz",
+    // "1" (owner, 2026-11-22): a main-site order is a Meta Lead only once the customer confirms the number
+    // through the bot (the thank-you page sends them there) or the sheet says «Kerakli» / «Sotildi» — no
+    // Lead on arrival, so typed-in strangers' numbers stop teaching the ads. "0" = a Lead on arrival again.
+    "LEAD_AFTER_CONFIRM": "0"
   }
   // Secrets (never in this file): set once with `npx wrangler secret put NAME`
   //   TURNSTILE_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

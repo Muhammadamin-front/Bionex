@@ -87,6 +87,7 @@ const REASON_CODE: Record<string, string> = {
   link_copied: 'havola_tashqarida',
   synthetic_click: 'dastur_bosgan',
   server_network: 'vpn_server',
+  device_other_number: 'qurilma_boshqa_raqam',
 };
 
 export const reasonCodes = (flags: string[], info: string[] = []) => [...flags.map((f) => REASON_CODE[f] ?? f), ...info].join(', ');
@@ -111,6 +112,7 @@ const FLAG_TEXT: Record<string, string> = {
   link_copied: "reklama havolasi Instagram/Facebook ilovasidan tashqarida ochilgan (nusxa olingan yoki boshqa brauzerda ochilgan bo'lishi mumkin)",
   spam_lookalike: "avval spam bo'lgan qurilmaga o'xshaydi",
   server_network: "VPN yoki server tarmog'idan yuborilgan (uy interneti yoki mobil aloqa emas; VPN yoqqan odam ham bo'lishi mumkin)",
+  device_other_number: "shu telefondan 24 soat ichida boshqa ism va boshqa raqam bilan ariza kelgan (birovning raqami bo'lishi mumkin)",
 };
 
 /**

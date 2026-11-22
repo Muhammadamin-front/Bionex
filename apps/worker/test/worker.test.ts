@@ -2247,3 +2247,109 @@ describe('the partner site (sites.ts t2)', () => {
     expect((await partner('/api/sheet', { method: 'POST' })).status).toBe(404);
   });
 });
+
+/**
+ * Strangers' numbers typed into the form (owner, 2026-11-22): the thank-you page sends the customer to the
+ * bot to share their own Telegram number, and one phone ordering for another number under another name
+ * within a day goes to the «Spam» tab.
+ */
+describe('confirming the order through the bot, and a second number from the same phone', () => {
+  const secret = async () => {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zeynara-webhook:123456:test-token'));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const say = async (msg: Record<string, unknown>, user = { id: 777, first_name: 'Ойша' }) => {
+    await mf.dispatchFetch(`${SITE}/api/telegram/hook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': await secret() },
+      body: JSON.stringify({ update_id: 1, message: { message_id: 1, chat: { id: user.id, type: 'private' }, from: user, ...msg } }),
+    });
+    return telegram.messages.filter((m) => String(m.chat_id) === String(user.id)).at(-1) as unknown as {
+      text: string;
+      reply_markup: { keyboard?: Array<Array<{ text: string; request_contact?: boolean }>>; remove_keyboard?: boolean };
+    };
+  };
+  const leads = () => meta.events.filter((e) => e.event_name === 'Lead');
+  const until = async (done: () => boolean) => {
+    for (let i = 0; i < 80 && !done(); i++) await new Promise((r) => setTimeout(r, 10));
+  };
+
+  beforeEach(async () => {
+    await mf.dispose();
+    mf = start({
+      META_PIXEL_ID: '1109358048693673',
+      META_CAPI_TOKEN: 'EAA-test-token',
+      META_API_BASE: 'https://graph.mock',
+      SHEETS_URL: 'https://sheets.mock/exec',
+      SHEETS_SECRET: 'sheet-secret',
+      SHEETS_NOTES: '1',
+      LEAD_AFTER_CONFIRM: '1',
+    });
+  });
+
+  it('gives the page the bot link; the same number shared there is ✅, and only then is the order a Lead', async () => {
+    const submissionId = sid();
+    const res = await order({ submissionId, signals: inBrowser }, { ip: '203.0.113.90' });
+    expect(await res.json()).toMatchObject({ status: 'accepted', confirmUrl: `https://t.me/bionexecobot?start=c_${submissionId}` });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(leads()).toHaveLength(0); // no Lead on arrival any more
+
+    let reply = await say({ text: `/start c_${submissionId}` });
+    expect(reply.text).toMatch(/тасдиқлаш учун/);
+    expect(reply.reply_markup.keyboard![0]![0]).toEqual({ text: '📱 Рақамни юбориш', request_contact: true });
+    reply = await say({ text: '90 312 45 67' }); // typed: proves nothing, asked again
+    expect(reply.text).toMatch(/Рақамни юбориш/);
+    reply = await say({ contact: { phone_number: '998903124567', user_id: 777 } });
+    expect(reply.text).toMatch(/Рақамингиз тасдиқланди/);
+    expect(reply.reply_markup.remove_keyboard).toBe(true);
+
+    expect(telegram.messages.some((m) => String(m.chat_id) === CHAT && m.text.startsWith('✅ <b>Мижоз рақамини Телеграм орқали тасдиқлади'))).toBe(true);
+    await until(() => leads().length > 0);
+    expect(leads()).toHaveLength(1);
+    expect(leads()[0]).toMatchObject({ event_id: submissionId });
+    await until(() => sheets.rows.some((r) => r.action === 'note'));
+    expect(sheets.rows.find((r) => r.action === 'note')).toMatchObject({ number: 1, column: 'Tasdiq' });
+
+    reply = await say({ text: `/start c_${submissionId}` });
+    expect(reply.text).toMatch(/аллақачон тасдиқланган/);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(leads()).toHaveLength(1);
+  });
+
+  it('another Telegram number: the operators get it, and the order is still a Lead', async () => {
+    const submissionId = sid();
+    await order({ submissionId, signals: inBrowser }, { ip: '203.0.113.93' });
+    await say({ text: `/start c_${submissionId}` });
+    const reply = await say({ contact: { phone_number: '998935551122', user_id: 777 } });
+    expect(reply.text).toMatch(/Аризангиз тасдиқланди/);
+    const note = telegram.messages.find((m) => String(m.chat_id) === CHAT && m.text.startsWith('📱'))!;
+    expect(note.text).toContain('+998 93 555 11 22');
+    await until(() => leads().length > 0);
+    expect(leads()).toHaveLength(1);
+  });
+
+  it("refuses someone else's contact, and a link for no order of ours starts the bot's own ordering", async () => {
+    const submissionId = sid();
+    await order({ submissionId, signals: inBrowser }, { ip: '203.0.113.94' });
+    await say({ text: `/start c_${submissionId}` });
+    let reply = await say({ contact: { phone_number: '998903124567', user_id: 999 } });
+    expect(reply.text).toMatch(/ўзингизнинг рақамингизни/);
+    reply = await say({ text: '/start c_3f2c1d4e-5b6a-4c7d-8e9f-999999999999' }, { id: 778, first_name: 'Рустам' });
+    expect(reply.text).toMatch(/^Ассалому алайкум, Рустам!/);
+  });
+
+  it('one phone, another number under another name within a day: «Spam» tab, still in the group; the same name is not', async () => {
+    const one = 'bbbbbbbb-2222-4222-8222-000000000001';
+    const two = 'bbbbbbbb-2222-4222-8222-000000000002';
+    await order({ fullName: 'Шахина Бону', phone: '+998 90 646 86 26', deviceId: one, signals: inBrowser }, { ip: '203.0.113.95' });
+    await order({ fullName: 'Шахина', phone: '+998 50 177 85 85', deviceId: one, signals: inBrowser }, { ip: '203.0.113.95' });
+    await order({ fullName: 'Рустам Алиев', phone: '+998 90 418 27 34', deviceId: two, signals: inBrowser }, { ip: '203.0.113.96' });
+    await order({ fullName: 'рустам алиев', phone: '+998 90 418 27 35', deviceId: two, signals: inBrowser }, { ip: '203.0.113.96' });
+    await until(() => sheets.rows.filter((r) => r.action !== 'note').length >= 4);
+    const tab = (name: string) => sheets.rows.filter((r) => r.sheet === name).map((r) => r.row[2]);
+    expect(tab('Spam')).toEqual(['Шахина']);
+    expect(tab('Lidlar').sort()).toEqual(['Рустам Алиев', 'Шахина Бону', 'рустам алиев'].sort());
+    expect(leadMessages()).toHaveLength(4);
+    expect(leadMessages()[1]!.text).toContain('бошқа исм ва бошқа рақам');
+  });
+});

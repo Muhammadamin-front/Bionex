@@ -77,7 +77,9 @@ function Inner({ children, tone }: { children: ReactNode; tone: Tone }) {
       </span>
       <span
         className={cn(
-          'relative z-20 flex w-full items-center justify-end gap-2 pl-16 pr-5 text-[1.05rem] font-bold tracking-tight transition-colors duration-300',
+          // Under 360 px a three-word label («Батафсил маълумот олиш») broke into three lines and spilled out of the
+          // fixed-height button in the arrival dialog: a little less room for the knob and a little smaller type there.
+          'relative z-20 flex w-full items-center justify-end gap-2 pl-16 pr-5 text-[1.05rem] font-bold leading-tight tracking-tight transition-colors duration-300 max-[359px]:pl-14 max-[359px]:pr-3 max-[359px]:text-[0.95rem]',
           TONES[tone].label,
         )}
       >

@@ -132,4 +132,6 @@ export interface ApiError {
 export interface LeadSubmitResponse {
   status: 'accepted' | 'duplicate';
   message: string;
+  /** Main site, a new order: t.me/<bot>?start=c_<submissionId>, where the customer confirms their number. */
+  confirmUrl?: string;
 }

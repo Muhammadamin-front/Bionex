@@ -114,6 +114,7 @@ const FLAG_TEXT: Record<string, string> = {
   no_captcha: '«бот эмасман» текшируви ўтмади (бот ёки эски телефон бўлиши мумкин)',
   likely_bot: 'Instagram/Facebook орқали эмас — бот эҳтимоли бор (одам ҳам бўлиши мумкин)',
   server_network: 'VPN ёки сервер тармоғидан юборилган (уй интернети ёки мобил алоқа эмас; VPN ёққан одам ҳам бўлиши мумкин)',
+  device_other_number: 'шу телефондан 24 соат ичида бошқа исм ва бошқа рақам билан ариза келган (бировнинг рақами бўлиши мумкин)',
 };
 
 /** The flags an order's group message carried, read back from its saved text (for orders from before the flags were kept apart). */

@@ -522,6 +522,23 @@ export function OrderForm({
       </span>
     </a>
   );
+  /**
+   * The number right under the submit button, seen with the form (owner, 2026-11-22: «telefon raqamni
+   * ko'rinadigan joyga chiqargin»): before, it sat below the payment line and the promises, under the fold
+   * in the arrival dialog. One tap rings; the number itself is in the text, not only behind an icon.
+   */
+  const callUnderButton = site.phone && site.phoneHref && (
+    <div data-part="call" className="sm:col-span-2">
+      <a
+        href={site.phoneHref}
+        className="flex min-h-12 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-2xl border-2 border-forest/25 bg-paper px-3 py-2 text-center font-display text-[1.02rem] font-bold text-forest transition-colors hover:border-forest/50"
+      >
+        <PhoneIcon className="h-5 w-5 flex-none" />
+        <span className="font-semibold text-ink-2">Ёки қўнғироқ қилинг:</span>
+        <span className="whitespace-nowrap tabular-nums">{site.phone}</span>
+      </a>
+    </div>
+  );
 
   if (completed) {
     return (
@@ -750,6 +767,8 @@ export function OrderForm({
           </AntiMetalButton>
         )}
 
+        {callUnderButton}
+
         {/* data-part: a page may restyle or move these (sites/plakat); nothing reads them otherwise. */}
         <p data-part="under-button" className="text-center text-[1.02rem] font-semibold text-ink-2 sm:col-span-2">
           {copy?.underButton ?? 'Мутахассисларимиз 15 дақиқа ичида қўнғироқ қилиб, бепул маслаҳат беради.'}
@@ -763,13 +782,6 @@ export function OrderForm({
             </li>
           ))}
         </ul>
-
-        {callButton && (
-          <div data-part="call" className="sm:col-span-2">
-            <p className="mb-2 text-center text-base text-muted">Ёзишга қийналсангиз, ўзингиз қўнғироқ қилинг:</p>
-            {callButton}
-          </div>
-        )}
 
         <p id={`${id}-privacy`} data-part="privacy" className="text-center text-[0.95rem] leading-relaxed text-muted sm:col-span-2">
           Исмингиз ва рақамингиз фақат сиз билан боғланиш учун ишлатилади.

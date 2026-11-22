@@ -371,9 +371,10 @@ async function takeOrder(request: Request, env: Env, ctx: ExecutionContext, url:
     // The bot's webhook belongs to this Worker's own address, never to the partner site's.
     if (site === 'main') ctx.waitUntil(registry.ensureWebhook(url.origin));
 
-    // Nothing is reported to Meta here, and the browser is never asked to either: a main-site
-    // `Lead` is sent from `reportToMeta` once an operator has rung the customer. One order is
-    // one event, and an order nobody could reach stays unreported.
+    // The thank-you page's link to confirm the number through the bot (main site only: the partner's
+    // orders never reach our bot, principle #2). Without it the page shows what it did before.
+    // Off since 2026-11-22 (owner: «yo'q, bunday qilmaymiz» — a step after the order costs orders): the
+    // bot's confirmation (registry.ts confirmOrder) stays ready, but the page is given no link to it.
     return answer(result.status);
   } catch (err) {
     // Never "accepted" unless it was recorded: anything unexpected is a clear "try again / call".
@@ -634,7 +635,7 @@ async function customerChat(message: TelegramMessage, env: Env, origin: string):
   await callTelegram(cfg, 'sendMessage', { chat_id: message.chat.id, text: reply.text, parse_mode: 'HTML', reply_markup: reply.keyboard });
 }
 
-function answer(status: 'accepted' | 'duplicate'): Response {
-  const body: LeadSubmitResponse = { status, message: MESSAGES[status] };
+function answer(status: 'accepted' | 'duplicate', confirmUrl?: string | null): Response {
+  const body: LeadSubmitResponse = { status, message: MESSAGES[status], ...(confirmUrl ? { confirmUrl } : {}) };
   return json(status === 'accepted' ? 201 : 200, body);
 }

@@ -2,7 +2,7 @@ import { NAME_MESSAGES, PHONE_MESSAGES } from '@bionex/shared/lead';
 import { normalizeName } from '@bionex/shared/name';
 import { formatUzPhone, normalizeUzPhone } from '@bionex/shared/phone';
 import { DurableObject } from 'cloudflare:workers';
-import { askName, askPhone, BOT_TEXT, done, testNotice, welcome, type BotReply } from './bot';
+import { askName, askPhone, BOT_TEXT, confirmDone, done, testNotice, welcome, type BotReply } from './bot';
 import { metaConfig, sendMetaEvent, type MetaUserData } from './meta';
 import { reasonCodes, REPEAT_COLUMN, sendSheetNote, sendSheetOrder, SPAM_SHEET, sheetsConfig, tashkentTime, type SheetLog } from './sheets';
 import { CONCERNS, REGIONS, type ConcernId, type RegionId } from '@bionex/shared/concerns';
@@ -92,7 +92,7 @@ const PARTNER_SHEET_HIDDEN_FLAGS = [...TRAP_FLAGS, 'likely_bot'];
  * place for each order, never both. «Holat» is read from «Lidlar» only, so nothing here reaches Meta
  * until a person copies the row into «Lidlar» (with its №) and sets «Sotildi» / «Kerakli».
  */
-const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device', 'spam_lookalike', 'rushed', 'spam_phone'];
+const MAIN_SPAM_SHEET_FLAGS = [...TRAP_FLAGS, 'no_captcha', 'likely_bot', 'spam_device', 'spam_lookalike', 'rushed', 'spam_phone', 'device_other_number'];
 /**
  * Main-site orders that get NO Lead the moment they arrive (owner, 2026-10-29: every other order is a
  * Lead at once, so the ads keep a signal). Such an order still waits in `meta_pending` (unless it is a
@@ -128,6 +128,16 @@ const META_OUTCOMES: ReadonlySet<LeadOutcome> = new Set<LeadOutcome>(['sold', 'r
  * the operator presses it, is still the one Meta hears about.
  */
 const META_WAIT: ReadonlySet<LeadOutcome> = new Set<LeadOutcome>(['noanswer', 'callback']);
+/**
+ * The order's confirmation through the bot (owner, 2026-11-22: strangers' numbers typed into the form):
+ * the thank-you page sends the phone to t.me/<bot>?start=c_<submissionId>, the customer shares their own
+ * Telegram contact, and the operators see ✅ (or the Telegram number, when it is another one). Written to
+ * the sheet's «Tasdiq» column.
+ */
+const CONFIRM_COLUMN = 'Tasdiq';
+const CONFIRM_START = /^\/start\s+c_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
+/** A name compared by its letters only: «Ойша» = «ойша ✅» = «Ойша 🎁−25%». */
+const nameKey = (name: string) => name.toLowerCase().replace(/[^\p{L}]/gu, '');
 /** Bump when the webhook needs new update types or commands. */
 const WEBHOOK_VERSION = 'v5';
 
@@ -314,6 +324,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!outboxColumns.includes('thread_id')) this.sql.exec('ALTER TABLE outbox ADD COLUMN thread_id INTEGER');
     const sessionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(bot_sessions)').toArray().map((c) => c.name);
     if (!sessionColumns.includes('test')) this.sql.exec('ALTER TABLE bot_sessions ADD COLUMN test INTEGER NOT NULL DEFAULT 0');
+    // The order a confirmation (step 'confirm') is for.
+    if (!sessionColumns.includes('lead_id')) this.sql.exec('ALTER TABLE bot_sessions ADD COLUMN lead_id INTEGER');
     // Orders now stay listable after their 10-order list went out (for /royxat): mark, don't delete.
     // Which order a submission became (main site): the thank-you screen's answer finds its order by it.
     const submissionColumns = this.sql.exec<{ name: string }>('PRAGMA table_info(submissions)').toArray().map((c) => c.name);
@@ -338,6 +350,8 @@ export class LeadRegistry extends DurableObject<Env> {
     if (!listColumns.includes('concern')) this.sql.exec('ALTER TABLE list_items ADD COLUMN concern TEXT');
     // «Қайси вилоятдансиз?», answered on the same screen.
     if (!listColumns.includes('region')) this.sql.exec('ALTER TABLE list_items ADD COLUMN region TEXT');
+    // The customer confirmed the order through the bot (CONFIRM_COLUMN): 1 with the same number, 2 with another.
+    if (!listColumns.includes('confirmed')) this.sql.exec('ALTER TABLE list_items ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0');
     // Orders already written to the «Spam» tab (live or by «/spam N»), so none is written twice.
     this.sql.exec('CREATE TABLE IF NOT EXISTS spam_exported (lead_id INTEGER PRIMARY KEY)');
     // The partner site's orders (acceptPartner): only what repeats and limits need, nothing else.
@@ -499,6 +513,12 @@ export class LeadRegistry extends DurableObject<Env> {
 
     // Operators marked an earlier order from this network or device as spam: say so on this one.
     input = { ...input, flags: [...input.flags, ...this.spamFlags(ipHash, deviceHash, fpHash, phoneHash, now)] };
+    // The same phone, within a day, ordering for another number under another name (owner, 2026-11-22:
+    // №1054 and №1055, one Galaxy S22, a minute apart, two names, two strangers' numbers). A customer
+    // correcting their number keeps their name and is not caught. «Spam» tab, still in the group.
+    if (deviceHash && !input.via && this.otherNumberFromDevice(deviceHash, phoneHash, input.fullName, now)) {
+      input = { ...input, flags: [...input.flags, 'device_other_number'] };
+    }
     // Meta makes a new fbclid for every ad click, so the same one behind an earlier order from another
     // number means the link was copied from an address bar (a real customer forwarding it looks the
     // same): a warning, never a refusal.
@@ -524,7 +544,10 @@ export class LeadRegistry extends DurableObject<Env> {
     if (input.meta && !input.flags.some((f) => TRAP_FLAGS.includes(f))) {
       // A clean order is a Lead at once (owner, 2026-10-29): with Leads only from the sheet the ads
       // had a few signals a day. A suspect one (NO_INSTANT_LEAD_FLAGS) waits for a person.
-      const instant = !input.flags.some((f) => (input.partnerRules ? PARTNER_RULES_NO_LEAD_FLAGS : NO_INSTANT_LEAD_FLAGS).includes(f));
+      // Since 2026-11-22 (LEAD_AFTER_CONFIRM, owner's yes): no Lead on arrival on the main site; it goes when
+      // the customer confirms the number through the bot (confirmOrder) or the sheet says «Kerakli» / «Sotildi».
+      const afterConfirm = this.env.LEAD_AFTER_CONFIRM === '1' && !input.partnerRules;
+      const instant = !afterConfirm && !input.flags.some((f) => (input.partnerRules ? PARTNER_RULES_NO_LEAD_FLAGS : NO_INSTANT_LEAD_FLAGS).includes(f));
       this.sql.exec(
         'INSERT INTO meta_pending (lead_id, event_id, user_data, source_url, at, lead_sent) VALUES (?, ?, ?, ?, ?, ?)',
         leadId,
@@ -831,13 +854,113 @@ export class LeadRegistry extends DurableObject<Env> {
   }
 
   /** The accepted order a submission became, with its thank-you answers so far. */
-  private orderOfSubmission(submissionId: string): { leadId: number; concern: string | null; region: string | null } | null {
+  private orderOfSubmission(submissionId: string): { leadId: number; concern: string | null; region: string | null; confirmed: number } | null {
     const leadId = this.sql
       .exec<{ lead_id: number | null }>("SELECT lead_id FROM submissions WHERE id = ? AND status = 'accepted'", submissionId)
       .toArray()[0]?.lead_id;
     if (!leadId) return null;
-    const item = this.sql.exec<{ concern: string | null; region: string | null }>('SELECT concern, region FROM list_items WHERE lead_id = ?', leadId).toArray()[0];
+    const item = this.sql
+      .exec<{ concern: string | null; region: string | null; confirmed: number }>('SELECT concern, region, confirmed FROM list_items WHERE lead_id = ?', leadId)
+      .toArray()[0];
     return item ? { leadId, ...item } : null;
+  }
+
+  /** Another number under another name from this phone within a day (`device_other_number`). */
+  private otherNumberFromDevice(deviceHash: string, phoneHash: string, name: string, now: number): boolean {
+    const key = nameKey(name);
+    return this.sql
+      .exec<{ name: string | null }>(
+        'SELECT li.name FROM leads l LEFT JOIN list_items li ON li.lead_id = l.id WHERE l.device_hash = ? AND l.phone_hash != ? AND l.at > ?',
+        deviceHash,
+        phoneHash,
+        now - DAY,
+      )
+      .toArray()
+      .some((r) => nameKey(r.name ?? '') !== key);
+  }
+
+  /**
+   * The thank-you page's link to confirm this order through the bot: t.me/<bot>?start=c_<submissionId>.
+   * Null for anything but a main-site order this registry accepted (the partner's orders are never ours, #2).
+   */
+  async confirmLink(submissionId: string): Promise<string | null> {
+    if (!this.orderOfSubmission(submissionId)) return null;
+    const bot = await this.botUsername();
+    return bot ? `https://t.me/${bot}?start=c_${submissionId}` : null;
+  }
+
+  /** The bot's @username, asked of Telegram once and kept. */
+  private async botUsername(): Promise<string | null> {
+    const kept = this.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'bot_username'").toArray()[0]?.v;
+    if (kept) return kept;
+    if (this.env.TELEGRAM_DRY_RUN === '1' || !this.env.TELEGRAM_BOT_TOKEN) return null;
+    try {
+      const me = await callTelegram<{ username?: string }>(this.telegramConfig(), 'getMe', {});
+      if (!me?.username) return null;
+      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('bot_username', ?)", me.username);
+      return me.username;
+    } catch (err) {
+      console.error('getMe failed: no confirmation link this time', (err as Error)?.message);
+      return null;
+    }
+  }
+
+  /**
+   * The customer shared their own Telegram contact for an order. The same number: ✅, the number is theirs.
+   * Another one: they are a real Telegram user who wants the call, and the operators get that number too.
+   * Either way the person is real, so the order's Lead goes to Meta now if it has not gone yet, and an order
+   * that was kept out of the group (a device or number marked spam before) is shown to the operators.
+   */
+  private async confirmOrder(leadId: number, telegramPhone: string, now: number): Promise<'same' | 'other' | 'already' | 'gone'> {
+    const item = this.sql
+      .exec<{ name: string; phone: string; confirmed: number; hidden: number; msg_html: string | null }>(
+        'SELECT name, phone, confirmed, hidden, msg_html FROM list_items WHERE lead_id = ?',
+        leadId,
+      )
+      .toArray()[0];
+    if (!item) return 'gone';
+    if (item.confirmed) return 'already';
+    const same = telegramPhone === item.phone;
+    const shown = telegramPhone.startsWith('+998') ? formatUzPhone(telegramPhone) : telegramPhone;
+    this.sql.exec(
+      'UPDATE list_items SET confirmed = ?, hidden = 0, name = ? WHERE lead_id = ?',
+      same ? 1 : 2,
+      same ? `${item.name} ✅` : `${item.name} 📱${shown}`,
+      leadId,
+    );
+    const line = same
+      ? '✅ <b>Мижоз рақамини Телеграм орқали тасдиқлади</b> — рақам ўзиники.'
+      : `📱 <b>Мижоз Телеграм орқали тасдиқлади, лекин Телеграм рақами бошқа:</b> ${shown}\nФормадаги рақам бошқа одамники бўлиши мумкин — шу рақамга қўнғироқ қилинг.`;
+    // Never posted (SILENT_FLAGS): the order itself now, with the confirmation under its text.
+    if (item.hidden === 2) {
+      if (item.msg_html) this.enqueue(`${item.msg_html}\n\n${line}`, { leadId, now, thread: 'leads' });
+    } else this.enqueue(line, { replyToLead: leadId, now, thread: 'leads' });
+    const sheet = this.env.SHEETS_NOTES === '1' ? sheetsConfig(this.env, 'main') : null;
+    if (sheet) {
+      this.ctx.waitUntil(
+        sendSheetNote(sheet, { number: leadId, column: CONFIRM_COLUMN, value: same ? `✅ ${tashkentTime(now)}` : `Telegram: ${shown}` }),
+      );
+    }
+    const pending = this.sql
+      .exec<{ event_id: string; user_data: string; source_url: string; at: number; lead_sent: number }>(
+        'SELECT event_id, user_data, source_url, at, lead_sent FROM meta_pending WHERE lead_id = ?',
+        leadId,
+      )
+      .toArray()[0];
+    const cfg = pending && !pending.lead_sent && now - pending.at <= META_WINDOW ? metaConfig(this.env) : null;
+    if (pending && cfg) {
+      this.sql.exec('UPDATE meta_pending SET lead_sent = 1 WHERE lead_id = ?', leadId);
+      try {
+        const userData = JSON.parse(pending.user_data) as MetaUserData;
+        this.ctx.waitUntil(
+          this.watchMeta(sendMetaEvent(cfg, { eventName: 'Lead', eventId: pending.event_id, userData, eventTime: pending.at, sourceUrl: pending.source_url })),
+        );
+      } catch {
+        // A row that cannot be read is not worth a guess.
+      }
+    }
+    await this.flush();
+    return same ? 'same' : 'other';
   }
 
   /** The main dataset refused or never got an event: Leads are being lost, so the group hears of it (hourly at most). */
@@ -1459,6 +1582,36 @@ export class LeadRegistry extends DurableObject<Env> {
         test ? 1 : 0,
       );
     const text = input.text?.trim() ?? '';
+
+    // From the thank-you page: confirm that order with the customer's own Telegram contact.
+    const confirmFor = CONFIRM_START.exec(text);
+    if (confirmFor) {
+      const order = this.orderOfSubmission(confirmFor[1]!.toLowerCase());
+      if (order?.confirmed) return confirmDone(BOT_TEXT.confirmAlready);
+      if (order) {
+        this.sql.exec(
+          "INSERT OR REPLACE INTO bot_sessions (user_id, step, phone, verified, updated_at, test, lead_id) VALUES (?, 'confirm', NULL, 0, ?, 0, ?)",
+          userId,
+          now,
+          order.leadId,
+        );
+        return askPhone(BOT_TEXT.confirmWelcome);
+      }
+      // Gone (older than a week) or never ours: the bot's own ordering, as for a plain Start.
+    }
+    if (session?.step === 'confirm' && !/^\/start\b/i.test(text)) {
+      const leadId = this.sql.exec<{ lead_id: number | null }>('SELECT lead_id FROM bot_sessions WHERE user_id = ?', userId).toArray()[0]?.lead_id;
+      // Only a shared contact proves the number: a typed one is what the form already had.
+      if (!input.contact) return askPhone(BOT_TEXT.confirmAgain);
+      if (input.contact.ownerId !== userId) return askPhone(BOT_TEXT.notOwnContact);
+      this.sql.exec('DELETE FROM bot_sessions WHERE user_id = ?', userId);
+      const raw = input.contact.phone.startsWith('+') ? input.contact.phone : `+${input.contact.phone}`;
+      const phone = normalizeUzPhone(raw);
+      const outcome = leadId ? await this.confirmOrder(leadId, phone.ok ? phone.e164 : raw.replace(/[^\d+]/g, ''), now) : 'gone';
+      return confirmDone(
+        outcome === 'same' ? BOT_TEXT.confirmSame : outcome === 'other' ? BOT_TEXT.confirmOther : outcome === 'already' ? BOT_TEXT.confirmAlready : BOT_TEXT.confirmGone,
+      );
+    }
 
     if (/^\/start\b/i.test(text) || !session) {
       // t.me/<bot>?start=test arrives as "/start test": a dry run that creates no order.

@@ -355,9 +355,6 @@ body {
 .plakat [data-part='privacy'] {
   font-size: 1rem;
 }
-.plakat [data-part='call'] a span span {
-  white-space: nowrap;
-}
 
 /* ---------- steps 2 and 3 ---------- */
 .plakat-next {

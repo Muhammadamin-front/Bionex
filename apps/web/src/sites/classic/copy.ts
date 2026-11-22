@@ -19,9 +19,12 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const ORDER_FAQ = 'Буюртма берсам нима бўлади?';
 
 export const MAIN_COPY: PageCopy = {
-  submit: 'Зейнарага ариза қолдириш',
-  sectionButton: 'Зейнарага ариза қолдириш',
-  bar: 'Ариза қолдириш',
+  // «Батафсил маълумот олиш» again (owner, 2026-11-22). Meta once had an automatic-events rule on exactly this
+  // text that sent a Lead for every press (#27); it was deleted, and the Pixel's config has no `estRules` now.
+  // Never turn on Events Manager's «track events automatically without code».
+  submit: 'Батафсил маълумот олиш',
+  sectionButton: 'Батафсил маълумот олиш',
+  bar: 'Батафсил маълумот олиш',
   underButton: `Олдиндан тўлов йўқ. ${cap(WHOS)} ${HOURS} қўнғироқ қилиб, манзилингизни аниқлайди.`,
   numberCheck: (phone) => `${cap(WHO)} шу рақамга қўнғироқ қилади: ${formatUzPhone(phone)}. Рақамингиз тўғрими?`,
   thanks: {

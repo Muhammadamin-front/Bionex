@@ -52,6 +52,18 @@ export const BOT_TEXT = {
     '🧪 Синов тугади. Мижоз шу жойда «✅ Буюртмангиз қабул қилинди» деган жавобни кўради.\n\n' +
     'Гуруҳнинг «📊 Ҳисобот» мавзусига синов хабари тушди. Ҳақиқий буюртма яратилмади.',
   testLimited: '🧪 Бугун синов кўп бўлди. Эртага қайта уриниб кўринг.',
+  // Confirming a website order (registry.ts confirmOrder): one tap, then a thank-you with the channel.
+  confirmWelcome:
+    'Ассалому алайкум! 👋\n\nАризангиз қабул қилинди. Уни тасдиқлаш учун пастдаги «📱 Рақамни юбориш» тугмасини босинг.\n\n' +
+    'Тасдиқланган аризаларга мутахассисимиз биринчи бўлиб қўнғироқ қилади.',
+  confirmAgain: 'Илтимос, пастдаги «📱 Рақамни юбориш» тугмасини босинг — шу билан аризангиз тасдиқланади.',
+  confirmSame:
+    '✅ Раҳмат! Рақамингиз тасдиқланди.\n\nМутахассисимиз 9:00–21:00 оралиғида қўнғироқ қилади. Телефонингизни ёнингизда сақланг.\n\n' +
+    'Телеграм каналимиз: t.me/zeynare',
+  confirmOther:
+    '✅ Раҳмат! Аризангиз тасдиқланди.\n\nМутахассисимиз 9:00–21:00 оралиғида сизга қўнғироқ қилади.\n\nТелеграм каналимиз: t.me/zeynare',
+  confirmAlready: '✅ Аризангиз аллақачон тасдиқланган. Мутахассисимиз тез орада қўнғироқ қилади.',
+  confirmGone: 'Аризангиз топилмади. Янги ариза қолдириш учун /start ни босинг.',
 };
 
 /** What the operators see for a test run: clearly not an order, nothing to call. */
@@ -84,4 +96,9 @@ export function askName(suggested: string | null): BotReply {
 
 export function done(text: string): BotReply {
   return { text: `${text}\n\n${BOT_TEXT.again}`, keyboard: { remove_keyboard: true } };
+}
+
+/** The end of a confirmation: the share button goes away, and nothing more is asked. */
+export function confirmDone(text: string): BotReply {
+  return { text, keyboard: { remove_keyboard: true } };
 }
